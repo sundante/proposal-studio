@@ -94,6 +94,7 @@ proposal-studio/
 ├── src/studio/
 │   ├── __init__.py
 │   ├── config.py            # load/validate YAML (pydantic), env overrides
+│   ├── models.py            # shared pydantic models (Cite, …)
 │   ├── llm.py               # Ollama client wrapper
 │   ├── guards.py            # cloud-model block, PHI scan, path sandbox
 │   ├── session.py           # per-chat state (active opportunity, last outputs)
@@ -234,6 +235,7 @@ JSON under `workspace/.sessions/`. Survives Open WebUI restarts.
   user-facing message when Ollama isn't running or the model isn't pulled (`ollama pull <model>`).
 - A **single-flight lock**: only one generation at a time (16 GB machine). Queue others, emit
   "waiting for model…" status.
+- All callers depend on an `LLMClient` Protocol (see DECISIONS.md), so `FakeLLM` can stand in.
 - `FakeLLM` in tests returns canned structured outputs keyed by schema name.
 
 ---
