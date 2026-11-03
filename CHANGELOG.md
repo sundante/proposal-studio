@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `/agent <name> <task>` and `studio agent`: sandboxed local agent CLIs (OpenCode, Claude Code
+  via Ollama; Hermes disabled until verified) with plan in a throwaway copy → approve → apply →
+  diff → approve copy-back, isolated HOME, env allowlist, timeouts and logs; "Agent · …"
+  models in Open WebUI (`owui/agents_pipe.py`); `docs/agents.md`.
 - Open WebUI integration: the **Proposal Studio** pipe (`owui/router_pipe.py`) with Valves,
   attachments → `/ingest`, confirmation dialog, and download links for PPTX/XLSX/reports; a PHI
   warning inlet filter (`owui/phi_filter.py`); slash-command Prompts (`owui/prompts/`).

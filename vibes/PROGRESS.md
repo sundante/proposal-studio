@@ -10,7 +10,7 @@
 | 5 | Offline research | ✅ done | 9e1ede5 |
 | 6 | Router core | ✅ done | 59b888f |
 | 7 | Open WebUI integration + setup scripts | ✅ done | 2b4e1b9 |
-| 8 | Agents route | ⬜ todo | |
+| 8 | Agents route | ✅ done | 0761ec7 |
 | 9 | Hardening + docs | ⬜ todo | |
 | 10 | Release pipeline + v0.1.0 | ⬜ todo | |
 
@@ -18,7 +18,7 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 8 — Agents route
+- Next step: Phase 9 — Hardening + docs
 
 ## Known issues
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side; the
@@ -37,3 +37,5 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - The Open WebUI pipe was verified via its HTTP API; the browser confirmation dialog (needs a
   live browser session) and the light-theme step are untested manually.
 - If the Ollama tray app is already running, `offline.env`'s `OLLAMA_*` settings don't apply.
+- Agent runs with qwen3:8b are slow (30–70 s per step here) and the model often doesn't use its
+  file tools; Hermes is disabled until a live offline run is verified.

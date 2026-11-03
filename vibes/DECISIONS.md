@@ -324,3 +324,45 @@ Format:
   - download link serves the PPTX (200, correct MIME type)
   - no non-local network requests in the log
 - Spec impact: none.
+
+## 2026-11-03 — VERIFY: agent CLI headless modes  (Phase 8)
+- Context: §10 requires checking each CLI before writing its adapter. Installed opencode-ai
+  1.19.5 and @anthropic-ai/claude-code 2.1.317 into a scratch npm prefix, plus hermes-agent
+  0.19.0 (wheel source read only: the sandbox blocked running third-party code from PyPI).
+- Findings:
+  1. **OpenCode** headless: `opencode run --agent plan|build --model ollama/<model>
+     --dir <workdir> "<prompt>"` (`--format json` exists, `--auto` auto-approves
+     permissions). Local Ollama works through a project `opencode.json` provider
+     (`@ai-sdk/openai-compatible`, `baseURL http://localhost:11434/v1`, bundled — no npm
+     download). The built-in `plan` agent denies edits but *allows bash*, so our config denies
+     bash. Network: by default it downloads the models.dev catalogue (6 MB); these env vars
+     stop that and other fetches (all verified in the binary, run tested offline):
+     `OPENCODE_DISABLE_MODELS_FETCH`, `_AUTOUPDATE`, `_LSP_DOWNLOAD`, `_DEFAULT_PLUGINS`,
+     `_EXTERNAL_SKILLS`, `_CLAUDE_CODE` (don't read ~/.claude); config `share: disabled`,
+     `autoupdate: false`. Real plan run against qwen3:8b: 42–67 s.
+  2. **Claude Code** headless: `claude -p "<prompt>" --model <model> --permission-mode
+     plan|acceptEdits --output-format text|json|stream-json`; also `--restricted` (no
+     shell/code tools), `--strict-mcp-config`, `--no-session-persistence`. Ollama 0.40 serves
+     the Anthropic Messages API (`/v1/messages`), so `ANTHROPIC_BASE_URL=http://localhost:11434`
+     + `ANTHROPIC_AUTH_TOKEN=ollama` + `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` +
+     `DISABLE_AUTOUPDATER=1` works (real plan run: 28 s). It warns that it doesn't know the
+     model's context window (harmless). It is run with an isolated HOME so it can't read the
+     user's real Claude credentials/settings.
+  3. **Hermes Agent**: scriptable entry point `hermes-agent --query "<prompt>" --model <m>
+     --base_url http://localhost:11434/v1 --api_key ollama --max_turns N
+     --enabled_toolsets file` (python-fire flags). It has no read-only mode (its "safe"
+     toolset includes web access), and a live run could not be verified here → shipped
+     **disabled** in `agents.yaml` with these source-derived flags, to enable after testing.
+  4. With qwen3:8b, both agents often fail to use their file tools and ask for clarification:
+     agent runs on this hardware are slow and of limited quality (warned in chat).
+- Decision:
+  - The **plan step always runs in a throwaway copy** of the sandbox (discarded after), so
+    even agents without a true read-only mode can't change anything while planning.
+  - **Apply** runs in a fresh working copy. The diff is shown, and changed files are copied
+    back to the opportunity only after a second approval. A changed `deck.json` must still
+    validate as a `Deck`.
+  - Shell access is denied by default (opencode `bash: deny`, Claude Code `--restricted`); a
+    user can relax this in `agents.yaml`.
+  - Each run gets an isolated HOME/USERPROFILE inside the sandbox and an allowlisted
+    environment (no inherited API keys or secrets).
+- Spec impact: §10.1 flags replaced by the verified ones; Hermes disabled by default.
