@@ -35,6 +35,10 @@ def test_public_paths_allowed(path: str) -> None:
     assert not guard.is_private(path)
 
 
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / ".git").exists(),
+    reason="needs a git checkout (the release bundle itself has no .git)",
+)
 def test_release_bundle_contains_only_public_files(tmp_path) -> None:
     import importlib.util as iu
     import zipfile
