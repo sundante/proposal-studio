@@ -13,6 +13,11 @@ models in [Ollama](https://ollama.com).
 - Deterministic Python routing. LLMs only do narrow, schema-constrained jobs. Formatting never
   goes through an LLM.
 
+## Install
+
+See [docs/install.md](docs/install.md): run `scripts/setup` once while online, then
+`scripts/start` and open http://localhost:8080 (pick the **Proposal Studio** model).
+
 ## Development
 
 ```bash
