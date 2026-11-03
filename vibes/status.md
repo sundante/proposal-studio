@@ -1,6 +1,6 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-03 · Branch `dev` · 6 of 11 phases done · 155 tests passing_
+_Last updated: 2026-11-03 · Branch `dev` · 7 of 11 phases done · 169 tests passing_
 
 Proposal Studio is a fully local, offline proposal workbench. It turns RFP documents into an
 AI-practice proposal deck on the user's own PowerPoint template, answers RFP questions with
@@ -19,13 +19,15 @@ reasoning behind each deviation is in [DECISIONS.md](DECISIONS.md).
 | 3 | Template inspector + PPTX renderer (no LLM) | ✅ done |
 | 4 | Blocks, storyline, deck writer | ✅ done |
 | 5 | Offline research | ✅ done |
-| 6 | Router core | ⬜ next |
-| 7–10 | Open WebUI, agents, hardening, release | ⬜ todo |
+| 6 | Router core + `studio chat` | ✅ done |
+| 7 | Open WebUI integration + setup scripts | ⬜ next |
+| 8–10 | Agents, hardening, release | ⬜ todo |
 
-What a user can do today, from the command line (there is no chat UI until Phase 7):
+What a user can do today, from the command line or the `studio chat` REPL (the Open WebUI chat arrives in Phase 7):
 
 ```bash
 studio doctor                                   # checks Python, config, workspace, Ollama, models
+studio chat                                     # chat REPL: /commands or plain text, auto-routed
 studio new acme-demo "Acme Health Plan AI RFP"  # create an opportunity
 studio ingest rfp.pdf addendum.docx             # PHI-scanned, indexed, incremental
 studio ask "When are proposals due?"            # cited answer, or "Not found in the RFP."
@@ -170,6 +172,23 @@ studio config set worker.model qwen3:4b         # runtime override; cloud models
   docs took 5 LLM calls in ~1 min 18 s. The findings cited all three sources correctly, and the
   gap round wasn't needed.
 
+### Phase 6 — Router core + `studio chat`
+- **`studio/router.py`:** one async `Router.handle(message, attachments, session, emit)`. It
+  parses every `/command` and alias (unknown ones get "Did you mean `/deck`?"), and handles
+  plain text with rules first (attachments, keywords, "?" with an indexed RFP), then the
+  `router` model's classifier, then a clarifying question below the confidence threshold.
+- **Confirmation:** `/render`, `/harvest` and `/agent` never auto-run. They wait for
+  `/approve` / `/reject`, and PHI warnings on ingest use the same mechanism.
+- **Every reply** starts with `→ routed to /x (rules | classifier, 0.95 | command)` and ends
+  with "Next:". Sessions are per chat id and persisted.
+- **Threading:** work runs in a worker thread, so the async host never blocks. Chunks stream
+  back, and status callbacks become Open WebUI-style status events.
+- **Shared views:** `studio/views.py` gives the CLI and chat the same output.
+- **`studio chat`:** a REPL with `:attach <file>` and `:quit`.
+- **Real run:** "When are proposals due?" went to `/ask` by rules, first answer text in 8.5 s
+  and cited. Classifier routing took 1–2 s (budget: under 15 s). "make the powerpoint" was held
+  until `/approve`, then rendered with 0 QA errors.
+
 ## Verified on a real model
 Local Ollama with qwen3:8b and nomic-embed-text, on the synthetic Acme Health Plan RFP:
 
@@ -223,12 +242,13 @@ Problems that real runs exposed and that are now fixed in code:
 - Rendered decks have only been checked structurally. No LibreOffice here, and Quick Look hangs
   headless, so open the CI `sample-deck` artifact in PowerPoint once to check it by eye.
 
-## Next up — Phase 6
-Router core (`studio/router.py`):
-- every chat command plus aliases, through a single `handle(message, attachments, session,
-  emit)` entry point
-- auto-routing: rules first, then the classifier, then a clarifying question when confidence
-  is low
-- file-writing routes (`/render`, `/agent`, `/harvest`) never auto-run without confirmation
-- a "→ routed to …" status line and "Next:" hints
-- a `studio chat` REPL
+## Next up — Phase 7
+Open WebUI integration and setup scripts:
+- **VERIFY first** against the installed `open-webui`: Pipe/Filter structure,
+  Valves/UserValves, `__event_emitter__` status, `__event_call__` confirmation, how attached
+  files reach a pipe, how to return a downloadable file, the Prompt import format, and the
+  offline/telemetry env vars.
+- **Build:** `owui/router_pipe.py` (wrapping `Router.handle`), `owui/phi_filter.py`,
+  `owui/prompts/*.json`.
+- **Scripts:** `setup.ps1` / `start.ps1` / `smoke_test.ps1`, plus `.sh` equivalents.
+- **Docs:** `docs/install.md`.

@@ -8,7 +8,7 @@
 | 3 | Template inspector + renderer | ✅ done | f68e3e1 |
 | 4 | Blocks, storyline, deck writer | ✅ done | cb2b909 |
 | 5 | Offline research | ✅ done | 9e1ede5 |
-| 6 | Router core | ⬜ todo | |
+| 6 | Router core | ✅ done | 59b888f |
 | 7 | Open WebUI integration + setup scripts | ⬜ todo | |
 | 8 | Agents route | ⬜ todo | |
 | 9 | Hardening + docs | ⬜ todo | |
@@ -18,7 +18,7 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 6 — Router core
+- Next step: Phase 7 — Open WebUI integration + setup scripts
 
 ## Known issues
 - Ollama keeps the embed model and worker loaded together unless `OLLAMA_MAX_LOADED_MODELS=1`

@@ -202,3 +202,32 @@ Format:
      `workspace/<opp>/research/`. Reports never overwrite (`-2`, `-3`…).
 - Why: Bounded, testable research on a 16 GB CPU-only machine.
 - Spec impact: §3 adds `config/research.yaml`.
+
+## 2026-11-03 — Router choices  (Phase 6)
+- Context: Building §5 (commands, auto-routing, sessions) and a `studio chat` REPL; tested on
+  qwen3:4b (router) / qwen3:8b (worker).
+- Decision:
+  1. `studio/views.py` holds the text formatting shared by the CLI and the router, so
+     `studio <cmd>` and `/<cmd>` say the same thing.
+  2. Extra commands beyond §5.1: `/approve` (`/yes`) and `/reject` (`/no`) — the confirmation
+     fallback for routes in `confirm_routes` and for PHI warnings — and `/library index|status`
+     (needed by `/research`). `/agent` is a placeholder until Phase 8.
+  3. `Router.handle()` runs routing + the handler in a worker thread and bridges chunks and
+     status callbacks through an asyncio queue, so sync httpx/LLM work never blocks the event
+     loop. Status events use the Open WebUI shape
+     `{"type": "status", "data": {"description", "done"}}` (verify in Phase 7).
+  4. Rules before the classifier: attachments-only → `/ingest`; `routes.keywords` → route;
+     "?" with an indexed active RFP → `/ask`. The classifier (`router` role,
+     `RouteDecision{route, alternative, confidence, args}`) excludes session/meta commands.
+     Below `auto_threshold` → "Did you mean `/x` or `/y`?". Classifier failure → clarification.
+  5. Pending confirmations live in `session.last_outputs["pending"]` (command, args,
+     attachments) and survive restarts with the session.
+  6. Path policy: typed paths in `/ingest` work only when `allow_local_paths` (the REPL);
+     the chat UI must use attachments.
+  7. `deck` keywords narrowed (a bare "slide " would send "which slide covers X?" into a
+     multi-minute deck rewrite).
+  8. Auto-routed `/digest` shows the saved digest when it is current; only an explicit
+     `/digest` rebuilds (a real run rebuilt it for "summarise the requirements": 116 s).
+- Why: Deterministic, transparent routing that never surprises the user with slow or
+  file-writing work.
+- Spec impact: §5.1 gains `/approve`, `/reject`, `/library`.

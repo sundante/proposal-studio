@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Chat router: every command and alias, auto-routing (rules → classifier → clarification),
+  confirmation for file-writing routes (`/approve`, `/reject`), route status line, "Next:"
+  hints, per-chat sessions; async `Router.handle()` with streaming and status events.
+- `studio chat` REPL over the router (`:attach <file>`, `:quit`).
 - `/research`: offline multi-step research over `library/` and the active RFP (plan,
   multi-query retrieval, cited findings, one gap round, synthesis) with a hard LLM-call cap;
   reports saved as markdown.
