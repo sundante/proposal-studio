@@ -1,6 +1,7 @@
-"""Generate a synthetic "Acme Health Plan" RFP as PDF, DOCX, XLSX and PPTX.
+"""Synthetic sample documents: a fictional "Acme Health Plan" RFP as PDF, DOCX, XLSX and PPTX.
 
-All content is fictional. Usage: ``python -m tests.fixtures.make_rfp OUTDIR``.
+Used by the tests and by ``studio smoke`` (end-to-end check on a real install). All content is
+fictional. Usage: ``python -m studio.samples OUTDIR``.
 """
 
 from __future__ import annotations
