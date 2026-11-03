@@ -183,8 +183,13 @@ class PipeBridge:
         event_call: Emit | None = None,
         task: str | None = None,
         default_opportunity: str = "",
+        agent: str | None = None,
     ) -> AsyncIterator[str]:
-        """Stream the reply for the latest user message."""
+        """Stream the reply for the latest user message.
+
+        With ``agent`` (the "Agent · …" models), plain text becomes ``/agent <agent> <text>``;
+        `/commands` such as `/approve` still work as typed.
+        """
         if task:  # title/tag/follow-up generation: not ours to answer
             return
         if not (self.root / "config").is_dir():
@@ -199,6 +204,8 @@ class PipeBridge:
             sess.active_opp = default_opportunity
         sess.last_outputs.pop("produced", None)
         text = extract_user_text(body)
+        if agent and text and not text.startswith("/"):
+            text = f"/agent {agent} {text}"
 
         with tempfile.TemporaryDirectory(prefix="studio-owui-") as tmp:
             attachments, notes = await materialize_files(files, Path(tmp), self.resolver)
@@ -243,9 +250,28 @@ class PipeBridge:
 
 FUNCTIONS = (  # (function id, file in owui/, display name)
     ("proposal_studio", "router_pipe.py", "Proposal Studio"),
+    ("proposal_studio_agents", "agents_pipe.py", "Proposal Studio Agents"),
     ("proposal_studio_phi", "phi_filter.py", "Proposal Studio PHI warning"),
 )
 SKIP_PROMPTS = {"approve", "reject"}  # typed rarely; the confirmation dialog covers them
+
+
+def agent_models(root: Path) -> list[dict[str, str]]:
+    """Manifold entries: one "Agent · <label>" model per enabled agent in agents.yaml."""
+    try:
+        agents = cfgmod.load_config(root).agents.agents
+    except cfgmod.ConfigError:
+        return []
+    return [
+        {"id": name, "name": f"Agent · {spec.label}"}
+        for name, spec in agents.items()
+        if spec.enabled
+    ]
+
+
+def agent_from_model(model_id: str) -> str:
+    """``proposal_studio_agents.opencode`` → ``opencode``."""
+    return model_id.split(".", 1)[1] if "." in model_id else model_id
 
 
 def prompt_entries(routes: cfgmod.RoutesConfig) -> list[dict[str, str]]:

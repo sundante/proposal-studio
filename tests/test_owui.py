@@ -337,3 +337,29 @@ def test_confirmation_error_never_approves(home: Path) -> None:
     assert "Running `/render`" not in out and "type `/approve`" in out
     sess = b.router.session(session_key("chat", {"id": "u1"}))
     assert sess.last_outputs["pending"]["command"] == "render"  # still waiting
+
+
+def test_agents_manifold_lists_enabled_agents(home: Path) -> None:
+    from studio.owui import agent_from_model, agent_models
+
+    models = agent_models(home)
+    assert {"id": "opencode", "name": "Agent · OpenCode (local)"} in models
+    assert all(m["id"] != "hermes" for m in models)  # disabled by default
+    assert agent_from_model("proposal_studio_agents.opencode") == "opencode"
+    pipe = load_function("agents_pipe.py")["Pipe"]()
+    pipe.valves = pipe.Valves(STUDIO_HOME=str(home))
+    assert pipe.pipes() == models
+    assert not (REPO_ROOT / "owui" / "agents_pipe.py").read_text().count("requirements:")
+
+
+def test_bridge_agent_prefix(home: Path) -> None:
+    b = bridge(home, fake_llm(), [])
+    collect(b, "/new acme")
+
+    async def run(text):
+        return "".join(
+            [c async for c in b.run(body(text), user={"id": "u1"}, chat_id="chat", agent="hermes")]
+        )
+
+    assert "→ routed to /agent (command)" in asyncio.run(run("tighten the deck"))
+    assert "Nothing is waiting" in asyncio.run(run("/approve"))  # commands pass through
