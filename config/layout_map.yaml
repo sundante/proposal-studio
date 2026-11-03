@@ -1,5 +1,31 @@
-# slide_type -> template layout + placeholder mapping (filled in Phase 3).
-# Run `studio template inspect templates/<file>` to list your template's layouts and placeholders.
-template: templates/sample/sample.pptx
-limits: { title: 70, bullet: 110, min_bullets: 3, max_bullets: 5 }
-layouts: {}
+# slide_type -> template layout + placeholder mapping, used by `/render`.
+# Run `studio template inspect templates/<file>` to list your template's layout names and
+# placeholder idx values, then point each slide_type at a layout and each field at a placeholder
+# (by idx number or by placeholder name). See docs/templates.md (Phase 9).
+template: templates/sample/proposal-sample.pptx
+remove_existing_slides: true # drop slides already in the template (examples, instructions)
+limits:
+  title: 70
+  subtitle: 120
+  bullet: 110
+  min_bullets: 3
+  max_bullets: 5
+  layer: 30
+  component: 40
+  max_layers: 6
+  max_components: 6
+  notes: 2000
+layouts:
+  title: { layout: Title Slide, placeholders: { title: 0, subtitle: 1 } }
+  understanding: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  before_after:
+    layout: Comparison
+    placeholders: { title: 0, before_title: 1, before: 2, after_title: 3, after: 4 }
+  solution_architecture: { layout: Title Only, placeholders: { title: 0 } } # layers drawn as shapes
+  ai_enablement: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  platform: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  governance: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  maturity: { layout: Title and Content, placeholders: { title: 0, stages: 1 } }
+  practice_leadership: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  why_us: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  next_steps: { layout: Title and Content, placeholders: { title: 0, steps: 1 } }

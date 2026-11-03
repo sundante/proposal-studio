@@ -139,12 +139,66 @@ class StorylineConfig(_Strict):
     slides: list[StorySlide]
 
 
+class Limits(_Strict):
+    """Hard text limits for slide fields (characters / item counts)."""
+
+    title: int = Field(default=70, gt=0)
+    subtitle: int = Field(default=120, gt=0)
+    bullet: int = Field(default=110, gt=0)
+    min_bullets: int = Field(default=3, ge=0)
+    max_bullets: int = Field(default=5, gt=0)
+    layer: int = Field(default=30, gt=0)
+    component: int = Field(default=40, gt=0)
+    max_layers: int = Field(default=6, gt=0)
+    max_components: int = Field(default=6, gt=0)
+    notes: int = Field(default=2000, gt=0)
+
+    @model_validator(mode="after")
+    def _check_counts(self) -> Limits:
+        if self.min_bullets > self.max_bullets:
+            raise ValueError("min_bullets must not exceed max_bullets")
+        return self
+
+
+class DiagramArea(_Strict):
+    """Box (inches from the top-left) the architecture diagram is drawn in."""
+
+    left: float = Field(ge=0)
+    top: float = Field(ge=0)
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+
+
+class LayoutSpec(_Strict):
+    """How one slide_type maps onto a template layout."""
+
+    layout: str
+    placeholders: dict[str, int | str] = Field(default_factory=dict)
+    limits: dict[str, int] = Field(default_factory=dict)
+    diagram_area: DiagramArea | None = None
+
+    @model_validator(mode="after")
+    def _check_limit_keys(self) -> LayoutSpec:
+        unknown = set(self.limits) - set(Limits.model_fields)
+        if unknown:
+            raise ValueError(f"unknown limit keys: {', '.join(sorted(unknown))}")
+        return self
+
+
 class LayoutMapConfig(_Strict):
-    """Template path, text limits and slide_type → layout mapping (detailed in Phase 3)."""
+    """Template path, text limits and slide_type → layout + placeholder mapping."""
 
     template: str
-    limits: dict[str, int] = Field(default_factory=dict)
-    layouts: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    remove_existing_slides: bool = True
+    limits: Limits = Field(default_factory=Limits)
+    layouts: dict[str, LayoutSpec] = Field(default_factory=dict)
+
+    def limits_for(self, slide_type: str) -> Limits:
+        """Global limits with the slide type's overrides applied."""
+        spec = self.layouts.get(slide_type)
+        if not spec or not spec.limits:
+            return self.limits
+        return Limits.model_validate({**self.limits.model_dump(), **spec.limits})
 
 
 # --- rag.yaml -------------------------------------------------------------------------------
