@@ -1,7 +1,7 @@
-# Commands, aliases, auto-route keywords and thresholds (router: Phase 6).
+# Commands, aliases, auto-route keywords and thresholds for the chat router.
 auto_route: true
-auto_threshold: 0.7
-confirm_routes: [render, agent, harvest] # never auto-run; need explicit command or confirmation
+auto_threshold: 0.7 # classifier confidence below this → ask a clarifying question
+confirm_routes: [render, agent, harvest] # never auto-run; need the explicit command or /approve
 commands:
   help: { route: meta, help: "List commands with examples" }
   new: { route: session, help: "Create an opportunity: /new <opp-id> [title]" }
@@ -9,28 +9,39 @@ commands:
   status: { route: session, help: "Show active opportunity and pipeline status" }
   ingest: { route: ingest, help: "Ingest attached files (or input/) and build the index" }
   ask: { route: rag, help: "Answer from the active RFP with citations: /ask <question>" }
-  digest: { route: digest, help: "Build or refresh digest.json and show a summary" }
-  harvest: { route: blocks, help: "Extract reusable blocks from library/proposals" }
+  digest: { route: digest, help: "Build or refresh the RFP digest: /digest [xlsx] [show]" }
+  harvest: { route: blocks, help: "Extract blocks from library/proposals: /harvest [client, …]" }
   blocks: { route: blocks, help: "Search or list blocks: /blocks [query]" }
-  outline: { route: deck, help: "Build outline.json from the storyline and digest" }
+  outline: { route: deck, help: "Decide which storyline slides go in the deck, and why" }
   toggle: { route: deck, help: "Turn an optional slide on/off: /toggle <slide_id> on|off" }
   deck: { route: deck, help: "Write deck.json (all slides or one): /deck [slide_id]" }
   edit: { route: deck, help: "Revise one slide: /edit <slide_id> <instruction>" }
   render: { route: render, help: "Build the PPTX on your template and show a QA report" }
   research: { route: research, help: "Offline research over library/: /research <question>" }
+  library: { route: research, help: "Index the local library: /library index|status" }
   agent: { route: agents, help: "Run an agent CLI in the sandbox: /agent <name> <task>" }
   config: { route: meta, help: "Show or change config: /config [set <key> <value> | reset]" }
+  approve: { route: meta, help: "Run the action waiting for confirmation" }
+  reject: { route: meta, help: "Cancel the action waiting for confirmation" }
 aliases:
   q: ask
   r: render
   d: digest
   h: help
-keywords:
+  "yes": approve
+  "no": reject
+keywords: # rules routing: any keyword in the message picks the route (no LLM)
   render: [render, pptx, powerpoint]
-  deck: ["slide ", "write the deck"]
+  deck: [write the deck, build the deck, generate the deck, draft the slides]
   digest: [digest, summarise the rfp, summarize the rfp]
   research: [research]
-examples:
+  harvest: [harvest]
+examples: # few-shot examples for the classifier
   - { text: "what is the submission deadline?", route: ask }
+  - { text: "does the RFP require HITRUST certification", route: ask }
   - { text: "build the slides", route: deck }
   - { text: "summarize this rfp", route: digest }
+  - { text: "list the mandatory requirements", route: digest }
+  - { text: "what have we said about MLOps in past proposals", route: research }
+  - { text: "which slides will be in the deck", route: outline }
+  - { text: "where are we with this opportunity", route: status }
