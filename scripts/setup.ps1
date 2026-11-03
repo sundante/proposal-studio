@@ -6,6 +6,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 $OpenWebUIVersion = if ($env:OPEN_WEBUI_VERSION) { $env:OPEN_WEBUI_VERSION } else { '0.13.0' }
 $Problems = New-Object System.Collections.Generic.List[string]
+$SkipModels = $false
 $Py = Join-Path $Root '.venv\Scripts\python.exe'
 
 function Find-Python {
@@ -48,7 +49,12 @@ if (-not (Install-Package @("open-webui==$OpenWebUIVersion"))) { $Problems.Add('
 if (-not (Install-Package @('-e', $Root))) { $Problems.Add('pip install studio failed') }
 
 $Ollama = (Get-Command ollama -ErrorAction SilentlyContinue).Source
-if (-not $Ollama) {
+if ($env:STUDIO_SKIP_MODELS -eq '1') {
+    Write-Host 'STUDIO_SKIP_MODELS=1: skipping Ollama and model downloads.'
+    $Ollama = $null
+    $SkipModels = $true
+}
+if (-not $Ollama -and -not $SkipModels) {
     $candidate = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
     if (Test-Path $candidate) { $Ollama = $candidate }
 }
@@ -68,7 +74,7 @@ if ($Ollama) {
             if ($LASTEXITCODE -ne 0) { $Problems.Add("ollama pull $m failed") }
         }
     }
-} else {
+} elseif (-not $SkipModels) {
     $Problems.Add('Ollama not found: install it for your user from https://ollama.com (no admin), then re-run')
 }
 

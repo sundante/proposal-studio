@@ -37,7 +37,9 @@ echo "Installing open-webui==$OPEN_WEBUI_VERSION and studio (this can take a whi
 pip_install "open-webui==$OPEN_WEBUI_VERSION" || problems+=("pip install open-webui failed")
 pip_install -e "$ROOT" || problems+=("pip install studio failed")
 
-if command -v ollama >/dev/null 2>&1; then
+if [ "${STUDIO_SKIP_MODELS:-}" = "1" ]; then
+  echo "STUDIO_SKIP_MODELS=1: skipping Ollama and model downloads."
+elif command -v ollama >/dev/null 2>&1; then
   if ! curl -fs http://127.0.0.1:11434/api/version >/dev/null; then
     echo "Starting Ollama…"; (OLLAMA_NO_CLOUD=1 ollama serve >/dev/null 2>&1 &) ; sleep 3
   fi
