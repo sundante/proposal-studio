@@ -1,0 +1,5 @@
+{
+  "command": "render",
+  "name": "/render — Build the PPTX on your template and show a QA report",
+  "content": "/render "
+}

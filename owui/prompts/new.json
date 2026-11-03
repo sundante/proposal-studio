@@ -1,0 +1,5 @@
+{
+  "command": "new",
+  "name": "/new — Create an opportunity: /new <opp-id> [title]",
+  "content": "/new "
+}

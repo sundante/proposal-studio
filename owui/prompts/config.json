@@ -1,0 +1,5 @@
+{
+  "command": "config",
+  "name": "/config — Show or change config: /config [set <key> <value> | reset]",
+  "content": "/config "
+}

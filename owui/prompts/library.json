@@ -1,0 +1,5 @@
+{
+  "command": "library",
+  "name": "/library — Index the local library: /library index|status",
+  "content": "/library "
+}

@@ -1,0 +1,5 @@
+{
+  "command": "use",
+  "name": "/use — Switch opportunity: /use <opp-id> (alone: list)",
+  "content": "/use "
+}

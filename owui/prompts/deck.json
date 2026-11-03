@@ -1,0 +1,5 @@
+{
+  "command": "deck",
+  "name": "/deck — Write deck.json (all slides or one): /deck [slide_id]",
+  "content": "/deck "
+}

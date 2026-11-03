@@ -1,0 +1,5 @@
+{
+  "command": "ingest",
+  "name": "/ingest — Ingest attached files (or input/) and build the index",
+  "content": "/ingest "
+}

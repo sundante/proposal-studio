@@ -1,0 +1,5 @@
+{
+  "command": "harvest",
+  "name": "/harvest — Extract blocks from library/proposals: /harvest [client, …]",
+  "content": "/harvest "
+}
