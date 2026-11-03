@@ -1,6 +1,6 @@
 # Proposal Studio — Build Plan
 
-Phases are built one per Claude Code session with `/phase <n>`. Each phase ends in a PR.
+Phases are built one per Claude Code session with `/phase <n>`. Each phase ends with commits pushed to `dev`.
 The design is in `PROJECT_SPEC.md`; progress is tracked in `PROGRESS.md`.
 
 ## Allowed dependencies

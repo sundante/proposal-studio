@@ -76,3 +76,11 @@ Format:
      asks for `--yes`.
 - Why: Deterministic, testable behaviour on small local models.
 - Spec impact: §3 adds `config/rag.yaml`.
+
+## 2026-11-03 — Git workflow: dev + main only  (process)
+- Context: Maintainer prefers to promote releases manually.
+- Decision: Only `dev` and `main` exist. All work is committed and pushed to `dev`; the maintainer
+  promotes `dev` → `main`. No phase branches or PRs. CI runs on pushes to both; Dependabot
+  targets `dev`. `/ship` commits the release bump on `main` after promotion.
+- Why: Simpler flow for a single maintainer.
+- Spec impact: §16.1 ("work happens on `phase/<n>-<slug>` branches merged by PR") superseded.

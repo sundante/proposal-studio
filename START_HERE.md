@@ -44,10 +44,10 @@ commit as "docs: resolve pre-build ambiguities", and stop. We'll start with /pha
 ## 3. The build loop (one phase per session)
 ```
 /clear
-/phase 0          ← builds, tests, commits, opens a PR
+/phase 0          ← builds, tests, commits and pushes to `dev`
 /review           ← strict self-review + fixes
 ```
-Then review the PR on GitHub, check CI is green, merge, and run `git switch main && git pull`.
+Check CI is green on `dev`, then promote `dev` → `main` yourself when ready.
 Repeat with `/phase 1` … `/phase 10`. Finish with `/ship 0.1.0`.
 
 If a session runs out of usage mid-phase: in the next session run `/clear` then `/resume`.

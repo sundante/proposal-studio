@@ -29,9 +29,10 @@ analysis, deck writing and PPTX rendering.
 - CLI: `studio --help`, `studio doctor`
 
 ## Git workflow
-- Branch per phase: `phase/<n>-<slug>` from `main`. Conventional Commits.
-- Small commits as you go. Before opening a PR: lint + tests green, `PROGRESS.md` updated.
-- Open PRs with `gh pr create`; PR body follows `.github/PULL_REQUEST_TEMPLATE.md` once it exists.
+- Only two branches: `dev` and `main`. Work and commit on `dev`; push with `git push origin dev`.
+- Never commit to, merge into or push `main` — the maintainer promotes `dev` → `main` manually.
+- No feature/phase branches and no PRs. Conventional Commits, small commits as you go.
+- Before pushing: lint + tests green, `PROGRESS.md` updated.
 
 ## Style of work
 - Be economical: don't print whole files back, don't re-read files you just wrote, keep summaries

@@ -1,8 +1,8 @@
 ---
-description: Self-review the current branch against the spec before merging
+description: Self-review recent work on dev against the spec
 ---
 
-Review `git diff main...HEAD` as a strict senior reviewer who did not write this code:
+Review `git diff origin/main...dev` (or the phase's commits on `dev`) as a strict senior reviewer who did not write this code:
 
 1. **Spec conformance:** for the phase being built, list each requirement in `BUILD_PLAN.md` and
    the referenced `PROJECT_SPEC.md` sections as ✅ / ⚠️ / ❌ with a file:line pointer.
