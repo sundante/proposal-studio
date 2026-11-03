@@ -384,3 +384,20 @@ Format:
      PRs at `dev`.
 - Why: Measured, not assumed, performance; docs that can't drift from the code.
 - Spec impact: none.
+
+## 2026-11-04 — Release pipeline  (Phase 10)
+- Decision:
+  1. `scripts/build_release.py` builds `proposal-studio-<ver>-windows.zip` from **git-tracked
+     files only**, under an allowlist (src, scripts, owui, config, templates/sample, docs,
+     tests, top-level docs). Every path is checked with the private-path guard. It also writes
+     RELEASE_NOTES.md from the CHANGELOG section and refuses a tag that doesn't match
+     `__version__`.
+  2. `.github/workflows/release.yml` runs on tag `v*.*.*`: build the sdist, the wheel and the
+     zip → install the zip on a clean `windows-latest` with `setup.ps1` (`STUDIO_SKIP_MODELS=1`,
+     since there's no Ollama on the runner; open-webui is really installed) → `studio --version`,
+     an Open WebUI import check and the offline test suite → `gh release create` with the
+     notes. The tests also run from inside the bundle; the git-only bundle test skips there.
+  3. Version 0.1.0 and the CHANGELOG `[0.1.0]` section are prepared on `dev`. The tag is created
+     on `main` by `/ship 0.1.0` after the maintainer promotes `dev` (the only `main` action).
+- Verified locally: bundle 223 KB with no private paths; `python -m build` → sdist + wheel;
+  unzip → `setup.sh` (models skipped) → `studio 0.1.0`, open-webui imports, 198 tests pass.

@@ -12,13 +12,13 @@
 | 7 | Open WebUI integration + setup scripts | ✅ done | 2b4e1b9 |
 | 8 | Agents route | ✅ done | 0761ec7 |
 | 9 | Hardening + docs | ✅ done | 6dd79d4 |
-| 10 | Release pipeline + v0.1.0 | ⬜ todo | |
+| 10 | Release pipeline + v0.1.0 | 🟡 ready to tag (after dev → main) | 415d709 |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 10 — Release pipeline + v0.1.0
+- Next step: promote `dev` → `main`, then `/ship 0.1.0` (creates the tag; CI publishes the release)
 
 ## Known issues
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side; the
