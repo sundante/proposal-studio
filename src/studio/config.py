@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from studio.guards import GuardError, check_model_allowed
 
-SECTIONS = ("models", "routes", "agents", "storyline", "layout_map")
+SECTIONS = ("models", "routes", "agents", "storyline", "layout_map", "rag")
 OVERRIDES_FILE = "overrides.yaml"
 
 
@@ -147,6 +147,24 @@ class LayoutMapConfig(_Strict):
     layouts: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
+# --- rag.yaml -------------------------------------------------------------------------------
+
+
+class RagConfig(_Strict):
+    """Chunking and retrieval settings."""
+
+    chunk_tokens: int = Field(default=800, ge=100, le=4000)
+    chunk_overlap: int = Field(default=100, ge=0, le=1000)
+    top_k: int = Field(default=6, ge=1, le=50)
+    min_score: float = Field(default=0.25, ge=-1.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _check_overlap(self) -> RagConfig:
+        if self.chunk_overlap >= self.chunk_tokens:
+            raise ValueError("chunk_overlap must be smaller than chunk_tokens")
+        return self
+
+
 class StudioConfig(_Strict):
     """The effective configuration: all sections merged with overrides."""
 
@@ -155,6 +173,7 @@ class StudioConfig(_Strict):
     agents: AgentsConfig
     storyline: StorylineConfig
     layout_map: LayoutMapConfig
+    rag: RagConfig = Field(default_factory=RagConfig)
 
     @model_validator(mode="after")
     def _check_agent_models(self) -> StudioConfig:
@@ -235,13 +254,14 @@ def load_config(root: Path | None = None) -> StudioConfig:
 def resolve_key(key: str, effective: dict[str, Any]) -> list[str]:
     """Turn a user key into a full path. ``worker.model`` → ``models.roles.worker.model``.
 
-    Tries, in order: the key as given, then under ``models.``, ``models.roles.``, ``routes.``.
+    Tries, in order: the key as given, then under ``models.``, ``models.roles.``, ``routes.``,
+    ``rag.``.
     Only paths that already exist in the effective config are accepted (no new keys).
     """
     parts = [p for p in key.strip().split(".") if p]
     if not parts:
         raise ConfigError("Empty config key.")
-    for prefix in ([], ["models"], ["models", "roles"], ["routes"]):
+    for prefix in ([], ["models"], ["models", "roles"], ["routes"], ["rag"]):
         path = prefix + parts
         node: Any = effective
         for part in path:

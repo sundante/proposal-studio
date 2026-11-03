@@ -1,0 +1,5 @@
+# Chunking and retrieval settings for ingest and /ask.
+chunk_tokens: 800 # approximate tokens per chunk (chars / 4)
+chunk_overlap: 100 # approximate tokens carried over between chunks of the same section
+top_k: 6 # chunks retrieved per question
+min_score: 0.25 # best cosine score below this → "Not found in the RFP." without an LLM call
