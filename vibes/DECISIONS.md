@@ -144,3 +144,37 @@ Format:
   8. Ruff: `typer.Option`/`typer.Argument` marked immutable for B008 (typer's documented style).
 - Why: Deterministic, testable rendering on any user template.
 - Spec impact: none beyond the above clarifications.
+
+## 2026-11-03 — Blocks, storyline and deck writer choices  (Phase 4)
+- Context: Building §9.1/§9.2/§9.4 and running it on qwen3:8b with a synthetic "Example
+  Hospital" library and the Acme RFP digest.
+- Decision:
+  1. New `config/deck.yaml` (`DeckConfig`): `blocks_per_slide` (3), `min_block_score` (0.2),
+     `harvest_min_chars` (80), `include_flagged_blocks` (false).
+  2. Harvest units = one PPTX slide or one DOCX/PDF section. After the model, Python anonymises
+     again: client names (model-reported + `--client`) → `{{client}}`, dates (incl. "March 3")
+     → `{{date}}`, amounts → `{{amount}}`, emails/phones dropped. The model's `uncertain` notes
+     are anonymised too and restatements are dropped (a real run leaked the client name into
+     review notes and flagged every block). Remaining percentages/multipliers set
+     `needs_review`. `HarvestResult` fields are all required so the model fills tags/capability.
+  3. Blocks are protected from re-harvest if `edited: true` **or** their content hash no longer
+     matches (hand edits are detected without the flag). Ids are stable per source unit; an
+     unchanged source makes no LLM call (`library/.index/harvest.json`).
+  4. `include_if` grammar: `<field> contains <text>`, `<field> not empty`,
+     `<field> count >= N`; several rules are OR'd. Optional slides without rules are included by
+     default. `/toggle` choices persist across `/outline` rebuilds.
+  5. Writer LLM schema = `slide_model(enforce=False)` + `used_blocks`/`used_facts` numbers;
+     limits are stated in the prompt and enforced in Python (one shorten retry, then truncate +
+     flag). Grammar-enforced `maxLength` would cut words mid-way.
+  6. Guards that flag (never silently remove), stored in each slide's `review` and surfaced as
+     render QA warnings: figures/certifications absent from blocks and RFP facts; on
+     client-facing slides (understanding, before_after) statements sharing almost no words with
+     any RFP fact; block `{{date}}`/`{{amount}}` slots filled with concrete values. The prompt
+     rules alone did not stop qwen3:8b from importing a past client's claim or filling a
+     placeholder with the proposal due date — the Python guards catch both.
+  7. Vendor slides with no vetted blocks become visible skeletons ("Add content — run
+     /harvest"); client-facing slides may be written from RFP facts alone (flagged). The title
+     slide is deterministic from the digest.
+  8. Every deck write copies the previous `deck.json` to `history/deck-<ts>.json`.
+- Why: Small local models drift; provenance and Python checks keep the deck honest.
+- Spec impact: §9.3 slides gain `review: list[str]`; §3 adds `config/deck.yaml`.

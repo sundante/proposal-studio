@@ -6,7 +6,7 @@
 | 1 | Ingest + RAG + /ask | ✅ done | cea14a3 |
 | 2 | RFP digest | ✅ done | 72e0a75 |
 | 3 | Template inspector + renderer | ✅ done | f68e3e1 |
-| 4 | Blocks, storyline, deck writer | ⬜ todo | |
+| 4 | Blocks, storyline, deck writer | ✅ done | cb2b909 |
 | 5 | Offline research | ⬜ todo | |
 | 6 | Router core | ⬜ todo | |
 | 7 | Open WebUI integration + setup scripts | ⬜ todo | |
@@ -18,7 +18,7 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 4 — Blocks, storyline, deck writer
+- Next step: Phase 5 — Offline research
 
 ## Known issues
 - Ollama keeps the embed model and worker loaded together unless `OLLAMA_MAX_LOADED_MODELS=1`
@@ -30,3 +30,6 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - Rendered decks were checked structurally (bounds, overlaps, empty placeholders), not visually:
   no LibreOffice on the dev machine and Quick Look hangs headless. Open the CI `sample-deck`
   artifact in PowerPoint once to eyeball it.
+- Deck quality depends on curated blocks: with only 5 synthetic blocks, 4 vendor slides render as
+  skeletons. qwen3:8b still imports block claims into client slides and fills `{{date}}` slots;
+  both are flagged for review, not prevented.

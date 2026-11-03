@@ -1,6 +1,6 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-03 · Branch `dev` · 4 of 11 phases done · 122 tests passing_
+_Last updated: 2026-11-03 · Branch `dev` · 5 of 11 phases done · 145 tests passing_
 
 Proposal Studio is a fully local, offline proposal workbench. It turns RFP documents into an
 AI-practice proposal deck on the user's own PowerPoint template, answers RFP questions with
@@ -17,8 +17,9 @@ reasoning behind each deviation is in [DECISIONS.md](DECISIONS.md).
 | 1 | Ingest + RAG + `/ask` | ✅ done |
 | 2 | RFP digest (`digest.json`, summary, XLSX matrix) | ✅ done |
 | 3 | Template inspector + PPTX renderer (no LLM) | ✅ done |
-| 4 | Blocks, storyline, deck writer | ⬜ next |
-| 5–10 | Research, router, Open WebUI, agents, hardening, release | ⬜ todo |
+| 4 | Blocks, storyline, deck writer | ✅ done |
+| 5 | Offline research | ⬜ next |
+| 6–10 | Router, Open WebUI, agents, hardening, release | ⬜ todo |
 
 What a user can do today, from the command line (there is no chat UI until Phase 7):
 
@@ -29,6 +30,9 @@ studio ingest rfp.pdf addendum.docx             # PHI-scanned, indexed, incremen
 studio ask "When are proposals due?"            # cited answer, or "Not found in the RFP."
 studio digest --xlsx                            # structured digest + requirements matrix
 studio status                                   # files, chunks, digest (stale?), loaded model
+studio harvest --client "Old Client"           # anonymised blocks from library/proposals
+studio outline && studio deck                   # which slides + tailored deck.json
+studio edit platform "shorter, mention FHIR"    # revise one slide, shows a diff
 studio template inspect templates/firm.potx     # layouts + placeholder idx → firm.layouts.json
 studio render --deck tests/fixtures/sample_deck.json --out build/   # PPTX + QA report
 studio config set worker.model qwen3:4b         # runtime override; cloud models rejected
@@ -121,6 +125,31 @@ studio config set worker.model qwen3:4b         # runtime override; cloud models
   the slide, no overlaps and no empty placeholders. CI uploads the rendered deck as an
   artifact.
 
+### Phase 4 — Blocks, storyline, deck writer
+- **`/harvest`** (`studio/blocks.py`):
+  - one LLM call per past-proposal slide or section
+  - a second, deterministic anonymisation pass in Python: client names → `{{client}}`,
+    dates → `{{date}}`, amounts → `{{amount}}`, emails and phones dropped
+  - review flags for remaining figures
+  - human-editable YAML blocks, never overwritten once edited (hand edits are detected by
+    content hash)
+  - incremental, and searchable by embedding plus tags
+- **`/outline`** (`deck/storyline.py`): `include_if` rules over the digest. The real run
+  included governance via "compliance contains HIPAA [3.2 Compliance, p.2]". Toggles persist.
+- **`/deck` and `/edit`** (`deck/writer.py`):
+  - one call per slide, using 2–4 vetted blocks plus that slide type's digest facts
+  - provenance on every slide (block ids and RFP citations)
+  - limits checked in Python, with one shorten retry and then truncation
+  - a deterministic title slide
+  - skeleton slides when no blocks exist
+  - single-slide regeneration, and `/edit` with a diff plus history
+- **Review guards** (flagged, never hidden), shown as QA warnings at render time: invented
+  figures or certifications, client-slide statements not in the RFP, and placeholder dates
+  filled with unrelated values.
+- **Real run:** harvest took ~56 s for 6 units, leaving 5 clean blocks with no client data. The
+  11-slide deck took ~1 min 14 s, and render reported 0 QA errors. The guards caught a
+  past-client claim and a misused date.
+
 ## Verified on a real model
 Local Ollama with qwen3:8b and nomic-embed-text, on the synthetic Acme Health Plan RFP:
 
@@ -156,6 +185,9 @@ Problems that real runs exposed and that are now fixed in code:
   SECURITY, CLAUDE.md, AGENTS.md, `.claude/` and `.github/`.
 
 ## Known issues and risks
+- Deck quality depends on the curated block library. With only 5 synthetic blocks, 4 vendor
+  slides render as skeletons. qwen3:8b still imports block claims and fills `{{date}}` slots;
+  these are flagged for review, not prevented.
 - `digest` takes ~55 s per section group on Apple silicon. Expect several minutes per group on
   the 16 GB CPU-only Windows target; prompt and output size will be tuned in Phase 9.
 - Ingesting one RFP as both PDF and DOCX duplicates excerpts. The docs should recommend one
@@ -169,10 +201,10 @@ Problems that real runs exposed and that are now fixed in code:
 - Rendered decks have only been checked structurally. No LibreOffice here, and Quick Look hangs
   headless, so open the CI `sample-deck` artifact in PowerPoint once to check it by eye.
 
-## Next up — Phase 4
-Blocks, storyline and the deck writer:
-- `/harvest` reusable, anonymised blocks from past proposals into `library/blocks/`
-- `/outline` from `storyline.yaml` plus digest rules
-- `/deck` tailors 2–4 vetted blocks per slide into `slide_model()` output, with a shorten retry
-  and provenance
-- `/edit` with a diff
+## Next up — Phase 5
+Offline research (`/research`):
+- decompose the question into sub-questions
+- multi-query retrieval over `library/` (proposals and reference) and the active RFP
+- cited findings, then one gap-check round
+- a markdown report saved to `workspace/<opp>/research/`
+- a hard cap on LLM calls, with progress events

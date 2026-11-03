@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `/harvest`: reusable, anonymised blocks from past proposals (`library/blocks/*.yaml`), with
+  edit protection, incremental re-harvest and review flags; `/blocks` list/search.
+- `/outline` with `include_if` rules over the digest and persistent `/toggle` choices.
+- `/deck` (all or one slide) tailoring vetted blocks to the digest with provenance, limit
+  enforcement and review flags for unsupported claims; `/edit` with a before/after diff and
+  deck history.
 - `/render`: deck.json → versioned PPTX on your template (no LLM), with layout/placeholder
   mapping in `config/layout_map.yaml`, limit enforcement, layered architecture diagram, speaker
   notes with sources, and a QA report. `.potx` templates supported.
