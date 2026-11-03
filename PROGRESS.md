@@ -2,7 +2,7 @@
 
 | Phase | Name | Status | PR |
 |---|---|---|---|
-| 0 | Bootstrap: repo, OSS foundations, config, LLM client, guards | ⬜ todo | |
+| 0 | Bootstrap: repo, OSS foundations, config, LLM client, guards | ✅ done (pending CI) | phase/0-bootstrap |
 | 1 | Ingest + RAG + /ask | ⬜ todo | |
 | 2 | RFP digest | ⬜ todo | |
 | 3 | Template inspector + renderer | ⬜ todo | |
@@ -17,8 +17,10 @@
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
-- Phase in progress: none
-- Next step: Phase 0
+- Phase in progress: none (Phase 0 awaiting PR merge + green CI on Windows/Ubuntu)
+- Next step: Phase 1 — Ingest + RAG + /ask
 
 ## Known issues
-- (none yet)
+- Remote push/PR needs `gh auth login` on the dev machine.
+- Dev machine has no models pulled: `ollama pull qwen3:8b qwen3:4b nomic-embed-text`.
+- CI on Windows not yet observed; first PR run is the Phase 0 done check.
