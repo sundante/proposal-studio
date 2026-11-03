@@ -37,7 +37,8 @@ studio smoke                        # end-to-end check on the real models
 Then pick **Proposal Studio** in Open WebUI. Typical flow:
 `/new` → attach the RFP → ask questions → `/digest xlsx` → `/outline` → `/deck` → `/edit` →
 `/render` (download link). Once per library: `/library index`, `/harvest`, then curate
-`library/blocks/`. Full guide: [docs/install.md](../docs/install.md).
+`library/blocks/`. Full guide: [docs/install.md](../docs/install.md); step-by-step walkthrough:
+[tutorial.html](../tutorial.html).
 
 ## What was built (by area)
 
@@ -89,7 +90,8 @@ Then pick **Proposal Studio** in Open WebUI. Typical flow:
   - Open WebUI + studio idle RSS 736 MB
   - worker context 8k
   - docs: README, install, commands (generated), config, templates, agents, performance,
-    troubleshooting, privacy
+    troubleshooting, privacy, plus **`tutorial.html`**, a detailed single-file offline tutorial
+    (a test keeps it in sync with the commands)
 - **Release:**
   - allowlisted bundle builder (tracked files only, private-path guard)
   - `release.yml`: sdist + wheel + Windows zip, a clean-install check on Windows, then a GitHub

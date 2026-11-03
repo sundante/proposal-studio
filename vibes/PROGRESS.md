@@ -20,9 +20,13 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - Phase in progress: none
 - Next step: promote `dev` → `main`, then `/ship 0.1.0` (creates the tag; CI publishes the release)
 
+## Docs
+- User docs: `README.md`, `tutorial.html` (step-by-step, offline single file), `docs/*.md`.
+- Project docs: `vibes/` (spec, build plan, decisions, progress, status).
+
 ## Known issues
-- Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side; the
-  docs should recommend one format per document).
+- Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
+  troubleshooting.md and the tutorial recommend one format per document).
 - Performance measured with `studio bench` (docs/performance.md); the Intel CPU-only target
   itself is still unmeasured (estimated 2–4× the Mac CPU-only numbers).
 - Rendered decks were checked structurally (bounds, overlaps, empty placeholders), not visually:

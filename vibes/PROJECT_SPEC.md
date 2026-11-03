@@ -1,5 +1,11 @@
 # Proposal Studio — Project Spec (v1)
 
+> **Status (2026-11-04):** v1 is fully built (Phases 0–10; see `vibes/PROGRESS.md` and
+> `vibes/status.md`). Where the build deviated from this spec — FAISS → NumPy search, verified
+> agent flags, the `dev`/`main` git workflow, list-valued digest citations, and a few extra
+> commands and config files — the reason is recorded in `vibes/DECISIONS.md`. Notes marked
+> **As built** below point to those changes.
+
 > This file is the single source of truth for building Proposal Studio. Keep it in the repo root.
 > Coding agents: read this file at the start of every session. Do not re-plan what is decided here.
 > When something here conflicts with the installed version of a tool, verify against the tool's
@@ -77,6 +83,15 @@ proposal work goes through the `studio` package**, so behaviour is testable outs
 ---
 
 ## 3. Repository layout
+
+> **As built**, in addition to the tree below:
+> - **studio modules:** `src/studio/{models,views,owui,samples,smoke,bench}.py`
+> - **config:** `config/{rag,deck,research}.yaml`
+> - **Open WebUI:** `owui/agents_pipe.py`
+> - **scripts:** `scripts/{offline.env,build_release.py,check_no_private_paths.py}`
+> - **CI:** `.github/workflows/release.yml`
+> - **user docs:** `docs/*.md`, `tutorial.html`
+> - **project docs:** non-functional docs live in `vibes/`
 
 ```
 proposal-studio/
@@ -346,6 +361,11 @@ One slide per LLM call, so a single slide can be regenerated (`/deck <slide_id>`
 ## 10. Agents route (Claude Code, OpenCode, Hermes Agent; extensible)
 
 ### 10.1 `config/agents.yaml`
+
+> **As built:** the flags below were the pre-build guess. The verified flags are in
+> `config/agents.yaml` (opencode `run --agent plan|build`, Claude Code `-p --permission-mode
+> plan|acceptEdits --restricted`, Hermes disabled). Plan always runs in a throwaway copy, and
+> there's a second approval before copy-back. See DECISIONS.md, 2026-11-03 (Phase 8).
 ```yaml
 sandbox_root: workspace/{opp}/agent
 default_timeout_s: 900
@@ -478,8 +498,9 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 ## 16. Repository, licensing, CI and releases
 
 ### 16.1 Repository
-- GitHub repo `proposal-studio` (name changeable), default branch `main`, protected; work happens on
-  `phase/<n>-<slug>` branches merged by PR (squash). Conventional Commits (`feat:`, `fix:`, `docs:`,
+- GitHub repo `proposal-studio` (name changeable), default branch `main`. **As built:** all work is
+  committed to `dev`, and the maintainer promotes `dev` → `main` (no phase branches or PRs; see
+  DECISIONS.md). Originally specified: `phase/<n>-<slug>` branches merged by PR (squash). Conventional Commits (`feat:`, `fix:`, `docs:`,
   `test:`, `chore:`, `ci:`).
 - Required files: `README.md`, `LICENSE` (Apache-2.0), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
   (Contributor Covenant), `SECURITY.md` (how to report issues; states the no-telemetry,

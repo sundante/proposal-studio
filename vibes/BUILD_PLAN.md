@@ -1,6 +1,10 @@
 # Proposal Studio — Build Plan
 
 Phases are built one per Claude Code session with `/phase <n>`. Each phase ends with commits pushed to `dev`.
+
+> **Status (2026-11-04):** all phases 0–10 are built. v0.1.0 is prepared; the tag is created
+> with `/ship 0.1.0` after `dev` is promoted to `main`. Deviations are in `vibes/DECISIONS.md`;
+> remaining known issues are in `vibes/PROGRESS.md`.
 The design is in `vibes/PROJECT_SPEC.md`; progress is tracked in `vibes/PROGRESS.md`.
 
 ## Allowed dependencies

@@ -1,5 +1,11 @@
 # Start here — building Proposal Studio in VS Code with Claude Code
 
+> **Status (2026-11-04):** the build described here is complete (Phases 0–10). This file is
+> kept as the record of how the project was built. **To use Proposal Studio, read the
+> [README](../README.md), the step-by-step [tutorial](../tutorial.html) and
+> [docs/install.md](../docs/install.md).** Changes since the kit: git uses `dev` + `main` only
+> (no PRs), and planning docs live in `vibes/`.
+
 ## 1. One-time setup (personal machine)
 1. Install: VS Code, Git, Python 3.11+, the GitHub CLI (`gh`), and the **Claude Code** extension for
    VS Code. Sign in to Claude Code with your Claude Pro account.
