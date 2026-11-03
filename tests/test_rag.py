@@ -108,3 +108,32 @@ def test_rewrite_handles_split_brackets(indexed: VectorIndex) -> None:
     rw = _CiteRewriter(hits)
     out = rw.feed("Due soon [") + rw.feed("1") + rw.feed("] done.") + rw.flush()
     assert out == f"Due soon {hits[0].chunk.cite} done."
+
+
+def test_search_matches_brute_force_and_old_layout_rebuilds(tmp_path: Path) -> None:
+    import json as _json
+
+    import numpy as np
+
+    index = VectorIndex(tmp_path / "idx")
+    texts = [f"topic {w} words" for w in ("alpha", "bravo", "charlie", "delta", "echo")]
+    chunks = [
+        Chunk(id=f"c{i}", file="f.txt", file_hash="h", section="S", text=t)
+        for i, t in enumerate(texts)
+    ]
+    vectors = [fake_embedding(t) for t in texts]
+    index.replace_file("f.txt", "h", chunks, vectors)
+    query = fake_embedding("bravo delta")
+    arr = np.asarray(vectors, dtype="float32")
+    arr /= np.linalg.norm(arr, axis=1, keepdims=True)
+    q = np.asarray(query, dtype="float32") / np.linalg.norm(query)
+    expected = [f"c{i}" for i in np.argsort(-(arr @ q), kind="stable")[:3]]
+    assert [h.chunk.id for h in index.search(query, 3)] == expected
+    assert len(index.search(query, 50)) == 5 and index.search(query, 0) == []
+
+    index.save()
+    (tmp_path / "idx" / "vectors.npz").unlink()  # simulate the pre-NumPy (FAISS) layout
+    (tmp_path / "idx" / "index.faiss").write_bytes(b"old")
+    old = VectorIndex(tmp_path / "idx")
+    assert len(old) == 0 and old.file_hash("f.txt") is None  # next ingest re-embeds
+    assert _json.loads((tmp_path / "idx" / "manifest.json").read_text())["files"]

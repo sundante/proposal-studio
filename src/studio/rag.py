@@ -1,7 +1,12 @@
-"""FAISS vector index per opportunity / library collection, retrieval, and cited answers."""
+"""Vector index per opportunity / library collection, retrieval, and cited answers.
+
+Search is exact cosine similarity with NumPy (what a flat inner-product index does), which is
+fast at RFP/library scale and avoids loading a second OpenMP runtime next to Open WebUI's torch.
+"""
 
 from __future__ import annotations
 
+import io
 import itertools
 import json
 import os
@@ -11,7 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import faiss
 import numpy as np
 
 from studio.config import RagConfig
@@ -37,8 +41,8 @@ def _normalise(vectors: Sequence[Sequence[float]]) -> np.ndarray:
     arr = np.asarray(vectors, dtype="float32")
     if arr.ndim != 2:
         raise ValueError("expected a 2-D array of embeddings")
-    faiss.normalize_L2(arr)
-    return arr
+    norms = np.linalg.norm(arr, axis=1, keepdims=True)
+    return arr / np.where(norms == 0, 1, norms)
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
@@ -48,11 +52,11 @@ def _write_atomic(path: Path, data: bytes) -> None:
 
 
 class VectorIndex:
-    """Cosine-similarity FAISS index with chunk metadata, stored in one directory.
+    """Cosine-similarity index with chunk metadata, stored in one directory.
 
-    Files: ``index.faiss`` (serialised via Python I/O so non-ASCII Windows paths work),
-    ``chunks.jsonl`` (chunk metadata keyed by FAISS id) and ``manifest.json``
-    (per-file hash and ids, embedding model, dimension).
+    Files: ``vectors.npz`` (normalised float32 vectors + their int ids), ``chunks.jsonl``
+    (chunk metadata keyed by id) and ``manifest.json`` (per-file hash and ids, embedding model,
+    dimension). All writes go through Python file I/O and are atomic.
     """
 
     def __init__(self, directory: Path) -> None:
@@ -62,7 +66,8 @@ class VectorIndex:
         self.next_id = 0
         self._files: dict[str, dict[str, Any]] = {}
         self._chunks: dict[int, Chunk] = {}
-        self._index: faiss.IndexIDMap2 | None = None
+        self._ids = np.zeros(0, dtype="int64")
+        self._vectors = np.zeros((0, 0), dtype="float32")
         if (directory / "manifest.json").exists():
             self._load()
 
@@ -81,16 +86,20 @@ class VectorIndex:
                     row = json.loads(line)
                     cid = int(row.pop("_id"))
                     self._chunks[cid] = Chunk.model_validate(row)
-        index_path = self.dir / "index.faiss"
-        if index_path.exists():
-            raw = np.frombuffer(index_path.read_bytes(), dtype="uint8")
-            self._index = faiss.deserialize_index(raw)
+        vectors_path = self.dir / "vectors.npz"
+        if vectors_path.exists():
+            with np.load(io.BytesIO(vectors_path.read_bytes())) as data:
+                self._ids, self._vectors = data["ids"], data["vectors"]
+        elif self._chunks:  # older FAISS layout: start over; the next ingest re-embeds
+            self.clear()
 
     def save(self) -> None:
         """Write the index, metadata and manifest to disk."""
         self.dir.mkdir(parents=True, exist_ok=True)
-        if self._index is not None:
-            _write_atomic(self.dir / "index.faiss", faiss.serialize_index(self._index).tobytes())
+        buffer = io.BytesIO()
+        np.savez(buffer, ids=self._ids, vectors=self._vectors)
+        _write_atomic(self.dir / "vectors.npz", buffer.getvalue())
+        (self.dir / "index.faiss").unlink(missing_ok=True)
         lines = [
             json.dumps({"_id": cid, **chunk.model_dump()}, ensure_ascii=False)
             for cid, chunk in sorted(self._chunks.items())
@@ -110,7 +119,7 @@ class VectorIndex:
         return len(self._chunks)
 
     def iter_chunks(self) -> list[Chunk]:
-        """All chunks in ingest order (by FAISS id)."""
+        """All chunks in ingest order (by id)."""
         return [self._chunks[cid] for cid in sorted(self._chunks)]
 
     def manifest_hashes(self) -> dict[str, str]:
@@ -133,21 +142,19 @@ class VectorIndex:
 
     def search(self, vector: Sequence[float], top_k: int) -> list[Hit]:
         """Top-``top_k`` chunks by cosine similarity."""
-        if self._index is None or not self._chunks:
+        if not len(self._ids) or top_k <= 0:
             return []
-        query = _normalise([vector])
-        scores, ids = self._index.search(query, min(top_k, len(self._chunks)))
-        return [
-            Hit(self._chunks[int(i)], float(s))
-            for s, i in zip(scores[0], ids[0], strict=True)
-            if i != -1 and int(i) in self._chunks
-        ]
+        scores = self._vectors @ _normalise([vector])[0]
+        best = np.argsort(-scores, kind="stable")[:top_k]  # deterministic on ties
+        return [Hit(self._chunks[int(self._ids[i])], float(scores[i])) for i in best]
 
     # -- updates --
 
     def clear(self) -> None:
         """Drop every vector and file entry (keeps nothing)."""
-        self._files, self._chunks, self._index = {}, {}, None
+        self._files, self._chunks = {}, {}
+        self._ids = np.zeros(0, dtype="int64")
+        self._vectors = np.zeros((0, 0), dtype="float32")
         self.dim, self.next_id = None, 0
 
     def ensure_model(self, embed_model: str) -> bool:
@@ -163,9 +170,9 @@ class VectorIndex:
         entry = self._files.pop(name, None)
         if not entry:
             return
-        ids = np.asarray(entry["ids"], dtype="int64")
-        if self._index is not None and len(ids):
-            self._index.remove_ids(ids)
+        if entry["ids"] and len(self._ids):
+            keep = ~np.isin(self._ids, np.asarray(entry["ids"], dtype="int64"))
+            self._ids, self._vectors = self._ids[keep], self._vectors[keep]
         for cid in entry["ids"]:
             self._chunks.pop(int(cid), None)
 
@@ -185,9 +192,10 @@ class VectorIndex:
                 raise ValueError(
                     f"embedding dimension {arr.shape[1]} != index dimension {self.dim}"
                 )
-            if self._index is None:
-                self._index = faiss.IndexIDMap2(faiss.IndexFlatIP(self.dim))
-            self._index.add_with_ids(arr, np.asarray(ids, dtype="int64"))
+            if not len(self._ids):
+                self._vectors = np.zeros((0, self.dim), dtype="float32")
+            self._ids = np.concatenate([self._ids, np.asarray(ids, dtype="int64")])
+            self._vectors = np.vstack([self._vectors, arr])
             self._chunks.update(zip(ids, chunks, strict=True))
             self.next_id += len(chunks)
         self._files[name] = {"hash": digest, "ids": ids}
