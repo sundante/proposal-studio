@@ -9,14 +9,14 @@ from __future__ import annotations
 import copy
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from studio.guards import GuardError, check_model_allowed
 
-SECTIONS = ("models", "routes", "agents", "storyline", "layout_map", "rag", "deck")
+SECTIONS = ("models", "routes", "agents", "storyline", "layout_map", "rag", "deck", "research")
 OVERRIDES_FILE = "overrides.yaml"
 
 
@@ -233,6 +233,22 @@ class DeckConfig(_Strict):
     include_flagged_blocks: bool = False  # use blocks marked needs_review when writing
 
 
+# --- research.yaml --------------------------------------------------------------------------
+
+
+class ResearchConfig(_Strict):
+    """Offline research settings."""
+
+    max_llm_calls: int = Field(default=12, ge=3, le=40)
+    max_sub_questions: int = Field(default=5, ge=1, le=8)
+    top_k_per_query: int = Field(default=4, ge=1, le=20)
+    excerpts_per_question: int = Field(default=6, ge=1, le=20)
+    weak_score: float = Field(default=0.35, ge=-1.0, le=1.0)
+    sources: list[Literal["rfp", "proposals", "reference"]] = Field(
+        default_factory=lambda: ["rfp", "proposals", "reference"], min_length=1
+    )
+
+
 class StudioConfig(_Strict):
     """The effective configuration: all sections merged with overrides."""
 
@@ -243,6 +259,7 @@ class StudioConfig(_Strict):
     layout_map: LayoutMapConfig
     rag: RagConfig = Field(default_factory=RagConfig)
     deck: DeckConfig = Field(default_factory=DeckConfig)
+    research: ResearchConfig = Field(default_factory=ResearchConfig)
 
     @model_validator(mode="after")
     def _check_agent_models(self) -> StudioConfig:
@@ -330,7 +347,8 @@ def resolve_key(key: str, effective: dict[str, Any]) -> list[str]:
     parts = [p for p in key.strip().split(".") if p]
     if not parts:
         raise ConfigError("Empty config key.")
-    for prefix in ([], ["models"], ["models", "roles"], ["routes"], ["rag"], ["deck"]):
+    shorthand = ([], ["models"], ["models", "roles"], ["routes"], ["rag"], ["deck"], ["research"])
+    for prefix in shorthand:
         path = prefix + parts
         node: Any = effective
         for part in path:

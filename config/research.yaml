@@ -1,0 +1,7 @@
+# Offline research (/research) over library/ and the active RFP. No web access, ever.
+max_llm_calls: 12 # hard cap per run (planning, findings, gap check, synthesis)
+max_sub_questions: 5 # the question is split into up to this many sub-questions
+top_k_per_query: 4 # chunks retrieved per query per source
+excerpts_per_question: 6 # best excerpts kept per sub-question
+weak_score: 0.35 # best retrieval score below this marks a sub-question as weakly evidenced
+sources: [rfp, proposals, reference]
