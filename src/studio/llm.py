@@ -260,6 +260,13 @@ class OllamaClient(BaseLLM):
             resp.raise_for_status()
             return [m["name"] for m in resp.json().get("models", [])]
 
+    def loaded_models(self) -> list[str]:
+        """Names of models currently loaded in memory (``/api/ps``)."""
+        with self._connection_errors():
+            resp = self._http.get("/api/ps", timeout=5.0)
+            resp.raise_for_status()
+            return [m["name"] for m in resp.json().get("models", [])]
+
 
 def model_is_pulled(model: str, pulled: Sequence[str]) -> bool:
     """True if ``model`` matches a pulled name (``nomic-embed-text`` == ``…:latest``)."""
