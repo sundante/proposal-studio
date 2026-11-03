@@ -84,3 +84,26 @@ Format:
   targets `dev`. `/ship` commits the release bump on `main` after promotion.
 - Why: Simpler flow for a single maintainer.
 - Spec impact: §16.1 ("work happens on `phase/<n>-<slug>` branches merged by PR") superseded.
+
+## 2026-11-03 — RFP digest implementation choices  (Phase 2)
+- Context: Building §8 (map-reduce digest) and testing on qwen3:8b with the synthetic Acme RFP.
+- Decision:
+  1. All citation fields are lists (`evidence: list[Cite]`, `cite: list[Cite]`), so merged
+     duplicates keep every citation ("keep all citations" in BUILD_PLAN Phase 2).
+  2. Map step: the model cites excerpt numbers (`excerpts: [2]`); Python maps them to `Cite`,
+     ignores invalid numbers and drops items left uncited (counted in the run's warnings).
+  3. Requirement ids are checked in Python: the model's `rfp_id` is kept only if a cited line
+     prints it and is about that requirement; otherwise the id is read from the cited line
+     (`ID: R-01` field or a leading `R-01`/`3.2.1`), else `REQ-NNN` is assigned. Requirements
+     sharing an id merge only if their wording overlaps. A real run showed qwen3:8b copying the
+     prompt's example id onto every requirement.
+  4. De-duplication: normalised text first, then embedding cosine >= `rag.dedupe_similarity`
+     (0.9). Citations of one section with and without a page (same RFP as PDF + DOCX) collapse
+     to the paged one.
+  5. Conflicting opportunity facts (e.g. two due dates) keep the first value and add a
+     "Conflicting …" entry to `risks_and_red_flags`.
+  6. New `rag.yaml` keys: `digest_group_tokens` (2000) and `dedupe_similarity` (0.9).
+     `digest.meta.json` stores source hashes so `status` can report a stale digest.
+- Why: Small local models are unreliable at ids and labels; Python checks keep the digest
+  trustworthy.
+- Spec impact: §8 `evidence`/`cite` fields become lists.

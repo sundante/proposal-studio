@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `/digest`: map-reduce RFP digest (`digest.json`) with cited problems, before/after,
+  requirements, evaluation criteria, compliance, systems, risks and open questions;
+  de-duplication, verified requirement ids, conflict flags; Markdown summary; optional XLSX
+  requirements matrix (`studio digest --xlsx`); stale-digest detection in `status`.
 - Ingest for PDF, DOCX, XLSX, PPTX, TXT and MD with heading paths, page/slide numbers and
   row-wise tables; section-aware chunking; PHI warning with confirmation.
 - Per-opportunity FAISS index with incremental updates (file hashing) and library collections.
