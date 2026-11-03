@@ -13,7 +13,7 @@ way.
   [vibes/DECISIONS.md](vibes/DECISIONS.md).
 
 ## Workflow
-1. Branch from `main` (`feat/<topic>`, `fix/<topic>`, or `phase/<n>-<slug>`).
+1. Fork and branch from `dev` (`feat/<topic>` or `fix/<topic>`); pull requests target `dev`.
 2. `pip install -e ".[dev]"` and `pre-commit install`.
 3. `ruff check . --fix && ruff format . && pytest -q`.
 4. Use Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`).
