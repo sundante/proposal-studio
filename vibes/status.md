@@ -1,284 +1,130 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-03 · Branch `dev` · 8 of 11 phases done · 184 tests passing_
+_Last updated: 2026-11-04 · Branch `dev` · all 11 phases built · v0.1.0 ready to tag · 199 tests_
 
-Proposal Studio is a fully local, offline proposal workbench. It turns RFP documents into an
-AI-practice proposal deck on the user's own PowerPoint template, answers RFP questions with
-citations, and researches over a local library. It runs on Open WebUI + Ollama + the Python
-package `studio`. The design is in [PROJECT_SPEC.md](PROJECT_SPEC.md), the phases are in
-[BUILD_PLAN.md](BUILD_PLAN.md), the checklist is in [PROGRESS.md](PROGRESS.md), and the
-reasoning behind each deviation is in [DECISIONS.md](DECISIONS.md).
+Proposal Studio is a fully local, offline proposal workbench: Open WebUI + Ollama + the
+`studio` Python package. It turns RFPs into a cited digest and an AI-practice proposal deck
+on your own PowerPoint template, answers RFP questions with citations, researches your local
+library, and hands file tasks to sandboxed local agents. See [PROJECT_SPEC.md](PROJECT_SPEC.md)
+(design), [BUILD_PLAN.md](BUILD_PLAN.md) (phases), [PROGRESS.md](PROGRESS.md) (checklist,
+known issues) and [DECISIONS.md](DECISIONS.md) (why).
 
 ## At a glance
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Bootstrap: repo, OSS files, CI, config, LLM client, guards, CLI | ✅ done |
-| 1 | Ingest + RAG + `/ask` | ✅ done |
-| 2 | RFP digest (`digest.json`, summary, XLSX matrix) | ✅ done |
-| 3 | Template inspector + PPTX renderer (no LLM) | ✅ done |
-| 4 | Blocks, storyline, deck writer | ✅ done |
-| 5 | Offline research | ✅ done |
-| 6 | Router core + `studio chat` | ✅ done |
-| 7 | Open WebUI integration + setup scripts | ✅ done |
-| 8 | Agents route | ⬜ next |
-| 9–10 | Hardening + docs, release | ⬜ todo |
+| 0 | Bootstrap: repo, OSS files, CI, config, LLM client, guards, CLI | ✅ |
+| 1 | Ingest + RAG + `/ask` | ✅ |
+| 2 | RFP digest | ✅ |
+| 3 | Template inspector + PPTX renderer (no LLM) | ✅ |
+| 4 | Blocks, storyline, deck writer | ✅ |
+| 5 | Offline research | ✅ |
+| 6 | Router core + `studio chat` | ✅ |
+| 7 | Open WebUI integration + setup scripts | ✅ |
+| 8 | Agents route (`/agent`) | ✅ |
+| 9 | Hardening + docs (`studio bench`, full docs) | ✅ |
+| 10 | Release pipeline + v0.1.0 | 🟡 prepared — tag after `dev` → `main` |
 
-What a user can do today, in Open WebUI (pick **Proposal Studio**), or from the CLI / `studio chat` REPL:
+## Using it now (dev setup)
 
 ```bash
-scripts/setup.sh && scripts/start.sh           # Windows: scripts\setup.ps1, scripts\start.ps1
-studio owui install --token sk-…                # add the pipe, PHI filter and / prompts to Open WebUI
-studio smoke                                    # end-to-end check on the real models
-studio doctor                                   # checks Python, config, workspace, Ollama, models
-studio chat                                     # chat REPL: /commands or plain text, auto-routed
-studio new acme-demo "Acme Health Plan AI RFP"  # create an opportunity
-studio ingest rfp.pdf addendum.docx             # PHI-scanned, indexed, incremental
-studio ask "When are proposals due?"            # cited answer, or "Not found in the RFP."
-studio digest --xlsx                            # structured digest + requirements matrix
-studio status                                   # files, chunks, digest (stale?), loaded model
-studio harvest --client "Old Client"           # anonymised blocks from library/proposals
-studio outline && studio deck                   # which slides + tailored deck.json
-studio edit platform "shorter, mention FHIR"    # revise one slide, shows a diff
-studio library index                            # index library/proposals + library/reference
-studio research "How do we approach FHIR R4?"   # cited offline research report
-studio template inspect templates/firm.potx     # layouts + placeholder idx → firm.layouts.json
-studio render --deck tests/fixtures/sample_deck.json --out build/   # PPTX + QA report
-studio config set worker.model qwen3:4b         # runtime override; cloud models rejected
+scripts/setup.sh                    # once, online (Windows: scripts\setup.ps1)
+scripts/start.sh                    # offline from here; open http://localhost:8080
+studio owui install --token sk-…    # pipe + agents + PHI filter + / prompts
+studio smoke                        # end-to-end check on the real models
 ```
 
-## Work done
+Then pick **Proposal Studio** in Open WebUI. Typical flow:
+`/new` → attach the RFP → ask questions → `/digest xlsx` → `/outline` → `/deck` → `/edit` →
+`/render` (download link). Once per library: `/library index`, `/harvest`, then curate
+`library/blocks/`. Full guide: [docs/install.md](../docs/install.md).
 
-### Phase 0 — Bootstrap
-- **Repo and open-source foundations:** src layout, `pyproject.toml`, Apache-2.0 licence,
-  README, CONTRIBUTING, Code of Conduct, SECURITY, CHANGELOG, issue and PR templates,
-  Dependabot, and pre-commit with a guard that blocks committing `library/`, `workspace/`,
-  private templates or `config/overrides.yaml`.
-- **CI:** GitHub Actions on Windows and Ubuntu × Python 3.11/3.12, running ruff and pytest.
-  It runs on pushes to `dev` and `main`.
-- **Config** (`config/*.yaml` → pydantic, `extra="forbid"`): models, routes, agents, storyline,
-  layout map and RAG settings. Runtime changes go to `config/overrides.yaml` through dotted keys
-  with shorthand (`worker.model` means `models.roles.worker.model`). The project root is
-  `$STUDIO_HOME` or the current directory.
-- **LLM client** (`studio/llm.py`):
-  - the `LLMClient` protocol and `OllamaClient` (httpx, native `/api/chat` and `/api/embed`)
-  - JSON-schema structured output with 2 validation retries
-  - streaming text and batched embeddings
-  - a single-flight lock ("waiting for model…")
-  - plain-sentence errors ("Run `ollama pull qwen3:8b`")
-- **Guards** (`studio/guards.py`): blocks cloud models (`:cloud`/`-cloud`), sandboxes paths
-  (traversal and symlink escapes), and runs a PHI regex scan (SSN, MRN, DOB, phone + name)
-  that masks what it reports.
+## What was built (by area)
 
-### Phase 1 — Ingest, RAG, `/ask`
-- **Ingest** (`studio/ingest.py`) for PDF, DOCX, XLSX, PPTX, TXT and MD:
-  - Every section keeps its heading path and page or slide number, e.g.
-    `[3 Scope of Work > 3.2 Compliance, p.2]`.
-  - Tables are read row by row with their headers (`ID: R-01; Requirement: …; Mandatory: Yes`).
-  - Chunks are ~800 tokens with 100 overlap and never span two sections.
-- **PHI safety:** if possible PHI is found, nothing is copied or indexed until the user
-  confirms (`--yes`).
-- **Index** (`studio/rag.py`):
-  - FAISS cosine index per opportunity (and for library collections).
-  - Files are hashed, so a re-ingest only re-embeds changed files.
-  - Changing the embedding model triggers a rebuild.
-  - Index writes are Windows-safe.
-- **`/ask`:** the model cites excerpt numbers and Python rewrites them, while streaming, into
-  exact `[section, p.N]` labels. When retrieval is weak, it says "Not found in the RFP." without
-  calling the LLM.
-- **Sessions** (`studio/session.py`): opportunities live under `workspace/<opp>/`. Per-chat
-  state is kept in `workspace/.sessions/` and survives restarts.
+- **Foundations:**
+  - src-layout package, validated YAML config with runtime overrides (`/config`)
+  - Ollama client (schema-constrained output with retries, streaming, single-flight lock)
+  - guards (cloud-model block, path sandbox, PHI scan)
+  - open-source files
+  - CI on Windows and Ubuntu × Python 3.11/3.12, plus a script syntax check and a rendered
+    sample-deck artifact
+- **RFP:**
+  - ingest for PDF/DOCX/XLSX/PPTX/TXT/MD, keeping heading paths, pages/slides and row-wise
+    tables
+  - PHI block-until-confirmed
+  - incremental index (exact NumPy cosine)
+  - `/ask` with `[section, p.N]` citations, or "Not found in the RFP."
+- **Digest:** map-reduce extraction with citations, de-duplication, requirement ids checked
+  against the RFP's own table rows, conflict flags, a Markdown summary and an XLSX matrix.
+- **Deck:**
+  - `/harvest`: anonymised (twice), edit-protected YAML blocks
+  - `/outline`: `include_if` rules that cite the RFP
+  - `/deck`: one call per slide over 2–4 vetted blocks, limits enforced in Python, provenance,
+    review guards (invented figures/certifications, client claims not in the RFP, filled
+    placeholders), skeletons instead of invention
+  - `/edit` with a diff and history
+- **Render:** your template (`.pptx`/`.potx`) mapped via `layout_map.yaml`, a layered
+  architecture diagram, notes with sources, versioned output and a QA report. No LLM.
+- **Research:** a plan → multi-query retrieval → cited findings → gap round → synthesis loop,
+  with a hard LLM-call cap and a saved markdown report.
+- **Router:**
+  - every command and alias
+  - rules → classifier → clarification
+  - file-writing routes wait for `/approve`
+  - route line and "Next:" on every reply
+  - per-chat sessions
+  - `studio chat`
+- **Open WebUI:**
+  - the Proposal Studio pipe: attachments, confirmation dialog, download links, Valves
+  - "Agent · …" models
+  - PHI filter and `/` prompts
+  - localhost-only API installer
+  - `offline.env` (offline, no telemetry, Ollama cloud off, one model loaded)
+  - setup/start/smoke scripts for Windows and Unix
+- **Agents:** OpenCode and Claude Code (via Ollama's Anthropic API), verified headless; Hermes
+  shipped disabled. Plan runs in a throwaway copy → approve → apply → diff → approve copy-back,
+  with an isolated HOME, an env allowlist, no shell by default, timeouts and logs.
+- **Hardening:**
+  - `studio bench [--cpu]`: every budgeted step passes, GPU and CPU-only
+  - Open WebUI + studio idle RSS 736 MB
+  - worker context 8k
+  - docs: README, install, commands (generated), config, templates, agents, performance,
+    troubleshooting, privacy
+- **Release:**
+  - allowlisted bundle builder (tracked files only, private-path guard)
+  - `release.yml`: sdist + wheel + Windows zip, a clean-install check on Windows, then a GitHub
+    Release
+  - version 0.1.0 and CHANGELOG prepared
 
-### Phase 2 — RFP digest
-- **`studio/digest.py`**, a map-reduce over the indexed chunks:
-  - one schema-constrained call per section group of about 2k tokens
-  - the reduce step is plain Python
-- **Digest contents:** opportunity facts, business and technical problems, current state and
-  desired outcomes, requirements (functional, nonfunctional, compliance; mandatory or not),
-  evaluation criteria, compliance frameworks, systems mentioned, risks and red flags, and open
-  questions. Every item is cited.
-- **Python-side safeguards:**
-  - invalid citations are dropped
-  - de-duplication by text, then by embeddings
-  - citations of merged items are combined
-  - requirement ids are checked against the cited table rows
-  - conflicting facts (for example, two due dates) are flagged as red flags rather than
-    silently picked
-- **Outputs:**
-  - `digest.json` plus `digest.meta.json`, used for stale detection
-  - a Markdown summary
-  - an XLSX requirements compliance matrix (`out/<opp>-requirements-vN.xlsx`, never
-    overwritten)
+## Problems that real runs caught (all fixed)
 
-### Phase 3 — Template inspector + renderer (no LLM)
-- **Slide schemas** (`studio/deck/schemas.py`) for all 11 storyline slide types: title, bullet
-  slides, before/after, architecture layers, maturity stages and next steps. Each carries
-  speaker notes and sources (provenance). `slide_model()` builds strict, length-limited
-  versions as the LLM schema for the Phase 4 deck writer.
-- **Template inspector:** `studio template inspect` lists layouts and placeholder idx values
-  and writes a `.layouts.json` to help fill `config/layout_map.yaml`. `.potx` files open
-  through an in-memory content-type patch (verified).
-- **Renderer** (`studio/render/renderer.py`):
-  - removes the template's own slides
-  - maps each slide type to a layout and its fields to placeholders
-  - enforces limits: word-boundary truncation, item trimming
-  - deletes unfilled placeholders
-  - draws the architecture slide as layered boxes
-  - writes the sources into speaker notes
-  - saves versioned `<opp>-vN.pptx` files
-  - returns a QA report covering errors, truncations, empty placeholders and missing
-    provenance
-- **Sample template:** an original, neutral 16:9 template generated in code
-  (`studio template sample`).
-- **Results:** the sample deck renders 11 slides in ~0.03 s with zero QA errors, no shapes off
-  the slide, no overlaps and no empty placeholders. CI uploads the rendered deck as an
-  artifact.
+- **qwen3:8b output problems** (citations, ids, client claims, `{{date}}` slots):
+  - It mis-copied long citation labels. It now cites numbers, and Python adds the labels.
+  - It stamped the prompt's example id on every requirement. Ids are now checked against the
+    RFP's table rows.
+  - It copied a past client's claim onto a client slide, and filled a `{{date}}` slot with the
+    due date. Both are now flagged by Python guards.
+- **Harvest:** client names leaked into review notes. The notes are now anonymised too.
+- **Open WebUI:**
+  - FAISS and Open WebUI's torch crashed the server (duplicate OpenMP). Search is now NumPy, and
+    FAISS is removed.
+  - The confirmation dialog auto-approved when no browser was connected. It now needs a literal
+    yes.
+- **Agents:** opencode downloads a model catalogue at runtime. That and other fetches are now
+  disabled via env vars.
 
-### Phase 4 — Blocks, storyline, deck writer
-- **`/harvest`** (`studio/blocks.py`):
-  - one LLM call per past-proposal slide or section
-  - a second, deterministic anonymisation pass in Python: client names → `{{client}}`,
-    dates → `{{date}}`, amounts → `{{amount}}`, emails and phones dropped
-  - review flags for remaining figures
-  - human-editable YAML blocks, never overwritten once edited (hand edits are detected by
-    content hash)
-  - incremental, and searchable by embedding plus tags
-- **`/outline`** (`deck/storyline.py`): `include_if` rules over the digest. The real run
-  included governance via "compliance contains HIPAA [3.2 Compliance, p.2]". Toggles persist.
-- **`/deck` and `/edit`** (`deck/writer.py`):
-  - one call per slide, using 2–4 vetted blocks plus that slide type's digest facts
-  - provenance on every slide (block ids and RFP citations)
-  - limits checked in Python, with one shorten retry and then truncation
-  - a deterministic title slide
-  - skeleton slides when no blocks exist
-  - single-slide regeneration, and `/edit` with a diff plus history
-- **Review guards** (flagged, never hidden), shown as QA warnings at render time: invented
-  figures or certifications, client-slide statements not in the RFP, and placeholder dates
-  filled with unrelated values.
-- **Real run:** harvest took ~56 s for 6 units, leaving 5 clean blocks with no client data. The
-  11-slide deck took ~1 min 14 s, and render reported 0 QA errors. The guards caught a
-  past-client claim and a misused date.
+## Still open
 
-### Phase 5 — Offline research
-- **`studio library index`:** indexes `library/proposals` and `library/reference` in place,
-  including subfolders. It is incremental, removes deleted files, and blocks on possible PHI
-  unless you pass `--yes`. It shares one `index_files()` core with `/ingest`.
-- **`/research`** (`studio/research.py`), an explicit loop with no LangGraph:
-  1. Plan sub-questions, with rephrasings, in one router call.
-  2. Search every source with each sub-question and its rephrasings.
-  3. Draft cited findings: `[file, p.N]` / `[file, slide N]`, with uncited points dropped.
-  4. Run one gap round for weak findings.
-  5. Write the synthesis (summary, implications for this RFP, gaps).
-
-  A hard LLM-call cap (default 12) always keeps one call for synthesis. Reports are saved as
-  markdown, and without an active opportunity it runs on the library alone.
-- **Real run:** a FHIR R4 + HIPAA question over the RFP, the past proposals and the reference
-  docs took 5 LLM calls in ~1 min 18 s. The findings cited all three sources correctly, and the
-  gap round wasn't needed.
-
-### Phase 6 — Router core + `studio chat`
-- **`studio/router.py`:** one async `Router.handle(message, attachments, session, emit)`. It
-  parses every `/command` and alias (unknown ones get "Did you mean `/deck`?"), and handles
-  plain text with rules first (attachments, keywords, "?" with an indexed RFP), then the
-  `router` model's classifier, then a clarifying question below the confidence threshold.
-- **Confirmation:** `/render`, `/harvest` and `/agent` never auto-run. They wait for
-  `/approve` / `/reject`, and PHI warnings on ingest use the same mechanism.
-- **Every reply** starts with `→ routed to /x (rules | classifier, 0.95 | command)` and ends
-  with "Next:". Sessions are per chat id and persisted.
-- **Threading:** work runs in a worker thread, so the async host never blocks. Chunks stream
-  back, and status callbacks become Open WebUI-style status events.
-- **Shared views:** `studio/views.py` gives the CLI and chat the same output.
-- **`studio chat`:** a REPL with `:attach <file>` and `:quit`.
-- **Real run:** "When are proposals due?" went to `/ask` by rules, first answer text in 8.5 s
-  and cited. Classifier routing took 1–2 s (budget: under 15 s). "make the powerpoint" was held
-  until `/approve`, then rendered with 0 QA errors.
-
-### Phase 7 — Open WebUI integration + setup scripts
-- **VERIFY first** against the open-webui 0.13.0 source: pipe arguments, Valves, status and
-  confirmation events, how attachments are stored, file downloads, RAG injection, task calls,
-  the prompt/function APIs, and the offline/telemetry env vars (all recorded in DECISIONS.md).
-- **Open WebUI functions:**
-  - `owui/router_pipe.py`, the **Proposal Studio** model: attachments are ingested, the
-    confirmation dialog is used, new PPTX/XLSX/report files come back as download links,
-    Open WebUI's background tasks are ignored, and RAG context it prepends is stripped.
-  - `owui/phi_filter.py`: warns about (or blocks) possible PHI in typed messages.
-  - `owui/prompts/`: one `/` shortcut per command.
-
-  The functions are thin wrappers over the tested `studio.owui` bridge.
-- **Install and checks:** `studio owui install` (localhost-only API install), `studio owui
-  prompts`, and `studio smoke` (end-to-end on the real models).
-- **Scripts:** `setup` / `start` / `smoke_test` for Windows (no admin) and macOS/Linux, sharing
-  one `offline.env` (offline, no telemetry, no web search, Ollama cloud off, one model loaded,
-  RAG context in the system message, background tasks off). Open WebUI binds to 127.0.0.1 and
-  keeps its data in `.owui-data/`. Install guide: `docs/install.md`.
-- **Real Open WebUI run:** the pipe was installed through the API, then a PDF upload went to
-  `/ingest`, `/ask` answered with a citation in 7.5 s, `/digest xlsx` and an 11-slide `/deck`
-  ran, and "make the powerpoint" waited for `/approve` and returned a working PPTX download
-  link. No non-local network traffic.
-- **Two real bugs found and fixed:**
-  - FAISS and Open WebUI's torch crashed the server (duplicate OpenMP), so search is now exact
-    NumPy cosine and `faiss-cpu` is gone.
-  - The confirmation dialog auto-approved when no browser was connected (error dict was
-    truthy); it now needs a literal yes.
-
-## Verified on a real model
-Local Ollama with qwen3:8b and nomic-embed-text, on the synthetic Acme Health Plan RFP:
-
-| Check | Result |
-|---|---|
-| `ask` "When are proposals due?" | Correct, cited `[2 Submission Instructions, p.1]`, ~9 s |
-| `ask` on an off-topic question | "Not found in the RFP." |
-| `ask` "Which requirements are mandatory?" | R-01 and R-02 from the table, cited p.3 |
-| Re-ingest of an unchanged file | Skipped, nothing re-embedded |
-| `digest` | Due date, 30-slide limit, portal, R-01/R-02 mandatory, R-03 optional, HIPAA/HITRUST/CMS-0057, the 40/30/30 weights, all cited. ~1 min 50 s for 2 section groups |
-
-Problems that real runs exposed and that are now fixed in code:
-- The model mis-copied long citation labels. It now cites excerpt numbers and Python adds the
-  labels.
-- The model stamped the prompt's example id onto every requirement. Ids are now checked
-  against the cited table rows.
-- PDF table cells lost their spaces. Text is now read per cell box.
-
-## Quality
-- **101 offline tests** (no Ollama, no internet, no real template), covering config, guards, the
-  LLM client, ingest for every format, the index, answers and citations, sessions, the digest
-  and the CLI.
-- Tests use `FakeLLM` and a deterministic bag-of-words fake embedder.
-- Fixtures are synthetic ("Acme Health Plan") and generated at test time; they're never
-  committed.
-- ruff lint and format are clean. About 2.9k lines of source and 1.3k lines of tests.
-
-## Process
-- Git: only `dev` and `main`. All work is committed and pushed to `dev`, and the maintainer
-  promotes it to `main` by hand. There are no phase branches or PRs.
-- Docs: non-functional planning and tracking docs live in `vibes/`. Files that tools or GitHub
-  expect at the root stay there: README, LICENSE, CHANGELOG, CONTRIBUTING, CODE_OF_CONDUCT,
-  SECURITY, CLAUDE.md, AGENTS.md, `.claude/` and `.github/`.
-
-## Known issues and risks
-- `/research` synthesis (summary and implications) isn't itself cited and can blur facts; the
-  findings carry the citations. qwen3:8b's sub-questions tend to overlap.
-- Deck quality depends on the curated block library. With only 5 synthetic blocks, 4 vendor
-  slides render as skeletons. qwen3:8b still imports block claims and fills `{{date}}` slots;
-  these are flagged for review, not prevented.
-- `digest` takes ~55 s per section group on Apple silicon. Expect several minutes per group on
-  the 16 GB CPU-only Windows target; prompt and output size will be tuned in Phase 9.
-- Ingesting one RFP as both PDF and DOCX duplicates excerpts. The docs should recommend one
-  format per document.
-- The Windows scripts are syntax-checked in CI but haven't been run on a real Windows 11 laptop
-  yet. The browser confirmation dialog and the light-theme step are untested by hand.
-- `pip install open-webui` is multi-GB (torch), which puts the <2 GB idle RAM budget at risk.
-  Revisit in Phase 9.
-- Hermes Agent may lack a headless mode on Windows; Phase 8 will likely mark it unsupported.
-- CI hasn't yet been observed running on Windows.
-- Rendered decks have only been checked structurally. No LibreOffice here, and Quick Look hangs
-  headless, so open the CI `sample-deck` artifact in PowerPoint once to check it by eye.
-
-## Next up — Phase 8
-The agents route:
-- **VERIFY** the headless flags of opencode, claude and hermes with `--help`.
-- **Build `studio/agents/`:** config-driven adapters; a sandbox (copy files in, copy back only
-  on approval, path checks, env allowlist); plan → approve → apply; streaming; timeouts and
-  cancel; logs; a diff of changed files; Windows `.cmd` shims.
-- **Wire it up:** `owui/agents_pipe.py` (manifold), `/agent` in the router, and
-  `studio agent`.
+- **To release:** promote `dev` → `main`, then `/ship 0.1.0`. That tags `v0.1.0`; CI builds,
+  checks the install on Windows, and publishes the release.
+- **Not yet run for real:**
+  - Windows scripts on a real Windows 11 laptop (CI checks syntax, and the release job does a
+    clean install there)
+  - the in-browser confirmation dialog and the light-theme step
+  - the 16 GB Intel CPU-only target (estimated 2–4× the Mac CPU-only numbers)
+  - a visual check of the rendered deck in PowerPoint
+- **Quality limits with qwen3:8b:** agents rarely use their file tools; research synthesis isn't
+  cited; deck quality depends on curated blocks. See [PROGRESS.md](PROGRESS.md).
+- **Hermes Agent:** enable it once a live offline run is verified.
+- **Before publishing:** confirm your employment terms allow a personal open-source project in
+  this area, and that your firm allows these tools on work machines.
