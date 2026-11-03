@@ -160,6 +160,8 @@ class OllamaClient(BaseLLM):
             options["num_ctx"] = rc.num_ctx
         if rc.temperature is not None:
             options["temperature"] = rc.temperature
+        if rc.num_gpu is not None:
+            options["num_gpu"] = rc.num_gpu
         return {
             "model": rc.model,
             "messages": list(messages),
