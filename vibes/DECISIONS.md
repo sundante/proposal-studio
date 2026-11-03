@@ -366,3 +366,21 @@ Format:
   - Each run gets an isolated HOME/USERPROFILE inside the sandbox and an allowlisted
     environment (no inherited API keys or secrets).
 - Spec impact: §10.1 flags replaced by the verified ones; Hermes disabled by default.
+
+## 2026-11-04 — Hardening and docs  (Phase 9)
+- Context: Checking §15 on real models and writing the user docs.
+- Decision:
+  1. `studio bench [--cpu]` times every route against the budget in a throwaway copy;
+     `--cpu` sets Ollama `num_gpu: 0` for all roles (new optional `num_gpu` in `RoleConfig`) to
+     approximate the CPU-only target. Results are in `docs/performance.md`: every budgeted
+     step passes on this Mac with GPU and CPU-only. Open WebUI + studio idle RSS is 736 MB.
+  2. Worker `num_ctx` 16384 → 8192 (the largest prompt fits; halves the KV cache).
+     `studio smoke` passes on real models after the change.
+  3. `studio doctor` notes when several models are loaded at once (Ollama tray app ignoring
+     `OLLAMA_MAX_LOADED_MODELS`).
+  4. `docs/commands.md` is generated from `routes.yaml` (`studio docs`) and a test keeps it in
+     sync; a test checks every relative `.md` link in README and docs/.
+  5. Hygiene: explicit UTF-8 on all text I/O (Windows defaults to cp1252); CONTRIBUTING points
+     PRs at `dev`.
+- Why: Measured, not assumed, performance; docs that can't drift from the code.
+- Spec impact: none.

@@ -11,20 +11,20 @@
 | 6 | Router core | ✅ done | 59b888f |
 | 7 | Open WebUI integration + setup scripts | ✅ done | 2b4e1b9 |
 | 8 | Agents route | ✅ done | 0761ec7 |
-| 9 | Hardening + docs | ⬜ todo | |
+| 9 | Hardening + docs | ✅ done | 6dd79d4 |
 | 10 | Release pipeline + v0.1.0 | ⬜ todo | |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 9 — Hardening + docs
+- Next step: Phase 10 — Release pipeline + v0.1.0
 
 ## Known issues
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side; the
   docs should recommend one format per document).
-- `/digest` takes ~55 s per section group on an Apple-silicon Mac with qwen3:8b; expect several
-  minutes per group on the 16 GB CPU-only target. Revisit prompt/output size in Phase 9.
+- Performance measured with `studio bench` (docs/performance.md); the Intel CPU-only target
+  itself is still unmeasured (estimated 2–4× the Mac CPU-only numbers).
 - Rendered decks were checked structurally (bounds, overlaps, empty placeholders), not visually:
   no LibreOffice on the dev machine and Quick Look hangs headless. Open the CI `sample-deck`
   artifact in PowerPoint once to eyeball it.
