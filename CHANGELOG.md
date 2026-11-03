@@ -6,59 +6,63 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Added
-- `/agent <name> <task>` and `studio agent`: sandboxed local agent CLIs (OpenCode, Claude Code
-  via Ollama; Hermes disabled until verified) with plan in a throwaway copy → approve → apply →
-  diff → approve copy-back, isolated HOME, env allowlist, timeouts and logs; "Agent · …"
-  models in Open WebUI (`owui/agents_pipe.py`); `docs/agents.md`.
-- Open WebUI integration: the **Proposal Studio** pipe (`owui/router_pipe.py`) with Valves,
-  attachments → `/ingest`, confirmation dialog, and download links for PPTX/XLSX/reports; a PHI
-  warning inlet filter (`owui/phi_filter.py`); slash-command Prompts (`owui/prompts/`).
-- `studio owui install` (local API install of functions + prompts), `studio owui prompts`,
-  `studio smoke` (end-to-end check on real models).
-- `scripts/setup|start|smoke_test` for Windows (`.ps1`, no admin) and macOS/Linux (`.sh`), with a
-  shared offline/no-telemetry environment (`scripts/offline.env`); `docs/install.md`.
+## [0.1.0] - 2026-11-04
 
-### Changed
-- Vector search uses exact cosine similarity with NumPy instead of FAISS (FAISS and Open WebUI's
-  torch crashed together on duplicate OpenMP runtimes). Existing indexes rebuild on next ingest.
-- Chat router: every command and alias, auto-routing (rules → classifier → clarification),
-  confirmation for file-writing routes (`/approve`, `/reject`), route status line, "Next:"
-  hints, per-chat sessions; async `Router.handle()` with streaming and status events.
-- `studio chat` REPL over the router (`:attach <file>`, `:quit`).
-- `/research`: offline multi-step research over `library/` and the active RFP (plan,
-  multi-query retrieval, cited findings, one gap round, synthesis) with a hard LLM-call cap;
-  reports saved as markdown.
-- `studio library index|status`: index `library/proposals` and `library/reference` in place.
-- `/harvest`: reusable, anonymised blocks from past proposals (`library/blocks/*.yaml`), with
-  edit protection, incremental re-harvest and review flags; `/blocks` list/search.
-- `/outline` with `include_if` rules over the digest and persistent `/toggle` choices.
-- `/deck` (all or one slide) tailoring vetted blocks to the digest with provenance, limit
-  enforcement and review flags for unsupported claims; `/edit` with a before/after diff and
-  deck history.
-- `/render`: deck.json → versioned PPTX on your template (no LLM), with layout/placeholder
-  mapping in `config/layout_map.yaml`, limit enforcement, layered architecture diagram, speaker
-  notes with sources, and a QA report. `.potx` templates supported.
-- `studio template inspect` (layouts + placeholders → `.layouts.json`) and `studio template
-  sample`; an original neutral sample template in `templates/sample/`.
-- Slide schemas for all 11 storyline slide types; CI job uploading the rendered sample deck.
-- `/digest`: map-reduce RFP digest (`digest.json`) with cited problems, before/after,
-  requirements, evaluation criteria, compliance, systems, risks and open questions;
-  de-duplication, verified requirement ids, conflict flags; Markdown summary; optional XLSX
-  requirements matrix (`studio digest --xlsx`); stale-digest detection in `status`.
-- Ingest for PDF, DOCX, XLSX, PPTX, TXT and MD with heading paths, page/slide numbers and
-  row-wise tables; section-aware chunking; PHI warning with confirmation.
-- Per-opportunity FAISS index with incremental updates (file hashing) and library collections.
-- `/ask` answers with `[section, p.N]` citations, or "Not found in the RFP."
-- Opportunities and per-chat sessions under `workspace/`.
-- CLI: `studio new|use|ingest|ask|status`.
-- Project scaffold (src layout, `studio` package, `pyproject.toml`, ruff and pytest config).
-- Open-source foundations: Apache-2.0 licence, contributing guide, code of conduct, security
-  policy, issue and PR templates, Dependabot, pre-commit with a private-path guard.
-- CI on Windows and Ubuntu with Python 3.11 and 3.12.
-- Default config (`config/*.yaml`) with pydantic validation, plus `config/overrides.yaml` for
-  runtime changes.
-- Ollama client with schema-constrained output, retries, streaming, batched embeddings and a
-  single-flight lock.
-- Guards: cloud-model block, path sandbox, PHI scan.
-- CLI: `studio --version`, `studio config show|set|reset`, `studio doctor`.
+First release: a fully local, offline proposal workbench on Open WebUI + Ollama.
+
+### Added
+- **RFP intake:**
+  - ingest for PDF, DOCX, XLSX, PPTX, TXT and MD, keeping heading paths, page/slide numbers
+    and row-wise tables
+  - PHI scan with confirmation
+  - incremental per-opportunity index
+  - `/ask` with `[section, p.N]` citations, or "Not found in the RFP."
+- **`/digest`:** a map-reduce RFP digest of problems, before/after, requirements (ids verified
+  against the RFP), evaluation criteria, compliance, systems, risks and open questions, with
+  citations, de-duplication and conflict flags. Includes a Markdown summary and an XLSX
+  requirements matrix.
+- **Deck:**
+  - `/harvest` builds anonymised, human-curated blocks from past proposals (edit-protected,
+    incremental)
+  - `/outline` uses `include_if` storyline rules and persistent `/toggle` choices
+  - `/deck` tailors vetted blocks to the digest, with provenance, limit enforcement and review
+    flags for unsupported claims
+  - `/edit` shows a before/after diff and keeps a deck history
+- **`/render`:** deck → versioned PPTX on *your* template (`.pptx`/`.potx`) with no LLM. Includes
+  `studio template inspect`, a layered architecture diagram, sources in the speaker notes, a QA
+  report, and an original neutral sample template.
+- **`/research`:** offline multi-step research over the library and the active RFP, with cited
+  findings, one gap round and a hard LLM-call cap. Plus `studio library index|status`.
+- **`/agent`:** sandboxed local agent CLIs (OpenCode, and Claude Code via local Ollama; Hermes
+  shipped disabled). Each run plans in a throwaway copy, then approve → apply → diff → approve
+  copy-back, with an isolated HOME and an env allowlist.
+- **Chat router:**
+  - every command and alias
+  - auto-routing: rules, then the classifier, then a clarifying question
+  - confirmation before file-writing routes
+  - a route status line and "Next:" hints on every reply
+  - per-chat sessions
+  - `studio chat` REPL
+- **Open WebUI integration:**
+  - the **Proposal Studio** pipe: attachments, confirmation dialog, download links, Valves
+  - "Agent · …" models
+  - PHI warning filter
+  - slash-command prompts
+  - `studio owui install`
+- **Setup:** `scripts/setup|start|smoke_test` for Windows (no admin) and macOS/Linux, sharing one
+  offline, no-telemetry environment (`scripts/offline.env`).
+- **Tools:** `studio doctor`, `studio smoke` and `studio bench` (performance against the budget).
+- **Docs:** install, commands, configuration, templates, agents, performance, troubleshooting and
+  privacy.
+- **Open-source foundations:** Apache-2.0, contributing guide, code of conduct, security policy,
+  issue/PR templates, Dependabot, pre-commit with a private-path guard, CI on Windows and Ubuntu
+  (Python 3.11/3.12), and a release workflow (sdist, wheel, Windows bundle zip, install check on
+  Windows).
+
+### Notes
+- Vector search is exact cosine similarity with NumPy: FAISS and Open WebUI's torch crash
+  together on duplicate OpenMP runtimes.
+- Tested with Open WebUI 0.13.0, Ollama 0.40, and qwen3:8b / qwen3:4b / nomic-embed-text.
+
+[Unreleased]: https://github.com/sundante/proposal-studio/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sundante/proposal-studio/releases/tag/v0.1.0
