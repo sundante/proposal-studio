@@ -109,6 +109,14 @@ class VectorIndex:
     def __len__(self) -> int:
         return len(self._chunks)
 
+    def iter_chunks(self) -> list[Chunk]:
+        """All chunks in ingest order (by FAISS id)."""
+        return [self._chunks[cid] for cid in sorted(self._chunks)]
+
+    def manifest_hashes(self) -> dict[str, str]:
+        """``{file: hash}`` for every indexed file."""
+        return {name: entry["hash"] for name, entry in sorted(self._files.items())}
+
     def files(self) -> list[str]:
         """Names of indexed files."""
         return sorted(self._files)

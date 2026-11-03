@@ -157,6 +157,8 @@ class RagConfig(_Strict):
     chunk_overlap: int = Field(default=100, ge=0, le=1000)
     top_k: int = Field(default=6, ge=1, le=50)
     min_score: float = Field(default=0.25, ge=-1.0, le=1.0)
+    digest_group_tokens: int = Field(default=2000, ge=200, le=8000)
+    dedupe_similarity: float = Field(default=0.9, ge=0.5, le=1.0)
 
     @model_validator(mode="after")
     def _check_overlap(self) -> RagConfig:
