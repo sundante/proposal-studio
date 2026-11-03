@@ -33,6 +33,18 @@ jobs:
           ruff format --check .
       - name: Private-path guard
         run: python scripts/check_no_private_paths.py --all
+      - name: Script syntax (PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem scripts/*.ps1) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $errors | ForEach-Object { Write-Error "$($f.Name): $_" }; exit 1 }
+          }
+      - name: Script syntax (bash)
+        if: runner.os == 'Linux'
+        run: for f in scripts/*.sh; do bash -n "$f"; done
       - name: Test
         run: pytest -q
 

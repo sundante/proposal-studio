@@ -4,6 +4,7 @@ workspace/
 templates/*
 !templates/sample/
 config/overrides.yaml
+.owui-data/
 
 # Generated decks (fixtures and the sample template are allowed)
 *.pptx
