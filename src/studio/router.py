@@ -36,6 +36,8 @@ from studio import ingest as ingestmod
 from studio import research as researchmod
 from studio import session as sessmod
 from studio import views
+from studio.agents.adapters import SLOW_WARNING, agents_text, run_text
+from studio.agents.base import AgentError, AgentRunner
 from studio.config import RoutesConfig, StudioConfig
 from studio.deck import storyline, writer
 from studio.deck.schemas import Deck
@@ -60,6 +62,7 @@ USER_ERRORS = (
     TemplateError,
     GuardError,
     LLMError,
+    AgentError,
 )
 # Commands the classifier may pick (session/meta commands need an explicit /command).
 CLASSIFIER_EXCLUDE = {"approve", "reject", "config", "new", "use", "toggle", "library", "edit"}
@@ -433,9 +436,54 @@ def h_library(c: Call) -> Iterator[str]:
 
 
 def h_agent(c: Call) -> Iterator[str]:
-    yield "Agent runs arrive in Phase 8 (sandboxed, with plan → approve → apply)." + _next(
-        "`/help`"
+    """`/agent <name> <task>`: plan (throwaway copy) → approve → apply → approve → copy back."""
+    parts = c.args.split(maxsplit=1)
+    if not parts:
+        yield agents_text(c.cfg.agents) + _next("`/agent <name> <task>`")
+        return
+    stage = "plan"
+    if parts[0] in ("--apply", "--copy-back"):
+        if not c.confirmed:
+            raise RouterError("Start with `/agent <name> <task>`; later steps run via `/approve`.")
+        stage, parts = parts[0][2:], parts[1].split(maxsplit=1) if len(parts) > 1 else []
+    if len(parts) != 2:
+        raise RouterError(
+            "Usage: `/agent <name> <task>`, e.g. `/agent opencode tighten deck.json`."
+        )
+    name, task = parts
+    opp = c.opportunity()
+    runner = AgentRunner(
+        c.cfg.agents, name, c.ctx.root, opp.path, block_cloud=c.cfg.models.block_cloud_models
     )
+
+    def progress(line: str) -> None:
+        c.status(f"{name}: {line[:90]}")
+
+    if stage == "plan":
+        yield SLOW_WARNING + "\n\n"
+        c.status(f"{name}: planning in a throwaway copy…")
+        run = runner.plan(task, on_line=progress)
+        yield run_text(run)
+        if run.ok:
+            c.pend("agent", f"--apply {name} {task}")
+            yield _next(f"`/approve` to let {name} make the changes in its sandbox, or `/reject`")
+        else:
+            yield _next("check the log, or try a clearer task")
+    elif stage == "apply":
+        c.status(f"{name}: applying in the sandbox…")
+        run = runner.apply(task, on_line=progress)
+        yield run_text(run)
+        if run.ok and run.changed:
+            c.pend("agent", f"--copy-back {name} {task}")
+            yield _next("`/approve` to copy the changes into the opportunity, or `/reject`")
+        else:
+            yield _next("`/agent` again with a different task")
+    else:
+        copied = runner.copy_back()
+        listed = ", ".join(f"`{p}`" for p in copied) or "nothing (no changes)"
+        yield f"Copied back: {listed}. Previous versions are in `history/`." + _next(
+            "`/render` to see the result"
+        )
 
 
 def h_config(c: Call) -> Iterator[str]:

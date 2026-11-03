@@ -520,6 +520,46 @@ def _emit_status(event: dict) -> None:
         _status(data.get("description", ""))
 
 
+# --- agents --------------------------------------------------------------------------------
+
+
+@app.command("agent")
+def agent_cmd(
+    name: str = typer.Argument(None, help="Agent name from config/agents.yaml; omit to list."),
+    task: str = typer.Argument(None, help="What the agent should do."),
+    yes: bool = typer.Option(False, "--yes", help="Apply and copy back without asking."),
+    opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
+) -> None:
+    """Run an agent CLI in the opportunity sandbox: plan → apply → copy back (with approvals)."""
+    from studio.agents.adapters import SLOW_WARNING, agents_text, run_text
+    from studio.agents.base import AgentError, AgentRunner
+
+    cfg = cfgmod.load_config()
+    if not name:
+        typer.echo(agents_text(cfg.agents))
+        return
+    if not task:
+        _fail('Usage: studio agent <name> "<task>"')
+    try:
+        root, opp_dir, _opp_id = _opp_dir(opp)
+        runner = AgentRunner(
+            cfg.agents, name, root, opp_dir, block_cloud=cfg.models.block_cloud_models
+        )
+        typer.echo(SLOW_WARNING.strip("_"))
+        plan = runner.plan(task, on_line=lambda line: _status(line[:120]))
+        typer.echo(run_text(plan))
+        if not plan.ok or not (yes or typer.confirm("Apply this in the sandbox?")):
+            raise typer.Exit(0 if plan.ok else 1)
+        applied = runner.apply(task, on_line=lambda line: _status(line[:120]))
+        typer.echo(run_text(applied))
+        if not applied.changed or not (yes or typer.confirm("Copy the changes back?")):
+            return
+        copied = runner.copy_back()
+        typer.echo(f"Copied back: {', '.join(copied) or 'nothing'}")
+    except (session.SessionError, AgentError) as exc:
+        _fail(str(exc))
+
+
 # --- Open WebUI and smoke test ---------------------------------------------------------------
 
 

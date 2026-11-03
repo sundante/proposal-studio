@@ -168,7 +168,7 @@ def test_config_agent_help_status(home: Path) -> None:
         "/config set worker.model big:cloud"
     )
     assert "Overrides cleared" in router.reply("/config reset")
-    assert "Phase 8" in router.reply("/agent opencode fix it")
+    assert "## Agents" in router.reply("/agent")
     help_text = router.reply("/help")
     assert "`/research`" in help_text and "`/q`→`/ask`" in help_text
     assert "No active opportunity" in router.reply("/status")
