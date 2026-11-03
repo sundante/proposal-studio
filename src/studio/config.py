@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from studio.guards import GuardError, check_model_allowed
 
-SECTIONS = ("models", "routes", "agents", "storyline", "layout_map", "rag")
+SECTIONS = ("models", "routes", "agents", "storyline", "layout_map", "rag", "deck")
 OVERRIDES_FILE = "overrides.yaml"
 
 
@@ -221,6 +221,18 @@ class RagConfig(_Strict):
         return self
 
 
+# --- deck.yaml ------------------------------------------------------------------------------
+
+
+class DeckConfig(_Strict):
+    """Block harvest and deck-writer settings."""
+
+    blocks_per_slide: int = Field(default=3, ge=2, le=4)
+    min_block_score: float = Field(default=0.2, ge=-1.0, le=1.0)
+    harvest_min_chars: int = Field(default=80, ge=0)
+    include_flagged_blocks: bool = False  # use blocks marked needs_review when writing
+
+
 class StudioConfig(_Strict):
     """The effective configuration: all sections merged with overrides."""
 
@@ -230,6 +242,7 @@ class StudioConfig(_Strict):
     storyline: StorylineConfig
     layout_map: LayoutMapConfig
     rag: RagConfig = Field(default_factory=RagConfig)
+    deck: DeckConfig = Field(default_factory=DeckConfig)
 
     @model_validator(mode="after")
     def _check_agent_models(self) -> StudioConfig:
@@ -317,7 +330,7 @@ def resolve_key(key: str, effective: dict[str, Any]) -> list[str]:
     parts = [p for p in key.strip().split(".") if p]
     if not parts:
         raise ConfigError("Empty config key.")
-    for prefix in ([], ["models"], ["models", "roles"], ["routes"], ["rag"]):
+    for prefix in ([], ["models"], ["models", "roles"], ["routes"], ["rag"], ["deck"]):
         path = prefix + parts
         node: Any = effective
         for part in path:

@@ -290,6 +290,7 @@ def _render_slide(
     if isinstance(slide, ArchitectureSlide):
         _draw_architecture(pptx_slide, slide, spec, prs, limits, qa)
 
+    qa.warnings.extend(f"{slide.id}: review — {flag}" for flag in slide.review)
     notes = truncate(slide.speaker_notes, limits.notes) if slide.speaker_notes else ""
     if len(slide.speaker_notes.strip()) > limits.notes:
         qa.truncated.append(f"{slide.id}.speaker_notes")

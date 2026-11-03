@@ -49,6 +49,7 @@ class SlideBase(_Model):
     title: str
     speaker_notes: str = ""
     sources: list[str] = Field(default_factory=list)  # block ids + digest citations
+    review: list[str] = Field(default_factory=list)  # things a human should check
 
 
 class TitleSlide(SlideBase):
@@ -244,16 +245,22 @@ def check_limits(slide: SlideBase, limits: Limits) -> list[LimitIssue]:
     return issues
 
 
-def slide_model(slide_type: str, limits: Limits) -> type[BaseModel]:
-    """A strict model for ``slide_type`` with the limits as JSON-schema constraints.
+def slide_model(slide_type: str, limits: Limits, *, enforce: bool = True) -> type[BaseModel]:
+    """The content model for ``slide_type`` (no ``id``/``sources``; those are filled in code).
 
-    Used as the deck writer's structured-output schema; ``id``/``sources`` are filled in code.
+    With ``enforce`` the limits become ``maxLength``/``maxItems`` constraints, for validating
+    content. With ``enforce=False`` the shape is the same but unconstrained: the deck writer
+    uses that as the LLM schema, because grammar-enforced lengths cut text mid-word.
     """
 
     def text(max_len: int) -> Any:
+        if not enforce:
+            return str
         return Annotated[str, StringConstraints(min_length=1, max_length=max_len)]
 
     def items(item: Any, lo: int, hi: int) -> Any:
+        if not enforce:
+            return list[item]
         return Annotated[list[item], Field(min_length=lo, max_length=hi)]
 
     lo, hi = limits.min_bullets, limits.max_bullets
