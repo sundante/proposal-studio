@@ -1,0 +1,39 @@
+# Client / private content — never commit
+library/
+workspace/
+templates/*
+!templates/sample/
+config/overrides.yaml
+
+# Generated decks (fixtures and the sample template are allowed)
+*.pptx
+*.potx
+!tests/fixtures/**/*.pptx
+!templates/sample/**
+
+# Indexes and logs
+*.faiss
+*.index
+logs/
+*.log
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/settings.local.json
