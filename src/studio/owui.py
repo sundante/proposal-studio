@@ -353,7 +353,10 @@ def install(
     routes = cfgmod.load_config(root).routes
     for entry in prompt_entries(routes):
         resp = client.post("/prompts/create", json=entry)
-        if resp.status_code == 400 and "taken" in resp.text.lower():
+        error_text = resp.text.lower()
+        if resp.status_code == 400 and (
+            "already registered" in error_text or "command taken" in error_text
+        ):
             log(f"Prompt /{entry['command']} already exists (kept)")
             continue
         check(resp, f"prompt /{entry['command']}")

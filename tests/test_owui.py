@@ -246,7 +246,12 @@ def _api(existing: bool, seen: list):
         if request.url.path.endswith("/prompts/create") and existing:
             return httpx.Response(
                 400,
-                json={"detail": "Uh-oh! This command is already registered. Command taken"},
+                json={
+                    "detail": (
+                        "Uh-oh! This command is already registered. "
+                        "Please choose another command string."
+                    )
+                },
             )
         return httpx.Response(200, json={"id": "x", "is_active": False, "is_global": False})
 
