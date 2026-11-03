@@ -1,6 +1,6 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-03 · Branch `dev` · 5 of 11 phases done · 145 tests passing_
+_Last updated: 2026-11-03 · Branch `dev` · 6 of 11 phases done · 155 tests passing_
 
 Proposal Studio is a fully local, offline proposal workbench. It turns RFP documents into an
 AI-practice proposal deck on the user's own PowerPoint template, answers RFP questions with
@@ -18,8 +18,9 @@ reasoning behind each deviation is in [DECISIONS.md](DECISIONS.md).
 | 2 | RFP digest (`digest.json`, summary, XLSX matrix) | ✅ done |
 | 3 | Template inspector + PPTX renderer (no LLM) | ✅ done |
 | 4 | Blocks, storyline, deck writer | ✅ done |
-| 5 | Offline research | ⬜ next |
-| 6–10 | Router, Open WebUI, agents, hardening, release | ⬜ todo |
+| 5 | Offline research | ✅ done |
+| 6 | Router core | ⬜ next |
+| 7–10 | Open WebUI, agents, hardening, release | ⬜ todo |
 
 What a user can do today, from the command line (there is no chat UI until Phase 7):
 
@@ -33,6 +34,8 @@ studio status                                   # files, chunks, digest (stale?)
 studio harvest --client "Old Client"           # anonymised blocks from library/proposals
 studio outline && studio deck                   # which slides + tailored deck.json
 studio edit platform "shorter, mention FHIR"    # revise one slide, shows a diff
+studio library index                            # index library/proposals + library/reference
+studio research "How do we approach FHIR R4?"   # cited offline research report
 studio template inspect templates/firm.potx     # layouts + placeholder idx → firm.layouts.json
 studio render --deck tests/fixtures/sample_deck.json --out build/   # PPTX + QA report
 studio config set worker.model qwen3:4b         # runtime override; cloud models rejected
@@ -150,6 +153,23 @@ studio config set worker.model qwen3:4b         # runtime override; cloud models
   11-slide deck took ~1 min 14 s, and render reported 0 QA errors. The guards caught a
   past-client claim and a misused date.
 
+### Phase 5 — Offline research
+- **`studio library index`:** indexes `library/proposals` and `library/reference` in place,
+  including subfolders. It is incremental, removes deleted files, and blocks on possible PHI
+  unless you pass `--yes`. It shares one `index_files()` core with `/ingest`.
+- **`/research`** (`studio/research.py`), an explicit loop with no LangGraph:
+  1. Plan sub-questions, with rephrasings, in one router call.
+  2. Search every source with each sub-question and its rephrasings.
+  3. Draft cited findings: `[file, p.N]` / `[file, slide N]`, with uncited points dropped.
+  4. Run one gap round for weak findings.
+  5. Write the synthesis (summary, implications for this RFP, gaps).
+
+  A hard LLM-call cap (default 12) always keeps one call for synthesis. Reports are saved as
+  markdown, and without an active opportunity it runs on the library alone.
+- **Real run:** a FHIR R4 + HIPAA question over the RFP, the past proposals and the reference
+  docs took 5 LLM calls in ~1 min 18 s. The findings cited all three sources correctly, and the
+  gap round wasn't needed.
+
 ## Verified on a real model
 Local Ollama with qwen3:8b and nomic-embed-text, on the synthetic Acme Health Plan RFP:
 
@@ -185,6 +205,8 @@ Problems that real runs exposed and that are now fixed in code:
   SECURITY, CLAUDE.md, AGENTS.md, `.claude/` and `.github/`.
 
 ## Known issues and risks
+- `/research` synthesis (summary and implications) isn't itself cited and can blur facts; the
+  findings carry the citations. qwen3:8b's sub-questions tend to overlap.
 - Deck quality depends on the curated block library. With only 5 synthetic blocks, 4 vendor
   slides render as skeletons. qwen3:8b still imports block claims and fills `{{date}}` slots;
   these are flagged for review, not prevented.
@@ -201,10 +223,12 @@ Problems that real runs exposed and that are now fixed in code:
 - Rendered decks have only been checked structurally. No LibreOffice here, and Quick Look hangs
   headless, so open the CI `sample-deck` artifact in PowerPoint once to check it by eye.
 
-## Next up — Phase 5
-Offline research (`/research`):
-- decompose the question into sub-questions
-- multi-query retrieval over `library/` (proposals and reference) and the active RFP
-- cited findings, then one gap-check round
-- a markdown report saved to `workspace/<opp>/research/`
-- a hard cap on LLM calls, with progress events
+## Next up — Phase 6
+Router core (`studio/router.py`):
+- every chat command plus aliases, through a single `handle(message, attachments, session,
+  emit)` entry point
+- auto-routing: rules first, then the classifier, then a clarifying question when confidence
+  is low
+- file-writing routes (`/render`, `/agent`, `/harvest`) never auto-run without confirmation
+- a "→ routed to …" status line and "Next:" hints
+- a `studio chat` REPL

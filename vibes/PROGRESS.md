@@ -7,7 +7,7 @@
 | 2 | RFP digest | ✅ done | 72e0a75 |
 | 3 | Template inspector + renderer | ✅ done | f68e3e1 |
 | 4 | Blocks, storyline, deck writer | ✅ done | cb2b909 |
-| 5 | Offline research | ⬜ todo | |
+| 5 | Offline research | ✅ done | 9e1ede5 |
 | 6 | Router core | ⬜ todo | |
 | 7 | Open WebUI integration + setup scripts | ⬜ todo | |
 | 8 | Agents route | ⬜ todo | |
@@ -18,7 +18,7 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 5 — Offline research
+- Next step: Phase 6 — Router core
 
 ## Known issues
 - Ollama keeps the embed model and worker loaded together unless `OLLAMA_MAX_LOADED_MODELS=1`
@@ -33,3 +33,5 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - Deck quality depends on curated blocks: with only 5 synthetic blocks, 4 vendor slides render as
   skeletons. qwen3:8b still imports block claims into client slides and fills `{{date}}` slots;
   both are flagged for review, not prevented.
+- `/research` synthesis (summary/implications) is not itself cited and can blur facts; the
+  findings carry the citations. Sub-questions from qwen3:8b tend to overlap.

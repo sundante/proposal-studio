@@ -178,3 +178,27 @@ Format:
   8. Every deck write copies the previous `deck.json` to `history/deck-<ts>.json`.
 - Why: Small local models drift; provenance and Python checks keep the deck honest.
 - Spec impact: §9.3 slides gain `review: list[str]`; §3 adds `config/deck.yaml`.
+
+## 2026-11-03 — Offline research choices  (Phase 5)
+- Context: Building §11 (`/research`) and running it on qwen3:8b over a synthetic library.
+- Decision:
+  1. No LangGraph: `research.py` is a small explicit loop (plan → multi-query retrieval →
+     per-sub-question findings → one gap round → synthesis). Easier to test and to cap.
+  2. Library indexing: `ingest.index_files()` is the shared core (hash, extract, PHI scan,
+     chunk, embed). `/ingest` copies RFP files into the opportunity; `studio library index`
+     indexes `library/{proposals,reference}` in place, subfolders included, named by relative
+     path; deleted files are removed. PHI hits block indexing until `--yes`.
+  3. New `config/research.yaml` (`ResearchConfig`): `max_llm_calls` 12, `max_sub_questions` 5,
+     `top_k_per_query` 4, `excerpts_per_question` 6, `weak_score` 0.35, `sources`.
+  4. The call cap counts logical model requests (each may include `generate_structured`'s own
+     validation retries). One call is always reserved for synthesis; the plan is sized to the
+     budget, and the gap round is skipped (with a note) when it can't fit.
+  5. Rephrasings come from the planning call (not one call per sub-question) to save budget.
+  6. Findings cite excerpt numbers; Python maps them to `[file, p.N]` / `[file, slide N]` and
+     drops uncited points. A sub-question is weak if it has no points, evidence isn't
+     "strong", or its best retrieval score is below `weak_score`.
+  7. With no active opportunity, research runs on the library alone and saves to
+     `workspace/research/`; otherwise it includes the RFP and saves to
+     `workspace/<opp>/research/`. Reports never overwrite (`-2`, `-3`…).
+- Why: Bounded, testable research on a 16 GB CPU-only machine.
+- Spec impact: §3 adds `config/research.yaml`.

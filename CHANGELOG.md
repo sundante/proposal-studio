@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `/research`: offline multi-step research over `library/` and the active RFP (plan,
+  multi-query retrieval, cited findings, one gap round, synthesis) with a hard LLM-call cap;
+  reports saved as markdown.
+- `studio library index|status`: index `library/proposals` and `library/reference` in place.
 - `/harvest`: reusable, anonymised blocks from past proposals (`library/blocks/*.yaml`), with
   edit protection, incremental re-harvest and review flags; `/blocks` list/search.
 - `/outline` with `include_if` rules over the digest and persistent `/toggle` choices.
