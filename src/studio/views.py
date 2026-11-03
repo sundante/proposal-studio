@@ -131,3 +131,65 @@ def library_status_text(root: Path) -> str:
         lines.append(f"{name}: {len(index.files())} files, {len(index)} chunks")
         lines += [f"  - {f} ({index.file_chunk_count(f)} chunks)" for f in index.files()]
     return "\n".join(lines)
+
+
+EXAMPLES = {
+    "new": "/new acme-2026 Acme Health Plan AI platform",
+    "use": "/use acme-2026",
+    "ingest": "(attach files) /ingest",
+    "ask": "/ask Which requirements are mandatory?",
+    "digest": "/digest xlsx",
+    "harvest": "/harvest Old Client Inc, Example Hospital",
+    "blocks": "/blocks mlops observability",
+    "toggle": "/toggle why_us off",
+    "deck": "/deck platform",
+    "edit": "/edit platform shorter, mention FHIR R4",
+    "research": "/research How have we approached prior authorization before?",
+    "library": "/library index",
+    "agent": "/agent opencode tighten the bullets in deck.json",
+    "config": "/config set worker.model qwen3:4b",
+}
+
+
+def commands_markdown(routes: Any) -> str:
+    """docs/commands.md, generated from config/routes.yaml (``studio docs``)."""
+    lines = [
+        "# Commands",
+        "",
+        "<!-- Generated from config/routes.yaml by `studio docs`. Do not edit by hand. -->",
+        "",
+        "Type these in the **Proposal Studio** model in Open WebUI, in `studio chat`, or use the",
+        "matching `studio <command>` CLI. Plain text works too: questions go to `/ask` once an RFP",
+        "is ingested, and other requests are routed automatically. Every reply shows",
+        "`→ routed to /x (how)`.",
+        "",
+        "| Command | What it does | Example |",
+        "|---|---|---|",
+    ]
+    for name, spec in routes.commands.items():
+        example = EXAMPLES.get(name, f"/{name}")
+        lines.append(f"| `/{name}` | {spec.help.replace('|', '/')} | `{example}` |")
+    lines += ["", "## Aliases", ""]
+    lines += [f"- `/{alias}` → `/{target}`" for alias, target in routes.aliases.items()]
+    lines += [
+        "",
+        "## Confirmation",
+        "",
+        "These commands write files, so they never run from plain text without confirmation: "
+        + ", ".join(f"`/{r}`" for r in routes.confirm_routes)
+        + ". Approve in the dialog or with `/approve` (`/yes`), or cancel with `/reject` (`/no`).",
+        "",
+        "## Auto-routing keywords",
+        "",
+    ]
+    lines += [
+        f"- `/{route}`: " + ", ".join(f'"{k}"' for k in words)
+        for route, words in routes.keywords.items()
+    ]
+    lines += [
+        "",
+        f"Anything else goes to the router model; below confidence {routes.auto_threshold} you get "
+        "a one-line clarifying question.",
+        "",
+    ]
+    return "\n".join(lines)

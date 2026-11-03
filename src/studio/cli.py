@@ -605,6 +605,31 @@ def smoke_cmd(
         raise typer.Exit(1)
 
 
+@app.command("docs")
+def docs_cmd() -> None:
+    """Regenerate docs/commands.md and owui/prompts/ from config/routes.yaml."""
+    from studio.owui import write_prompts
+
+    root = cfgmod.project_root()
+    routes = cfgmod.load_config().routes
+    (root / "docs").mkdir(exist_ok=True)
+    (root / "docs" / "commands.md").write_text(views.commands_markdown(routes), encoding="utf-8")
+    write_prompts(routes, root / "owui" / "prompts")
+    typer.echo("Wrote docs/commands.md and owui/prompts/")
+
+
+@app.command("bench")
+def bench_cmd(
+    cpu: bool = typer.Option(False, "--cpu", help="Force CPU-only inference (num_gpu=0)."),
+) -> None:
+    """Time each route against the performance budget on the real models (synthetic RFP)."""
+    from studio.bench import run_bench
+
+    timings = run_bench(cfgmod.project_root(), cpu_only=cpu, log=typer.echo)
+    if any(t.ok is False for t in timings):
+        raise typer.Exit(1)
+
+
 # --- templates and render -------------------------------------------------------------------
 
 
@@ -733,6 +758,18 @@ def run_checks(client: OllamaClient | None = None) -> list[Check]:
                 model_is_pulled(rc.model, pulled),
                 f"Model for {role}: {rc.model}",
                 f"Run `ollama pull {rc.model}`.",
+            )
+        )
+    try:
+        loaded = client.loaded_models()
+    except LLMError:
+        loaded = []
+    if len(loaded) > 1:  # informational: RAM pressure on a 16 GB laptop
+        checks.append(
+            Check(
+                True,
+                f"Note: {len(loaded)} models loaded at once ({', '.join(loaded)}). On 16 GB, start "
+                "Ollama via scripts/start.* so OLLAMA_MAX_LOADED_MODELS=1 applies",
             )
         )
     return checks
