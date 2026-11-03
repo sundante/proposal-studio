@@ -118,9 +118,15 @@ class RouterContext:
     root: Path
     llm_factory: Callable[[], LLMClient]
     allow_local_paths: bool = False  # REPL: True. Chat UI: files arrive as attachments.
+    route_overrides: dict[str, Any] = field(default_factory=dict)  # e.g. Open WebUI Valves
 
     def config(self) -> StudioConfig:
-        return cfgmod.load_config(self.root)
+        cfg = cfgmod.load_config(self.root)
+        if self.route_overrides:
+            cfg = cfg.model_copy(
+                update={"routes": cfg.routes.model_copy(update=self.route_overrides)}
+            )
+        return cfg
 
 
 @dataclass
@@ -145,6 +151,10 @@ class Call:
 
     def opportunity(self) -> sessmod.Opportunity:
         return sessmod.active_opportunity(self.ctx.root, self.session)
+
+    def produced(self, path: Path) -> None:
+        """Record a file this message created (the chat UI offers it for download)."""
+        self.session.last_outputs.setdefault("produced", []).append(str(path))
 
     def pend(self, command: str, args: str = "", **extra: Any) -> None:
         self.session.last_outputs["pending"] = {
@@ -278,6 +288,7 @@ def h_digest(c: Call) -> Iterator[str]:
     text = digestmod.render_summary(result, warnings)
     if "xlsx" in words:
         path = digestmod.export_matrix(result, opp.path / "out", opp.id)
+        c.produced(path)
         text += f"\n\nRequirements matrix: `{path}`"
     yield text
 
@@ -377,6 +388,8 @@ def h_render(c: Call) -> Iterator[str]:
     c.status("Rendering…")
     report = render(deck, c.cfg.layout_map, template, opp.path / "out", deck.opportunity)
     c.session.last_outputs["render"] = str(report.path) if report.path else ""
+    if report.path:
+        c.produced(report.path)
     yield report.qa.to_markdown(report.path)
 
 
@@ -387,6 +400,7 @@ def h_research(c: Call) -> Iterator[str]:
     )
     out_dir = opp_dir / "research" if opp_dir else c.ctx.root / "workspace" / "research"
     path = researchmod.save_report(report, out_dir)
+    c.produced(path)
     yield report.to_markdown() + f"\n\nSaved: `{path}`"
 
 
