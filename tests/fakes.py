@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterator, Sequence
 from typing import Any
 
@@ -21,7 +22,7 @@ class FakeLLM(BaseLLM):
         self,
         structured: dict[str, Any] | None = None,
         text: str = "fake answer",
-        dim: int = 8,
+        dim: int = 256,
     ) -> None:
         self.structured = {
             k: list(v) if isinstance(v, list) else [v] for k, v in (structured or {}).items()
@@ -52,7 +53,13 @@ class FakeLLM(BaseLLM):
         return [fake_embedding(t, self.dim) for t in texts]
 
 
-def fake_embedding(text: str, dim: int = 8) -> list[float]:
-    """Deterministic pseudo-embedding derived from a hash of the text."""
-    digest = hashlib.sha256(text.encode("utf-8")).digest()
-    return [b / 255.0 for b in digest[:dim]]
+def fake_embedding(text: str, dim: int = 256) -> list[float]:
+    """Deterministic bag-of-words embedding: hashed word counts, so shared words mean similarity."""
+    vector = [0.0] * dim
+    for word in re.findall(r"[a-z0-9]+", text.lower()):
+        if len(word) > 2:
+            bucket = int.from_bytes(hashlib.md5(word.encode()).digest()[:4], "little") % dim
+            vector[bucket] += 1.0
+    if not any(vector):
+        vector[0] = 1.0
+    return vector

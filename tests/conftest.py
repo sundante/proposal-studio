@@ -17,3 +17,11 @@ def studio_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "config" / "overrides.yaml").unlink(missing_ok=True)
     monkeypatch.setenv("STUDIO_HOME", str(tmp_path))
     return tmp_path
+
+
+@pytest.fixture(scope="session")
+def rfp_files(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
+    """Synthetic Acme Health Plan RFP fixtures (PDF, DOCX, XLSX, PPTX), generated once."""
+    from tests.fixtures.make_rfp import make_all
+
+    return make_all(tmp_path_factory.mktemp("rfp"))
