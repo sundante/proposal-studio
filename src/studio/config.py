@@ -102,14 +102,33 @@ class RoutesConfig(_Strict):
 
 
 class AgentSpec(_Strict):
-    """Headless agent CLI adapter definition."""
+    """Headless agent CLI adapter definition (flags verified per CLI; see DECISIONS.md)."""
 
     label: str
     plan_cmd: list[str]
     apply_cmd: list[str]
     env: dict[str, str] = Field(default_factory=dict)
+    files: dict[str, str] = Field(default_factory=dict)  # written into the working copy
     model: str
     enabled: bool = True
+    note: str = ""  # shown when the agent is disabled or limited
+
+
+DEFAULT_ENV_ALLOWLIST = [
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "COMSPEC",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "NODE_OPTIONS",
+]
 
 
 class AgentsConfig(_Strict):
@@ -117,6 +136,8 @@ class AgentsConfig(_Strict):
 
     sandbox_root: str = "workspace/{opp}/agent"
     default_timeout_s: int = Field(default=900, gt=0)
+    copy_in: list[str] = Field(default_factory=lambda: ["deck.json", "digest.json", "outline.json"])
+    env_allowlist: list[str] = Field(default_factory=lambda: list(DEFAULT_ENV_ALLOWLIST))
     agents: dict[str, AgentSpec] = Field(default_factory=dict)
 
 

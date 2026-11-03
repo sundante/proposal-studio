@@ -1,27 +1,58 @@
-# Agent CLI adapters (Phase 8). Flags marked VERIFY must be checked against each CLI's --help.
+# Agent CLI adapters for /agent (headless flags verified per CLI — see vibes/DECISIONS.md).
+# Placeholders: {prompt} the task, {model} the model below, {workdir} the agent's working copy.
+# Every run: plan in a throwaway copy → you approve → apply in a working copy → you approve
+# copying results back. Runs get an isolated HOME and only the env_allowlist + `env` below.
 sandbox_root: "workspace/{opp}/agent"
 default_timeout_s: 900
+copy_in: [deck.json, digest.json, outline.json] # files from the opportunity the agent can see
 agents:
   opencode:
     label: "OpenCode (local)"
-    plan_cmd: ["opencode", "run", "--model", "ollama/{model}", "{prompt}"] # VERIFY flags
-    apply_cmd: ["opencode", "run", "--model", "ollama/{model}", "{prompt}"]
-    env: {}
     model: "qwen3:8b"
+    plan_cmd: [opencode, run, --agent, plan, --model, "ollama/{model}", --dir, "{workdir}", "{prompt}"]
+    apply_cmd: [opencode, run, --agent, build, --auto, --model, "ollama/{model}", --dir, "{workdir}", "{prompt}"]
+    env:
+      OPENCODE_DISABLE_MODELS_FETCH: "1"
+      OPENCODE_DISABLE_AUTOUPDATE: "1"
+      OPENCODE_DISABLE_LSP_DOWNLOAD: "1"
+      OPENCODE_DISABLE_DEFAULT_PLUGINS: "1"
+      OPENCODE_DISABLE_EXTERNAL_SKILLS: "1"
+      OPENCODE_DISABLE_CLAUDE_CODE: "1"
+    files:
+      opencode.json: |
+        {
+          "$schema": "https://opencode.ai/config.json",
+          "share": "disabled",
+          "autoupdate": false,
+          "provider": {
+            "ollama": {
+              "npm": "@ai-sdk/openai-compatible",
+              "name": "Ollama (local)",
+              "options": { "baseURL": "http://localhost:11434/v1" },
+              "models": { "{model}": { "name": "{model}" } }
+            }
+          },
+          "permission": { "webfetch": "deny", "bash": "deny" },
+          "agent": { "plan": { "permission": { "bash": "deny", "edit": "deny" } } }
+        }
   claude-code:
-    label: "Claude Code (via Ollama)"
-    plan_cmd: ["claude", "-p", "{prompt}", "--model", "{model}", "--permission-mode", "plan",
-               "--output-format", "stream-json"] # VERIFY flags
-    apply_cmd: ["claude", "-p", "{prompt}", "--model", "{model}",
-                "--permission-mode", "acceptEdits", "--output-format", "stream-json"]
+    label: "Claude Code (via local Ollama)"
+    model: "qwen3:8b"
+    plan_cmd: [claude, -p, "{prompt}", --model, "{model}", --permission-mode, plan, --restricted,
+               --output-format, text, --strict-mcp-config, --no-session-persistence]
+    apply_cmd: [claude, -p, "{prompt}", --model, "{model}", --permission-mode, acceptEdits, --restricted,
+                --output-format, text, --strict-mcp-config, --no-session-persistence]
     env:
       ANTHROPIC_BASE_URL: http://localhost:11434
       ANTHROPIC_AUTH_TOKEN: ollama
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-    model: "qwen3:8b"
+      DISABLE_AUTOUPDATER: "1"
   hermes:
     label: "Hermes Agent (local)"
-    plan_cmd: ["hermes", "..."] # VERIFY: find the headless/non-interactive mode
-    apply_cmd: ["hermes", "..."]
-    env: {}
     model: "qwen3:8b"
+    enabled: false
+    note: "Flags taken from hermes-agent 0.19.0 source; not run-tested yet. Set enabled: true after checking it works offline."
+    plan_cmd: [hermes-agent, --query, "{prompt}", --model, "{model}", --base_url, "http://localhost:11434/v1",
+               --api_key, ollama, --max_turns, "3", --enabled_toolsets, file]
+    apply_cmd: [hermes-agent, --query, "{prompt}", --model, "{model}", --base_url, "http://localhost:11434/v1",
+                --api_key, ollama, --max_turns, "10", --enabled_toolsets, file]
