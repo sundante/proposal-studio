@@ -1,0 +1,130 @@
+# Proposal Studio — Build Plan
+
+Phases are built one per Claude Code session with `/phase <n>`. Each phase ends in a PR.
+The design is in `PROJECT_SPEC.md`; progress is tracked in `PROGRESS.md`.
+
+## Allowed dependencies
+Runtime: `httpx`, `pydantic>=2`, `pyyaml`, `pymupdf`, `python-docx`, `openpyxl`, `python-pptx`,
+`faiss-cpu`, `numpy`, `typer`.
+Dev (`[dev]` extra): `pytest`, `pytest-asyncio`, `ruff`, `pre-commit`, `build`.
+Not a dependency of `studio` (installed separately by `setup.ps1`): `open-webui`.
+Optional, only if Phase 5 records a reason in DECISIONS.md: `langgraph`.
+Anything else → ask first.
+
+---
+
+## Phase 0 — Bootstrap: repo, OSS foundations, config, LLM client, guards
+Spec: §0, §3, §4, §6, §7 (PHI scan only), §16.1, §16.2
+- Repo layout from §3 (empty modules with docstrings), `pyproject.toml` (package `studio`, src layout,
+  Python ≥3.11, entry point `studio = studio.cli:app`, `[dev]` extra, ruff config), `.gitignore` per §16.1.
+- OSS files per §16.1: LICENSE (Apache-2.0), README (short placeholder with project pitch + "under
+  construction"), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, CHANGELOG, `.github/` issue + PR templates,
+  `dependabot.yml`, `.pre-commit-config.yaml` with the library/workspace commit guard. `AGENTS.md` =
+  copy of the essentials of `CLAUDE.md` for other agents.
+- CI `.github/workflows/ci.yml` per §16.2 (the render-artifact job is added in Phase 3).
+- `config/*.yaml` defaults from §4, §5, §9.2, §10.1; `studio/config.py` (pydantic models, base +
+  `overrides.yaml`, validation, set/reset helpers for `/config`).
+- `studio/llm.py` per §6 (+ `FakeLLM` in `tests/fakes.py`); `studio/guards.py` (cloud-model block, path
+  sandbox, PHI regex scan).
+- `studio/cli.py`: `studio --version`, `studio config show|set|reset`, `studio doctor` (Ollama reachable,
+  models pulled, Python version, workspace writable — printed as a checklist).
+- Tests: config validation, cloud-model rejection, sandbox traversal, PHI scan, FakeLLM structured retry.
+- Done when: CI green on Windows + Ubuntu.
+
+## Phase 1 — Ingest + RAG + `/ask`
+Spec: §7
+- `ingest.py`: PDF/DOCX/XLSX/PPTX/TXT/MD → sections with heading path + page/slide; tables row-wise
+  with headers; section-aware chunking (~800 tokens, 100 overlap); file hashing.
+- `rag.py`: FAISS per opportunity and per library collection; incremental updates; `retrieve(top_k)`;
+  `answer()` with mandatory `[section, p.N]` citations and an explicit "not found in the RFP" path.
+- `session.py`: opportunities (create/use/list) + per-chat state in `workspace/.sessions/`.
+- CLI: `studio new|use|ingest|ask|status`.
+- Synthetic "Acme Health Plan" RFP fixtures generated in test setup (PDF + DOCX). Tests: chunk metadata,
+  incremental indexing, citation format (FakeLLM + deterministic fake embedder).
+
+## Phase 2 — RFP digest
+Spec: §8
+- Pydantic `Digest` exactly as §8 (`cite = {section, page}`).
+- Map: schema-constrained extraction per section group (<2k tokens of RFP text per call). Reduce in
+  Python: merge, de-duplicate (normalised text + embedding similarity), keep all citations.
+- Markdown summary renderer for chat; optional XLSX compliance matrix.
+- CLI: `studio digest [--xlsx]`. Tests: canned section outputs → valid, de-duplicated digest.
+
+## Phase 3 — Template inspector + renderer (no LLM)
+Spec: §9.3, §9.5, §16.2 (render artifact job)
+- `deck/schemas.py`: pydantic model per slide type in the §9.2 spine, char limits from
+  `layout_map.yaml`, `speaker_notes` + `sources` on every slide; `Deck` model.
+- `render/inspect_template.py` + `studio template inspect <file>` → `templates/<name>.layouts.json`.
+- `.potx` support per §9.5 (try the content-type patch; record the outcome in DECISIONS.md).
+- `render/renderer.py`: layouts/placeholders via `layout_map.yaml`, remove sample slides, shape-drawn
+  layered architecture slide, versioned output, QA report.
+- Original neutral light template generated in code under `templates/sample/` + matching `layout_map.yaml`.
+- `studio render [--deck path]`; sample `deck.json` fixture renders with zero QA errors.
+- Add the CI job that renders the fixture and uploads the PPTX artifact.
+
+## Phase 4 — Blocks, storyline, deck writer
+Spec: §9.1, §9.2, §9.4
+- `blocks.py`: `/harvest` over `library/proposals` (PPTX slides, DOCX/PDF sections) → classify by
+  slide type, extract client-neutral blocks, anonymise with `{{client}}`, flag uncertain items, YAML
+  per block, never overwrite `edited: true`; search by tags + embeddings.
+- `deck/storyline.py`: `outline.json` from `storyline.yaml` + digest (`include_if` rules), toggles.
+- `deck/writer.py`: 2–4 blocks per slide, tailoring prompt with the no-invention rule, schema output,
+  one shorten retry, safe truncation + flag, provenance; single-slide regenerate; `/edit` with diff.
+- CLI: `studio harvest|blocks|outline|toggle|deck|edit`. Tests: anonymisation, edited-block
+  protection, `include_if`, writer truncation path.
+
+## Phase 5 — Offline research
+Spec: §11
+- `research.py` as a small explicit loop (LangGraph only with a recorded reason): decompose →
+  multi-query retrieval over library + active RFP → cited findings → one gap round → synthesis →
+  markdown report saved. Hard LLM-call cap; progress callback.
+- `studio research "<q>"`. Tests: call cap, citation format.
+
+## Phase 6 — Router core
+Spec: §5
+- `router.py`: all §5.1 commands + aliases, dispatch to phases 1–5, auto-routing (rules → classifier
+  → clarification below threshold), file-writing routes never auto-run without confirmation,
+  "→ routed to …" status line, "Next:" suggestions.
+- Single entry point `handle(message, attachments, session, emit)` → async iterator of chunks.
+- `studio chat` REPL over `handle()`.
+- Tests: every command parses, aliases, rules routing, low confidence → clarification,
+  auto-routed `/render` requires confirmation.
+
+## Phase 7 — Open WebUI integration + setup scripts
+Spec: §12, §16.4
+- VERIFY first, against the installed `open-webui` package in a scratch venv (source/docs): Pipe and
+  Filter structure, Valves/UserValves, `__event_emitter__` status, `__event_call__` confirmation,
+  how attached files reach a pipe, how to return a downloadable file, Prompt import JSON format,
+  offline/telemetry/RAG env var names. Record in DECISIONS.md before coding.
+- `owui/router_pipe.py`, `owui/phi_filter.py`, `owui/prompts/*.json`.
+- `scripts/setup.ps1` (idempotent, no admin), `scripts/start.ps1` (env from §12.2), `scripts/smoke_test.ps1`
+  (doctor + synthetic RFP through ingest → digest → outline → deck → render on the sample template).
+  Also provide `setup.sh`/`start.sh` equivalents for macOS/Linux dev.
+- `docs/install.md` (Open WebUI functions, prompt import, Valves, light theme).
+
+## Phase 8 — Agents route
+Spec: §10
+- VERIFY each CLI's headless flags with `--help` (opencode, claude, hermes); update
+  `config/agents.yaml`; mark any CLI without a reliable headless mode as unsupported with a clear
+  message. Record in DECISIONS.md.
+- `studio/agents/`: config-driven adapters, sandbox (copy-in, copy-back on approval, path checks,
+  env allowlist), plan → approve → apply, streaming, timeouts + cancel, logs, changed-file diff,
+  Windows `.cmd` shim resolution.
+- `owui/agents_pipe.py` (manifold), `/agent` in the router, `studio agent <name> "<task>"`.
+- Tests with a fake agent CLI script: plan/apply, rejection, timeout, sandbox escape, env stripping.
+
+## Phase 9 — Hardening + docs
+Spec: §14, §15
+- Check every route against the performance budget; trim prompts/`num_ctx`; `think=false` default;
+  one model loaded at a time.
+- Full README (pitch, screenshots placeholder, install from Releases, daily workflow
+  `/new → /ingest → /digest → /outline → /deck → /render`, command reference, privacy checklist) and
+  `docs/` pages: commands, config, templates (how to map your own template), agents, troubleshooting,
+  privacy.
+
+## Phase 10 — Release pipeline + v0.1.0
+Spec: §16.3, §16.4
+- `.github/workflows/release.yml`: on tag `v*.*.*` build sdist + wheel + `proposal-studio-<ver>-windows.zip`,
+  create a GitHub Release with notes from CHANGELOG.
+- Verify the zip installs cleanly in a fresh folder with `setup.ps1` (simulate on the CI Windows runner).
+- Then run `/ship 0.1.0`.
