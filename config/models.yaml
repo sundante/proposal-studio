@@ -1,0 +1,10 @@
+# Model registry per role. Override at runtime with `/config set` (writes config/overrides.yaml).
+ollama_url: http://localhost:11434
+roles:
+  router: { model: "qwen3:4b", num_ctx: 4096, temperature: 0.0 }
+  worker: { model: "qwen3:8b", num_ctx: 16384, temperature: 0.3 }
+  embed: { model: nomic-embed-text }
+keep_alive: 10m
+block_cloud_models: true # reject any model name containing ":cloud" or "-cloud"
+think: false # disable qwen3 thinking by default (speed)
+timeout_s: 600

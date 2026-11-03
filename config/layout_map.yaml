@@ -1,0 +1,5 @@
+# slide_type -> template layout + placeholder mapping (filled in Phase 3).
+# Run `studio template inspect templates/<file>` to list your template's layouts and placeholders.
+template: templates/sample/sample.pptx
+limits: { title: 70, bullet: 110, min_bullets: 3, max_bullets: 5 }
+layouts: {}

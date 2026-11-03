@@ -1,0 +1,36 @@
+# Commands, aliases, auto-route keywords and thresholds (router: Phase 6).
+auto_route: true
+auto_threshold: 0.7
+confirm_routes: [render, agent, harvest] # never auto-run; need explicit command or confirmation
+commands:
+  help: { route: meta, help: "List commands with examples" }
+  new: { route: session, help: "Create an opportunity: /new <opp-id> [title]" }
+  use: { route: session, help: "Switch opportunity: /use <opp-id> (alone: list)" }
+  status: { route: session, help: "Show active opportunity and pipeline status" }
+  ingest: { route: ingest, help: "Ingest attached files (or input/) and build the index" }
+  ask: { route: rag, help: "Answer from the active RFP with citations: /ask <question>" }
+  digest: { route: digest, help: "Build or refresh digest.json and show a summary" }
+  harvest: { route: blocks, help: "Extract reusable blocks from library/proposals" }
+  blocks: { route: blocks, help: "Search or list blocks: /blocks [query]" }
+  outline: { route: deck, help: "Build outline.json from the storyline and digest" }
+  toggle: { route: deck, help: "Turn an optional slide on/off: /toggle <slide_id> on|off" }
+  deck: { route: deck, help: "Write deck.json (all slides or one): /deck [slide_id]" }
+  edit: { route: deck, help: "Revise one slide: /edit <slide_id> <instruction>" }
+  render: { route: render, help: "Build the PPTX on your template and show a QA report" }
+  research: { route: research, help: "Offline research over library/: /research <question>" }
+  agent: { route: agents, help: "Run an agent CLI in the sandbox: /agent <name> <task>" }
+  config: { route: meta, help: "Show or change config: /config [set <key> <value> | reset]" }
+aliases:
+  q: ask
+  r: render
+  d: digest
+  h: help
+keywords:
+  render: [render, pptx, powerpoint]
+  deck: ["slide ", "write the deck"]
+  digest: [digest, summarise the rfp, summarize the rfp]
+  research: [research]
+examples:
+  - { text: "what is the submission deadline?", route: ask }
+  - { text: "build the slides", route: deck }
+  - { text: "summarize this rfp", route: digest }

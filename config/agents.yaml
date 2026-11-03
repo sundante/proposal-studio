@@ -1,0 +1,27 @@
+# Agent CLI adapters (Phase 8). Flags marked VERIFY must be checked against each CLI's --help.
+sandbox_root: "workspace/{opp}/agent"
+default_timeout_s: 900
+agents:
+  opencode:
+    label: "OpenCode (local)"
+    plan_cmd: ["opencode", "run", "--model", "ollama/{model}", "{prompt}"] # VERIFY flags
+    apply_cmd: ["opencode", "run", "--model", "ollama/{model}", "{prompt}"]
+    env: {}
+    model: "qwen3:8b"
+  claude-code:
+    label: "Claude Code (via Ollama)"
+    plan_cmd: ["claude", "-p", "{prompt}", "--model", "{model}", "--permission-mode", "plan",
+               "--output-format", "stream-json"] # VERIFY flags
+    apply_cmd: ["claude", "-p", "{prompt}", "--model", "{model}",
+                "--permission-mode", "acceptEdits", "--output-format", "stream-json"]
+    env:
+      ANTHROPIC_BASE_URL: http://localhost:11434
+      ANTHROPIC_AUTH_TOKEN: ollama
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    model: "qwen3:8b"
+  hermes:
+    label: "Hermes Agent (local)"
+    plan_cmd: ["hermes", "..."] # VERIFY: find the headless/non-interactive mode
+    apply_cmd: ["hermes", "..."]
+    env: {}
+    model: "qwen3:8b"

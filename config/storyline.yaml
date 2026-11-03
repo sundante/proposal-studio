@@ -1,0 +1,17 @@
+# Fixed deck spine with optional slides (Phase 4). include_if: simple rules over the digest.
+slides:
+  - { id: title, slide_type: title, required: true }
+  - { id: understanding, slide_type: understanding, required: true, max_items: 5 }
+  - { id: before_after, slide_type: before_after, required: true, max_items: 5 }
+  - { id: solution_architecture, slide_type: solution_architecture, required: true }
+  - { id: ai_enablement, slide_type: ai_enablement, required: true, max_items: 5 }
+  - { id: platform, slide_type: platform, required: true, max_items: 5 }
+  - id: governance
+    slide_type: governance
+    required: false
+    include_if: ["compliance contains HIPAA", "compliance contains HITRUST"]
+    max_items: 5
+  - { id: maturity, slide_type: maturity, required: true, max_items: 5 }
+  - { id: practice_leadership, slide_type: practice_leadership, required: true, max_items: 5 }
+  - { id: why_us, slide_type: why_us, required: false, max_items: 5 }
+  - { id: next_steps, slide_type: next_steps, required: false, max_items: 5 }
