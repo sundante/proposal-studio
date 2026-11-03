@@ -15,12 +15,18 @@ import yaml
 from studio import __version__, ingest, rag, session
 from studio import config as cfgmod
 from studio import digest as digestmod
+from studio.deck.schemas import Deck
 from studio.llm import LLMClient, LLMError, OllamaClient, model_is_pulled
 from studio.rag import VectorIndex
+from studio.render import inspect_template as inspector
+from studio.render.renderer import render as render_deck
+from studio.render.sample_template import build_sample_template
 
 app = typer.Typer(help="Proposal Studio: local, offline proposal workbench.", no_args_is_help=True)
 config_app = typer.Typer(help="Show or change the effective configuration.", no_args_is_help=True)
 app.add_typer(config_app, name="config")
+template_app = typer.Typer(help="Inspect templates and build the sample.", no_args_is_help=True)
+app.add_typer(template_app, name="template")
 
 
 def _version(value: bool) -> None:
@@ -140,9 +146,7 @@ def use(opp_id: str = typer.Argument(None, help="Opportunity to switch to; omit 
 
 @app.command("ingest")
 def ingest_cmd(
-    files: list[Path] = typer.Argument(  # noqa: B008 - typer's documented pattern
-        None, help="Files or folders; omit to ingest input/."
-    ),
+    files: list[Path] = typer.Argument(None, help="Files or folders; omit to ingest input/."),
     yes: bool = typer.Option(False, "--yes", help="Continue even if possible PHI is found."),
     opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
 ) -> None:
@@ -276,6 +280,66 @@ def digest_cmd(
             typer.echo(f"\nRequirements matrix: {path}")
     except (cfgmod.ConfigError, session.SessionError, digestmod.DigestError, LLMError) as exc:
         _fail(str(exc))
+
+
+# --- templates and render -------------------------------------------------------------------
+
+
+@template_app.command("inspect")
+def template_inspect(path: Path) -> None:
+    """List a template's layouts and placeholders; write <name>.layouts.json beside it."""
+    try:
+        out, data = inspector.write_layouts_json(path)
+    except inspector.TemplateError as exc:
+        _fail(str(exc))
+    typer.echo(inspector.layouts_table(data))
+    typer.echo(f"\nWrote {out}")
+    _next("map each slide_type to a layout and placeholder idx in config/layout_map.yaml")
+
+
+@template_app.command("sample")
+def template_sample(
+    out: Path = typer.Option(
+        Path("templates/sample/proposal-sample.pptx"), "--out", help="Where to write it."
+    ),
+) -> None:
+    """(Re)generate the neutral sample template."""
+    path = build_sample_template(out if out.is_absolute() else cfgmod.project_root() / out)
+    typer.echo(f"Wrote {path}")
+
+
+@app.command("render")
+def render_cmd(
+    opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
+    deck: Path = typer.Option(None, "--deck", help="deck.json to render (default: the opp's)."),
+    template: Path = typer.Option(None, "--template", help="Template (default: layout_map)."),
+    out: Path = typer.Option(None, "--out", help="Output folder (default: the opp's out/)."),
+) -> None:
+    """Render deck.json to a versioned PPTX on the template, with a QA report. No LLM."""
+    root = cfgmod.project_root()
+    try:
+        cfg = cfgmod.load_config()
+        if deck and out:
+            deck_path, out_dir = deck, out
+        else:
+            _root, _store, sess = _session()
+            opportunity = session.active_opportunity(root, sess, opp)
+            deck_path = deck or opportunity.path / "deck.json"
+            out_dir = out or opportunity.path / "out"
+        if not deck_path.exists():
+            _fail(f"No deck at {deck_path} yet. Build one with `/deck` first.")
+        deck_model = Deck.model_validate_json(deck_path.read_text(encoding="utf-8"))
+    except (cfgmod.ConfigError, session.SessionError) as exc:
+        _fail(str(exc))
+    except ValueError as exc:  # pydantic ValidationError
+        _fail(f"{deck_path} isn't a valid deck: {exc}")
+    template_path = template or Path(cfg.layout_map.template)
+    if not template_path.is_absolute():
+        template_path = root / template_path
+    report = render_deck(deck_model, cfg.layout_map, template_path, out_dir, deck_model.opportunity)
+    typer.echo(report.qa.to_markdown(report.path))
+    if not report.qa.ok:
+        raise typer.Exit(1)
 
 
 # --- doctor ---------------------------------------------------------------------------------

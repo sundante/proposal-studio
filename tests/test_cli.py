@@ -140,3 +140,38 @@ def test_digest_cli(studio_home: Path, tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0 and "Acme Health Plan" in result.output
     result = runner.invoke(app, ["status"])
     assert "Digest: yes" in result.output and "stale" not in result.output
+
+
+def test_template_and_render_cli(tmp_path: Path, monkeypatch) -> None:
+    from tests.conftest import REPO_ROOT, SAMPLE_DECK
+
+    monkeypatch.setenv("STUDIO_HOME", str(REPO_ROOT))
+    tpl = tmp_path / "sample.pptx"
+    assert runner.invoke(app, ["template", "sample", "--out", str(tpl)]).exit_code == 0
+    result = runner.invoke(app, ["template", "inspect", str(tpl)])
+    assert result.exit_code == 0 and "[4] Comparison" in result.output
+    assert (tmp_path / "sample.layouts.json").exists()
+
+    args = ["render", "--deck", str(SAMPLE_DECK), "--out", str(tmp_path / "out"), "--template"]
+    result = runner.invoke(app, [*args, str(tpl)])
+    assert result.exit_code == 0, result.output
+    assert "11 slides, ✅ no errors" in result.output
+    assert (tmp_path / "out" / "acme-demo-v1.pptx").exists()
+
+    bad = tmp_path / "bad.json"
+    bad.write_text(
+        '{"opportunity": "x", "slides": [{"id": "a", "slide_type": "why_us", "title": "W"}]}'
+    )
+    other = tmp_path / "other.pptx"
+    other.write_bytes(b"junk")
+    result = runner.invoke(
+        app, ["render", "--deck", str(bad), "--out", str(tmp_path), "--template", str(other)]
+    )
+    assert result.exit_code == 1 and "Save As" in result.output
+
+
+def test_render_without_deck(studio_home: Path, monkeypatch) -> None:
+    monkeypatch.setenv("STUDIO_SESSION", "t")
+    runner.invoke(app, ["new", "acme"])
+    result = runner.invoke(app, ["render"])
+    assert result.exit_code == 1 and "/deck" in result.output

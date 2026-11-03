@@ -35,3 +35,21 @@ jobs:
         run: python scripts/check_no_private_paths.py --all
       - name: Test
         run: pytest -q
+
+  render-sample:
+    name: render sample deck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Render tests/fixtures/sample_deck.json
+        run: studio render --deck tests/fixtures/sample_deck.json --out build/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sample-deck
+          path: build/*.pptx
