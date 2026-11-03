@@ -239,3 +239,22 @@ def test_harvest_outline_deck_edit_render_cli(studio_home: Path, monkeypatch) ->
     result = runner.invoke(app, ["render"])
     assert result.exit_code == 0, result.output
     assert "no errors" in result.output and (opp / "out" / "acme-v1.pptx").exists()
+
+
+def test_library_and_research_cli(studio_home: Path, monkeypatch) -> None:
+    from studio import cli
+    from tests.fixtures.make_reference import make_reference
+    from tests.test_research import llm
+
+    make_reference(studio_home / "library" / "reference")
+    monkeypatch.setattr(cli, "get_llm", llm)
+    monkeypatch.setenv("STUDIO_SESSION", "research")
+    result = runner.invoke(app, ["library", "index"])
+    assert result.exit_code == 0, result.output
+    assert "reference: 2 new" in result.output and "proposals: 0 new" in result.output
+    assert "standards/fhir_r4_notes.pdf" in runner.invoke(app, ["library", "status"]).output
+
+    result = runner.invoke(app, ["research", "How do we handle FHIR R4 and HIPAA?"])
+    assert result.exit_code == 0, result.output
+    assert "## Summary" in result.output and "Saved:" in result.output
+    assert list((studio_home / "workspace" / "research").glob("*.md"))

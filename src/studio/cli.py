@@ -16,6 +16,7 @@ from studio import __version__, ingest, rag, session
 from studio import blocks as blockmod
 from studio import config as cfgmod
 from studio import digest as digestmod
+from studio import research as researchmod
 from studio.deck import storyline, writer
 from studio.deck.schemas import Deck
 from studio.llm import LLMClient, LLMError, OllamaClient, model_is_pulled
@@ -27,6 +28,8 @@ from studio.render.sample_template import build_sample_template
 app = typer.Typer(help="Proposal Studio: local, offline proposal workbench.", no_args_is_help=True)
 config_app = typer.Typer(help="Show or change the effective configuration.", no_args_is_help=True)
 app.add_typer(config_app, name="config")
+library_app = typer.Typer(help="Index the local library for /research.", no_args_is_help=True)
+app.add_typer(library_app, name="library")
 template_app = typer.Typer(help="Inspect templates and build the sample.", no_args_is_help=True)
 app.add_typer(template_app, name="template")
 
@@ -435,6 +438,90 @@ def edit_cmd(
     typer.echo(report.diff or "(no change)")
     _print_flags(report.flagged)
     _next("`studio render`")
+
+
+# --- library and research -------------------------------------------------------------------
+
+
+@library_app.command("index")
+def library_index_cmd(
+    collection: str = typer.Argument("all", help="proposals, reference or all."),
+    yes: bool = typer.Option(False, "--yes", help="Continue even if possible PHI is found."),
+) -> None:
+    """Index library/proposals and/or library/reference in place (incremental)."""
+    root = cfgmod.project_root()
+    names = list(rag.LIBRARY_COLLECTIONS) if collection == "all" else [collection]
+    try:
+        cfg = cfgmod.load_config()
+        llm = get_llm()
+        for name in names:
+            report = ingest.index_library(
+                root,
+                name,
+                llm,
+                cfg.rag,
+                cfg.models.roles["embed"].model,
+                confirm_phi=yes,
+                on_status=_status,
+            )
+            if report.blocked:
+                typer.echo(f"{name}: possible PHI found; nothing indexed. Re-run with --yes:")
+                for hit in report.phi_hits:
+                    typer.echo(
+                        f"  - {hit.file}"
+                        + (f", p.{hit.page}" if hit.page else "")
+                        + f": {hit.kind}"
+                    )
+                raise typer.Exit(2)
+            parts = [f"{len(report.new)} new", f"{len(report.changed)} changed"]
+            parts += [f"{len(report.unchanged)} unchanged", f"{len(report.removed)} removed"]
+            typer.echo(f"{name}: {', '.join(parts)}; {report.total_chunks} chunks indexed.")
+            for file, reason in report.skipped.items():
+                typer.echo(f"  skipped {file}: {reason}")
+    except (cfgmod.ConfigError, ingest.IngestError, LLMError) as exc:
+        _fail(str(exc))
+    _next('`studio research "<question>"`')
+
+
+@library_app.command("status")
+def library_status_cmd() -> None:
+    """Show what is indexed in each library collection."""
+    root = cfgmod.project_root()
+    for name in rag.LIBRARY_COLLECTIONS:
+        index = rag.library_index(root, name)
+        typer.echo(f"{name}: {len(index.files())} files, {len(index)} chunks")
+        for file in index.files():
+            typer.echo(f"  - {file} ({index.file_chunk_count(file)} chunks)")
+
+
+@app.command("research")
+def research_cmd(
+    question: str,
+    opp: str = typer.Option(None, "--opp", help="Opportunity whose RFP to include."),
+    max_calls: int = typer.Option(None, "--max-calls", min=3, max=40, help="LLM call cap."),
+) -> None:
+    """Offline multi-step research over library/ (+ the active RFP); saves a cited report."""
+    root, _store, sess = _session()
+    try:
+        cfg = cfgmod.load_config()
+        opportunity = None
+        if opp or sess.active_opp:
+            opportunity = session.active_opportunity(root, sess, opp)
+        report = researchmod.run_research(
+            question,
+            root,
+            get_llm(),
+            cfg,
+            opp_dir=opportunity.path if opportunity else None,
+            max_calls=max_calls,
+            on_status=_status,
+        )
+    except (cfgmod.ConfigError, session.SessionError, researchmod.ResearchError, LLMError) as exc:
+        _fail(str(exc))
+    out_dir = opportunity.path / "research" if opportunity else root / "workspace" / "research"
+    path = researchmod.save_report(report, out_dir)
+    typer.echo(report.to_markdown())
+    typer.echo(f"\nSaved: {path}")
 
 
 # --- templates and render -------------------------------------------------------------------
