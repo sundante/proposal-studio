@@ -13,8 +13,10 @@ import typer
 import yaml
 
 from studio import __version__, ingest, rag, session
+from studio import blocks as blockmod
 from studio import config as cfgmod
 from studio import digest as digestmod
+from studio.deck import storyline, writer
 from studio.deck.schemas import Deck
 from studio.llm import LLMClient, LLMError, OllamaClient, model_is_pulled
 from studio.rag import VectorIndex
@@ -280,6 +282,159 @@ def digest_cmd(
             typer.echo(f"\nRequirements matrix: {path}")
     except (cfgmod.ConfigError, session.SessionError, digestmod.DigestError, LLMError) as exc:
         _fail(str(exc))
+
+
+# --- blocks, outline, deck -------------------------------------------------------------------
+
+
+@app.command("harvest")
+def harvest_cmd(
+    path: Path = typer.Argument(None, help="File or folder (default: library/proposals)."),
+    client: list[str] = typer.Option([], "--client", help="Client name(s) to anonymise."),
+) -> None:
+    """Extract reusable, anonymised blocks from past proposals into library/blocks."""
+    root = cfgmod.project_root()
+    try:
+        cfg = cfgmod.load_config()
+        report = blockmod.harvest(
+            root, get_llm(), cfg.deck, source=path, clients=client, on_status=_status
+        )
+    except (cfgmod.ConfigError, blockmod.BlockError, LLMError) as exc:
+        _fail(str(exc))
+    typer.echo(
+        f"Blocks: {len(report.new)} new, {len(report.refreshed)} refreshed, "
+        f"{len(report.protected)} protected (edited), {report.unchanged} unchanged sources, "
+        f"{report.skipped} skipped (not reusable)."
+    )
+    if report.flagged:
+        typer.echo(f"Needs review ({len(report.flagged)}): {', '.join(report.flagged)}")
+    for failure in report.failed:
+        typer.echo(f"Failed: {failure}")
+    where = blockmod.blocks_dir(root)
+    _next(f"review YAML in {where} (set needs_review: false), then `studio blocks`")
+
+
+@app.command("blocks")
+def blocks_cmd(
+    query: str = typer.Argument("", help="Search text; omit to list."),
+    slide_type: str = typer.Option(None, "--type", help="Only this slide type."),
+) -> None:
+    """List or search the block library."""
+    root = cfgmod.project_root()
+    try:
+        cfg = cfgmod.load_config()
+        if query:
+            hits = blockmod.search_blocks(
+                root, query, get_llm(), cfg.models.roles["embed"].model, slide_type=slide_type, k=10
+            )
+        else:
+            hits = [
+                (b, 0.0) for b in blockmod.load_blocks(root) if slide_type in (None, b.slide_type)
+            ]
+    except (cfgmod.ConfigError, blockmod.BlockError, LLMError) as exc:
+        _fail(str(exc))
+    if not hits:
+        typer.echo("No blocks yet.")
+        _next("`studio harvest`")
+        return
+    for block, score in hits:
+        flag = " ⚠ needs review" if block.needs_review else ""
+        shown = f" ({score:.2f})" if query else ""
+        typer.echo(f"- [{block.slide_type}] {block.id}{shown}: {block.title}{flag}")
+
+
+def _opp_dir(opp: str | None) -> tuple[Path, Path, str]:
+    root, _store, sess = _session()
+    opportunity = session.active_opportunity(root, sess, opp)
+    return root, opportunity.path, opportunity.id
+
+
+@app.command("outline")
+def outline_cmd(opp: str = typer.Option(None, "--opp", help="Opportunity id.")) -> None:
+    """Decide which storyline slides go in the deck (and why)."""
+    try:
+        cfg = cfgmod.load_config()
+        _root, opp_dir, opp_id = _opp_dir(opp)
+        digest = digestmod.load_digest(opp_dir)
+        if digest is None:
+            _fail("No digest yet. Run `studio digest` first.")
+        outline = storyline.build_outline(
+            cfg.storyline, digest, opp_id, storyline.load_outline(opp_dir)
+        )
+        storyline.save_outline(opp_dir, outline)
+    except (cfgmod.ConfigError, session.SessionError, storyline.OutlineError) as exc:
+        _fail(str(exc))
+    typer.echo(storyline.render_outline(outline))
+
+
+@app.command("toggle")
+def toggle_cmd(
+    slide_id: str,
+    state: str = typer.Argument(..., help="on or off"),
+    opp: str = typer.Option(None, "--opp", help="Opportunity id."),
+) -> None:
+    """Turn an optional slide on or off in the outline."""
+    if state not in ("on", "off"):
+        _fail("Use `on` or `off`.")
+    try:
+        _root, opp_dir, _opp_id = _opp_dir(opp)
+        outline = storyline.load_outline(opp_dir)
+        if outline is None:
+            _fail("No outline yet. Run `studio outline` first.")
+        storyline.save_outline(opp_dir, storyline.toggle(outline, slide_id, state == "on"))
+    except (session.SessionError, storyline.OutlineError) as exc:
+        _fail(str(exc))
+    typer.echo(storyline.render_outline(outline))
+
+
+def _print_flags(flagged: dict[str, list[str]]) -> None:
+    if flagged:
+        typer.echo("\nPlease review:")
+        for slide_id, flags in flagged.items():
+            for flag in flags:
+                typer.echo(f"  - {slide_id}: {flag}")
+
+
+@app.command("deck")
+def deck_cmd(
+    slide_id: str = typer.Argument(None, help="Regenerate only this slide."),
+    opp: str = typer.Option(None, "--opp", help="Opportunity id."),
+) -> None:
+    """Write deck.json by tailoring vetted blocks to the digest (one LLM call per slide)."""
+    try:
+        cfg = cfgmod.load_config()
+        root, opp_dir, opp_id = _opp_dir(opp)
+        report = writer.write_deck(
+            opp_dir, opp_id, root, get_llm(), cfg, slide_id=slide_id, on_status=_status
+        )
+    except (cfgmod.ConfigError, session.SessionError, writer.DeckError, LLMError) as exc:
+        _fail(str(exc))
+    typer.echo(f"Wrote {len(report.written)} slide(s) to {report.path}")
+    for slide in report.deck.slides:
+        if slide.id in report.written:
+            typer.echo("\n" + "\n".join(writer.slide_text(slide)))
+    _print_flags(report.flagged)
+    _next('`studio render` (or `studio edit <slide_id> "<instruction>"`)')
+
+
+@app.command("edit")
+def edit_cmd(
+    slide_id: str,
+    instruction: str,
+    opp: str = typer.Option(None, "--opp", help="Opportunity id."),
+) -> None:
+    """Revise one slide following an instruction; shows a before/after diff."""
+    try:
+        cfg = cfgmod.load_config()
+        root, opp_dir, _opp_id = _opp_dir(opp)
+        report = writer.edit_slide(
+            opp_dir, root, get_llm(), cfg, slide_id, instruction, on_status=_status
+        )
+    except (cfgmod.ConfigError, session.SessionError, writer.DeckError, LLMError) as exc:
+        _fail(str(exc))
+    typer.echo(report.diff or "(no change)")
+    _print_flags(report.flagged)
+    _next("`studio render`")
 
 
 # --- templates and render -------------------------------------------------------------------

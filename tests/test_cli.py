@@ -175,3 +175,67 @@ def test_render_without_deck(studio_home: Path, monkeypatch) -> None:
     runner.invoke(app, ["new", "acme"])
     result = runner.invoke(app, ["render"])
     assert result.exit_code == 1 and "/deck" in result.output
+
+
+def test_harvest_outline_deck_edit_render_cli(studio_home: Path, monkeypatch) -> None:
+    from studio import cli
+    from tests.conftest import REPO_ROOT
+    from tests.fakes import FakeLLM
+    from tests.fixtures.make_library import make_library
+    from tests.test_blocks import CANNED
+    from tests.test_digest import sample_digest
+
+    (studio_home / "templates" / "sample").mkdir(parents=True)
+    tpl = REPO_ROOT / "templates" / "sample" / "proposal-sample.pptx"
+    (studio_home / "templates" / "sample" / tpl.name).write_bytes(tpl.read_bytes())
+    make_library(studio_home / "library" / "proposals")
+    plat = {
+        "title": "A complete AI platform",
+        "bullets": ["Development workbench", "MLOps and LLMOps pipelines", "Observability"],
+        "used_blocks": [1],
+    }
+    llm = FakeLLM(
+        {
+            "HarvestResult": CANNED,
+            "WriteUnderstandingContent": {"title": "Understanding", "bullets": ["a", "b", "c"]},
+            "WriteBeforeAfterContent": {
+                "title": "Before and after",
+                "before": ["Manual", "Slow", "Siloed"],
+                "after": ["Assisted", "Fast", "Unified"],
+            },
+            "WritePlatformContent": plat,
+            "WriteGovernanceContent": {"title": "Governance", "bullets": ["HIPAA", "b", "c"]},
+            "WriteMaturityContent": {
+                "title": "Maturity",
+                "stages": [
+                    {"name": n, "description": "d"} for n in ("Foundation", "Scale", "Optimize")
+                ],
+            },
+        }
+    )
+    monkeypatch.setattr(cli, "get_llm", lambda: llm)
+    monkeypatch.setenv("STUDIO_SESSION", "test")
+
+    result = runner.invoke(app, ["harvest", "--client", "Example Hospital"])
+    assert result.exit_code == 0, result.output
+    assert "5 new" in result.output and "Needs review (1)" in result.output
+    assert "[platform]" in runner.invoke(app, ["blocks"]).output
+
+    runner.invoke(app, ["new", "acme"])
+    opp = studio_home / "workspace" / "acme"
+    (opp / "digest.json").write_text(sample_digest().model_dump_json())
+    result = runner.invoke(app, ["outline"])
+    assert result.exit_code == 0 and "✅ **governance**" in result.output
+    assert runner.invoke(app, ["toggle", "title", "off"]).exit_code == 1
+    assert runner.invoke(app, ["toggle", "next_steps", "off"]).exit_code == 0
+
+    result = runner.invoke(app, ["deck"])
+    assert result.exit_code == 0, result.output
+    assert "Please review:" in result.output and "Next: `studio render`" in result.output
+
+    result = runner.invoke(app, ["edit", "platform", "shorter"])
+    assert result.exit_code == 0, result.output
+
+    result = runner.invoke(app, ["render"])
+    assert result.exit_code == 0, result.output
+    assert "no errors" in result.output and (opp / "out" / "acme-v1.pptx").exists()
