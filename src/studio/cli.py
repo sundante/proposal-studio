@@ -31,6 +31,10 @@ config_app = typer.Typer(help="Show or change the effective configuration.", no_
 app.add_typer(config_app, name="config")
 library_app = typer.Typer(help="Index the local library for /research.", no_args_is_help=True)
 app.add_typer(library_app, name="library")
+owui_app = typer.Typer(
+    help="Open WebUI helpers (prompts, automated install).", no_args_is_help=True
+)
+app.add_typer(owui_app, name="owui")
 template_app = typer.Typer(help="Inspect templates and build the sample.", no_args_is_help=True)
 app.add_typer(template_app, name="template")
 
@@ -514,6 +518,51 @@ def _emit_status(event: dict) -> None:
     data = event.get("data", {})
     if not data.get("done"):
         _status(data.get("description", ""))
+
+
+# --- Open WebUI and smoke test ---------------------------------------------------------------
+
+
+@owui_app.command("prompts")
+def owui_prompts_cmd(
+    out: Path = typer.Option(Path("owui/prompts"), "--out", help="Output folder."),
+) -> None:
+    """Regenerate owui/prompts/*.json (slash-command shortcuts) from config/routes.yaml."""
+    from studio.owui import write_prompts
+
+    root = cfgmod.project_root()
+    paths = write_prompts(cfgmod.load_config().routes, out if out.is_absolute() else root / out)
+    typer.echo(f"Wrote {len(paths)} files to {paths[0].parent}")
+
+
+@owui_app.command("install")
+def owui_install_cmd(
+    token: str = typer.Option(..., "--token", envvar="OWUI_API_KEY", help="Admin API key (sk-…)."),
+    url: str = typer.Option("http://localhost:8080", "--url", help="Local Open WebUI URL."),
+    global_filter: bool = typer.Option(
+        False, "--global-filter", help="Enable the PHI filter for all models."
+    ),
+) -> None:
+    """Install/update the Proposal Studio functions and prompts into a local Open WebUI."""
+    from studio.owui import InstallError, install
+
+    try:
+        install(url, token, cfgmod.project_root(), global_filter=global_filter, log=typer.echo)
+    except (InstallError, cfgmod.ConfigError, httpx.HTTPError) as exc:
+        _fail(str(exc))
+    _next("open Open WebUI, pick the **Proposal Studio** model and type `/help`")
+
+
+@app.command("smoke")
+def smoke_cmd(
+    keep: bool = typer.Option(False, "--keep", help="Keep the temporary project folder."),
+) -> None:
+    """End-to-end check on the real models: synthetic RFP → ingest → ask → digest → render."""
+    from studio.smoke import run_smoke
+
+    ok = run_smoke(cfgmod.project_root(), get_llm, keep=keep, log=typer.echo)
+    if not ok:
+        raise typer.Exit(1)
 
 
 # --- templates and render -------------------------------------------------------------------
