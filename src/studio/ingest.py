@@ -20,7 +20,7 @@ from studio.config import RagConfig
 from studio.guards import resolve_in_sandbox, scan_phi
 from studio.llm import LLMClient
 from studio.models import Chunk, Section
-from studio.rag import VectorIndex
+from studio.rag import LIBRARY_COLLECTIONS, VectorIndex, library_index
 
 StatusFn = Callable[[str], None]
 
@@ -512,32 +512,32 @@ def _gather(input_dir: Path, paths: Sequence[Path]) -> list[tuple[Path, str]]:
     return [(f, f.name) for f in sorted(input_dir.iterdir()) if f.is_file()]
 
 
-def ingest(
-    opp_dir: Path,
-    paths: Sequence[Path],
+def index_files(
+    index: VectorIndex,
+    targets: Sequence[tuple[Path, str]],
     llm: LLMClient,
     cfg: RagConfig,
     embed_model: str,
     *,
     confirm_phi: bool = False,
     on_status: StatusFn | None = None,
+    present: set[str] | None = None,
+    before_index: Callable[[Path, str], None] | None = None,
 ) -> IngestReport:
-    """Ingest files into ``opp_dir``: copy into ``input/``, PHI-scan, chunk, update the index.
+    """Hash, extract, PHI-scan, chunk and embed ``targets`` (source, index name) into ``index``.
 
-    With no ``paths``, everything in ``input/`` is (re)ingested and files no longer present are
-    removed from the index. If possible PHI is found and ``confirm_phi`` is False, nothing is
-    copied or indexed and the report comes back with ``blocked=True``.
+    Unchanged files (same hash) are skipped. If ``present`` is given, indexed files not in it are
+    removed. If possible PHI is found and ``confirm_phi`` is False, nothing is indexed and the
+    report comes back with ``blocked=True``. ``before_index`` runs for each file about to be
+    indexed (``/ingest`` uses it to copy files into ``input/``).
     """
     status = on_status or (lambda _msg: None)
-    input_dir = opp_dir / "input"
-    input_dir.mkdir(parents=True, exist_ok=True)
-    index = VectorIndex(opp_dir / "index")
     if index.ensure_model(embed_model):
         status(f"Embedding model changed to {embed_model}; rebuilding the index.")
 
     report = IngestReport()
     pending: list[tuple[Path, str, str, list[Section]]] = []
-    for src, name in _gather(input_dir, paths):
+    for src, name in targets:
         if src.suffix.lower() not in SUPPORTED_SUFFIXES:
             report.skipped[name] = "unsupported file type"
             continue
@@ -566,14 +566,12 @@ def ingest(
 
     chunks_by_file: dict[str, tuple[str, list[Chunk]]] = {}
     for src, name, digest, sections in pending:
-        dest = resolve_in_sandbox(input_dir, name)
-        if src.resolve() != dest:
-            shutil.copy2(src, dest)
+        if before_index:
+            before_index(src, name)
         chunks = chunk_sections(sections, digest, cfg.chunk_tokens, cfg.chunk_overlap)
         chunks_by_file[name] = (digest, chunks)
 
-    if not paths:
-        present = {name for _, name in _gather(input_dir, paths)}
+    if present is not None:
         for name in index.files():
             if name not in present:
                 index.remove_file(name)
@@ -589,3 +587,78 @@ def ingest(
     index.save()
     report.total_chunks = len(index)
     return report
+
+
+def ingest(
+    opp_dir: Path,
+    paths: Sequence[Path],
+    llm: LLMClient,
+    cfg: RagConfig,
+    embed_model: str,
+    *,
+    confirm_phi: bool = False,
+    on_status: StatusFn | None = None,
+) -> IngestReport:
+    """Ingest files into ``opp_dir``: copy into ``input/``, PHI-scan, chunk, update the index.
+
+    With no ``paths``, everything in ``input/`` is (re)ingested and files no longer present are
+    removed from the index. If possible PHI is found and ``confirm_phi`` is False, nothing is
+    copied or indexed and the report comes back with ``blocked=True``.
+    """
+    input_dir = opp_dir / "input"
+    input_dir.mkdir(parents=True, exist_ok=True)
+
+    def copy_in(src: Path, name: str) -> None:
+        dest = resolve_in_sandbox(input_dir, name)
+        if src.resolve() != dest:
+            shutil.copy2(src, dest)
+
+    targets = _gather(input_dir, paths)
+    present = None if paths else {name for _, name in targets}
+    return index_files(
+        VectorIndex(opp_dir / "index"),
+        targets,
+        llm,
+        cfg,
+        embed_model,
+        confirm_phi=confirm_phi,
+        on_status=on_status,
+        present=present,
+        before_index=copy_in,
+    )
+
+
+def index_library(
+    root: Path,
+    collection: str,
+    llm: LLMClient,
+    cfg: RagConfig,
+    embed_model: str,
+    *,
+    confirm_phi: bool = False,
+    on_status: StatusFn | None = None,
+) -> IngestReport:
+    """Index ``library/<collection>/`` in place (subfolders included) into its library index.
+
+    Files are named by their path relative to the collection folder; deleted files are removed
+    from the index.
+    """
+    if collection not in LIBRARY_COLLECTIONS:
+        raise IngestError(f"Unknown library collection '{collection}'. Use proposals or reference.")
+    folder = root / "library" / collection
+    folder.mkdir(parents=True, exist_ok=True)
+    targets = [
+        (path, path.relative_to(folder).as_posix())
+        for path in sorted(folder.rglob("*"))
+        if path.is_file() and not path.name.startswith(".")
+    ]
+    return index_files(
+        library_index(root, collection),
+        targets,
+        llm,
+        cfg,
+        embed_model,
+        confirm_phi=confirm_phi,
+        on_status=on_status,
+        present={name for _, name in targets},
+    )
