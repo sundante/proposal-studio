@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Ingest for PDF, DOCX, XLSX, PPTX, TXT and MD with heading paths, page/slide numbers and
+  row-wise tables; section-aware chunking; PHI warning with confirmation.
+- Per-opportunity FAISS index with incremental updates (file hashing) and library collections.
+- `/ask` answers with `[section, p.N]` citations, or "Not found in the RFP."
+- Opportunities and per-chat sessions under `workspace/`.
+- CLI: `studio new|use|ingest|ask|status`.
 - Project scaffold (src layout, `studio` package, `pyproject.toml`, ruff and pytest config).
 - Open-source foundations: Apache-2.0 licence, contributing guide, code of conduct, security
   policy, issue and PR templates, Dependabot, pre-commit with a private-path guard.

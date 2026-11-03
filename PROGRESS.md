@@ -2,8 +2,8 @@
 
 | Phase | Name | Status | PR |
 |---|---|---|---|
-| 0 | Bootstrap: repo, OSS foundations, config, LLM client, guards | ✅ done (pending CI) | phase/0-bootstrap |
-| 1 | Ingest + RAG + /ask | ⬜ todo | |
+| 0 | Bootstrap: repo, OSS foundations, config, LLM client, guards | ✅ done | phase/0-bootstrap |
+| 1 | Ingest + RAG + /ask | ✅ done (pending CI) | phase/1-ingest-rag |
 | 2 | RFP digest | ⬜ todo | |
 | 3 | Template inspector + renderer | ⬜ todo | |
 | 4 | Blocks, storyline, deck writer | ⬜ todo | |
@@ -17,10 +17,12 @@
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
-- Phase in progress: none (Phase 0 awaiting PR merge + green CI on Windows/Ubuntu)
-- Next step: Phase 1 — Ingest + RAG + /ask
+- Phase in progress: none (Phase 1 awaiting PR merge + green CI)
+- Next step: Phase 2 — RFP digest
 
 ## Known issues
-- Remote push/PR needs `gh auth login` on the dev machine.
-- Dev machine has no models pulled: `ollama pull qwen3:8b qwen3:4b nomic-embed-text`.
-- CI on Windows not yet observed; first PR run is the Phase 0 done check.
+- `gh` is not authenticated on the dev machine; PRs are opened from the GitHub compare page.
+- Ollama keeps the embed model and worker loaded together unless `OLLAMA_MAX_LOADED_MODELS=1`
+  is set (done by `start.ps1`/`start.sh` in Phase 7).
+- Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side; the
+  docs should recommend one format per document).

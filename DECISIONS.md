@@ -52,3 +52,27 @@ Format:
   - Hermes Agent may lack a native Windows/headless mode; expect "unsupported headless" in Phase 8.
 - Why: Visibility for later phases.
 - Spec impact: none.
+
+## 2026-11-03 — Ingest + RAG implementation choices  (Phase 1)
+- Context: Building §7 (ingest, FAISS RAG, `/ask`).
+- Decision:
+  1. New `config/rag.yaml` (`chunk_tokens`, `chunk_overlap`, `top_k`, `min_score`) validated as
+     `RagConfig`; `/config set top_k 8` works via the `rag.` shorthand.
+  2. PDF headings: a line is a heading if its font is >= 1.15x the body median, or it matches
+     numbered-heading text (`3.2 Scope`) and is bold/larger. Level = numbering depth, else font
+     size rank. PDF table cells are read with `page.get_textbox(cell)` because
+     `Table.extract()` dropped spaces on generated PDFs. DOCX `Title` is treated as level 1 so it
+     doesn't prefix every citation.
+  3. FAISS: `IndexIDMap2(IndexFlatIP)` over L2-normalised vectors (cosine). Serialised with
+     `faiss.serialize_index` + Python file I/O (atomic replace), avoiding faiss's C `fopen` on
+     non-ASCII Windows paths. Changing the embedding model clears and rebuilds the index.
+  4. `/ask` citations: the model cites excerpt numbers (`[2]`), and Python rewrites them into
+     the exact `[section, p.N]` labels while streaming. A real qwen3:8b run showed the model
+     mis-copying long labels; numbers are reliable and keep formatting out of the LLM. Answers
+     without a valid cite get a "Sources" footer; unknown cites are flagged.
+  5. "Not found in the RFP." is returned with no LLM call when the best retrieval score is below
+     `min_score`, and also when the model replies `NOT_FOUND`.
+  6. PHI on ingest: nothing is copied or indexed until confirmed; the CLI exits with code 2 and
+     asks for `--yes`.
+- Why: Deterministic, testable behaviour on small local models.
+- Spec impact: §3 adds `config/rag.yaml`.
