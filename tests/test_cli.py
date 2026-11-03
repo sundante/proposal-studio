@@ -116,3 +116,27 @@ def test_ask_without_opportunity(studio_home: Path, monkeypatch) -> None:
     monkeypatch.setenv("STUDIO_SESSION", "empty")
     result = runner.invoke(app, ["ask", "anything"])
     assert result.exit_code == 1 and "/new" in result.output
+
+
+def test_digest_cli(studio_home: Path, tmp_path: Path, monkeypatch) -> None:
+    from studio import cli
+    from tests.fakes import FakeLLM
+    from tests.test_digest import GROUP_A
+
+    monkeypatch.setattr(cli, "get_llm", lambda: FakeLLM({"DigestPart": GROUP_A}))
+    monkeypatch.setenv("STUDIO_SESSION", "test")
+    runner.invoke(app, ["new", "acme"])
+    assert runner.invoke(app, ["digest"]).exit_code == 1  # nothing ingested
+    rfp = tmp_path / "rfp.txt"
+    rfp.write_text("1 Submission\nDue March 15, 2027.\n\n2 Background\nManual review today.\n")
+    runner.invoke(app, ["ingest", str(rfp)])
+
+    result = runner.invoke(app, ["digest", "--xlsx"])
+    assert result.exit_code == 0, result.output
+    assert "## RFP digest — Enterprise AI Platform" in result.output
+    assert "acme-requirements-v1.xlsx" in result.output
+
+    result = runner.invoke(app, ["digest", "--show"])
+    assert result.exit_code == 0 and "Acme Health Plan" in result.output
+    result = runner.invoke(app, ["status"])
+    assert "Digest: yes" in result.output and "stale" not in result.output

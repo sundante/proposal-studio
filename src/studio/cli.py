@@ -14,6 +14,7 @@ import yaml
 
 from studio import __version__, ingest, rag, session
 from studio import config as cfgmod
+from studio import digest as digestmod
 from studio.llm import LLMClient, LLMError, OllamaClient, model_is_pulled
 from studio.rag import VectorIndex
 
@@ -228,7 +229,9 @@ def status(
             typer.echo(f"  - {name} ({count} chunks)")
     else:
         typer.echo("Ingested: nothing yet")
-    for key in ("digest", "outline", "deck"):
+    stale = " (stale: files changed since; re-run `studio digest`)" if info["digest_stale"] else ""
+    typer.echo(f"Digest: {'yes' + stale if info['digest'] else 'no'}")
+    for key in ("outline", "deck"):
         typer.echo(f"{key.capitalize()}: {'yes' if info[key] else 'no'}")
     typer.echo(f"Renders: {', '.join(info['renders']) or 'none'}")
     try:
@@ -238,8 +241,41 @@ def status(
         typer.echo("Loaded model: unknown (Ollama not reachable)")
     if not info["files"]:
         _next("`studio ingest <files>`")
-    elif not info["digest"]:
+    elif not info["digest"] or info["digest_stale"]:
         _next('`studio ask "<question>"` or `studio digest`')
+    elif not info["outline"]:
+        _next("`studio outline`")
+
+
+@app.command("digest")
+def digest_cmd(
+    opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
+    xlsx: bool = typer.Option(False, "--xlsx", help="Also export a requirements matrix (XLSX)."),
+    show: bool = typer.Option(False, "--show", help="Show the saved digest; don't rebuild."),
+) -> None:
+    """Build (or show) the RFP digest: problems, requirements, criteria, compliance, risks."""
+    root, _store, sess = _session()
+    warnings: list[str] = []
+    try:
+        cfg = cfgmod.load_config()
+        opportunity = session.active_opportunity(root, sess, opp)
+        if show:
+            result = digestmod.load_digest(opportunity.path)
+            if result is None:
+                _fail(f"No digest for {opportunity.id} yet. Run `studio digest`.")
+            if digestmod.is_stale(opportunity.path):
+                warnings.append(
+                    "Files changed since this digest was built; re-run `studio digest`."
+                )
+        else:
+            report = digestmod.build_digest(opportunity.path, get_llm(), cfg.rag, on_status=_status)
+            result, warnings = report.digest, report.warnings
+        typer.echo(digestmod.render_summary(result, warnings))
+        if xlsx:
+            path = digestmod.export_matrix(result, opportunity.path / "out", opportunity.id)
+            typer.echo(f"\nRequirements matrix: {path}")
+    except (cfgmod.ConfigError, session.SessionError, digestmod.DigestError, LLMError) as exc:
+        _fail(str(exc))
 
 
 # --- doctor ---------------------------------------------------------------------------------

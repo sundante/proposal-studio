@@ -14,6 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from studio import digest as digestmod
 from studio.rag import VectorIndex
 
 OPP_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
@@ -133,7 +134,8 @@ def opportunity_status(opp: Opportunity) -> dict[str, Any]:
         "title": opp.title,
         "files": {name: index.file_chunk_count(name) for name in index.files()},
         "chunks": len(index),
-        "digest": (opp.path / "digest.json").exists(),
+        "digest": (opp.path / digestmod.DIGEST_FILE).exists(),
+        "digest_stale": digestmod.is_stale(opp.path),
         "outline": (opp.path / "outline.json").exists(),
         "deck": (opp.path / "deck.json").exists(),
         "renders": sorted(p.name for p in out.glob("*.pptx")) if out.exists() else [],
