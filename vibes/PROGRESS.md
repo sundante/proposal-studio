@@ -9,7 +9,7 @@
 | 4 | Blocks, storyline, deck writer | ✅ done | cb2b909 |
 | 5 | Offline research | ✅ done | 9e1ede5 |
 | 6 | Router core | ✅ done | 59b888f |
-| 7 | Open WebUI integration + setup scripts | ⬜ todo | |
+| 7 | Open WebUI integration + setup scripts | ✅ done | 2b4e1b9 |
 | 8 | Agents route | ⬜ todo | |
 | 9 | Hardening + docs | ⬜ todo | |
 | 10 | Release pipeline + v0.1.0 | ⬜ todo | |
@@ -18,11 +18,9 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
 - Phase in progress: none
-- Next step: Phase 7 — Open WebUI integration + setup scripts
+- Next step: Phase 8 — Agents route
 
 ## Known issues
-- Ollama keeps the embed model and worker loaded together unless `OLLAMA_MAX_LOADED_MODELS=1`
-  is set (done by `start.ps1`/`start.sh` in Phase 7).
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side; the
   docs should recommend one format per document).
 - `/digest` takes ~55 s per section group on an Apple-silicon Mac with qwen3:8b; expect several
@@ -35,3 +33,7 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
   both are flagged for review, not prevented.
 - `/research` synthesis (summary/implications) is not itself cited and can blur facts; the
   findings carry the citations. Sub-questions from qwen3:8b tend to overlap.
+- `setup.ps1`/`start.ps1` are syntax-checked in CI but not yet run on a real Windows 11 laptop.
+- The Open WebUI pipe was verified via its HTTP API; the browser confirmation dialog (needs a
+  live browser session) and the light-theme step are untested manually.
+- If the Ollama tray app is already running, `offline.env`'s `OLLAMA_*` settings don't apply.

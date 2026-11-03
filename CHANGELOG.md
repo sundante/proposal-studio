@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Open WebUI integration: the **Proposal Studio** pipe (`owui/router_pipe.py`) with Valves,
+  attachments → `/ingest`, confirmation dialog, and download links for PPTX/XLSX/reports; a PHI
+  warning inlet filter (`owui/phi_filter.py`); slash-command Prompts (`owui/prompts/`).
+- `studio owui install` (local API install of functions + prompts), `studio owui prompts`,
+  `studio smoke` (end-to-end check on real models).
+- `scripts/setup|start|smoke_test` for Windows (`.ps1`, no admin) and macOS/Linux (`.sh`), with a
+  shared offline/no-telemetry environment (`scripts/offline.env`); `docs/install.md`.
+
+### Changed
+- Vector search uses exact cosine similarity with NumPy instead of FAISS (FAISS and Open WebUI's
+  torch crashed together on duplicate OpenMP runtimes). Existing indexes rebuild on next ingest.
 - Chat router: every command and alias, auto-routing (rules → classifier → clarification),
   confirmation for file-writing routes (`/approve`, `/reject`), route status line, "Next:"
   hints, per-chat sessions; async `Router.handle()` with streaming and status events.

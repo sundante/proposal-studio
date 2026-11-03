@@ -5,7 +5,7 @@ The design is in `vibes/PROJECT_SPEC.md`; progress is tracked in `vibes/PROGRESS
 
 ## Allowed dependencies
 Runtime: `httpx`, `pydantic>=2`, `pyyaml`, `pymupdf`, `python-docx`, `openpyxl`, `python-pptx`,
-`faiss-cpu`, `numpy`, `typer`.
+`numpy`, `typer`. (`faiss-cpu` was dropped in Phase 7: see DECISIONS.md.)
 Dev (`[dev]` extra): `pytest`, `pytest-asyncio`, `ruff`, `pre-commit`, `build`.
 Not a dependency of `studio` (installed separately by `setup.ps1`): `open-webui`.
 Optional, only if Phase 5 records a reason in vibes/DECISIONS.md: `langgraph`.
@@ -35,7 +35,7 @@ Spec: §0, §3, §4, §6, §7 (PHI scan only), §16.1, §16.2
 Spec: §7
 - `ingest.py`: PDF/DOCX/XLSX/PPTX/TXT/MD → sections with heading path + page/slide; tables row-wise
   with headers; section-aware chunking (~800 tokens, 100 overlap); file hashing.
-- `rag.py`: FAISS per opportunity and per library collection; incremental updates; `retrieve(top_k)`;
+- `rag.py`: vector index per opportunity and per library collection; incremental updates; `retrieve(top_k)`;
   `answer()` with mandatory `[section, p.N]` citations and an explicit "not found in the RFP" path.
 - `session.py`: opportunities (create/use/list) + per-chat state in `workspace/.sessions/`.
 - CLI: `studio new|use|ingest|ask|status`.

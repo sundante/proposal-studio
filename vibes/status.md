@@ -1,6 +1,6 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-03 · Branch `dev` · 7 of 11 phases done · 169 tests passing_
+_Last updated: 2026-11-03 · Branch `dev` · 8 of 11 phases done · 184 tests passing_
 
 Proposal Studio is a fully local, offline proposal workbench. It turns RFP documents into an
 AI-practice proposal deck on the user's own PowerPoint template, answers RFP questions with
@@ -20,12 +20,16 @@ reasoning behind each deviation is in [DECISIONS.md](DECISIONS.md).
 | 4 | Blocks, storyline, deck writer | ✅ done |
 | 5 | Offline research | ✅ done |
 | 6 | Router core + `studio chat` | ✅ done |
-| 7 | Open WebUI integration + setup scripts | ⬜ next |
-| 8–10 | Agents, hardening, release | ⬜ todo |
+| 7 | Open WebUI integration + setup scripts | ✅ done |
+| 8 | Agents route | ⬜ next |
+| 9–10 | Hardening + docs, release | ⬜ todo |
 
-What a user can do today, from the command line or the `studio chat` REPL (the Open WebUI chat arrives in Phase 7):
+What a user can do today, in Open WebUI (pick **Proposal Studio**), or from the CLI / `studio chat` REPL:
 
 ```bash
+scripts/setup.sh && scripts/start.sh           # Windows: scripts\setup.ps1, scripts\start.ps1
+studio owui install --token sk-…                # add the pipe, PHI filter and / prompts to Open WebUI
+studio smoke                                    # end-to-end check on the real models
 studio doctor                                   # checks Python, config, workspace, Ollama, models
 studio chat                                     # chat REPL: /commands or plain text, auto-routed
 studio new acme-demo "Acme Health Plan AI RFP"  # create an opportunity
@@ -189,6 +193,34 @@ studio config set worker.model qwen3:4b         # runtime override; cloud models
   and cited. Classifier routing took 1–2 s (budget: under 15 s). "make the powerpoint" was held
   until `/approve`, then rendered with 0 QA errors.
 
+### Phase 7 — Open WebUI integration + setup scripts
+- **VERIFY first** against the open-webui 0.13.0 source: pipe arguments, Valves, status and
+  confirmation events, how attachments are stored, file downloads, RAG injection, task calls,
+  the prompt/function APIs, and the offline/telemetry env vars (all recorded in DECISIONS.md).
+- **Open WebUI functions:**
+  - `owui/router_pipe.py`, the **Proposal Studio** model: attachments are ingested, the
+    confirmation dialog is used, new PPTX/XLSX/report files come back as download links,
+    Open WebUI's background tasks are ignored, and RAG context it prepends is stripped.
+  - `owui/phi_filter.py`: warns about (or blocks) possible PHI in typed messages.
+  - `owui/prompts/`: one `/` shortcut per command.
+
+  The functions are thin wrappers over the tested `studio.owui` bridge.
+- **Install and checks:** `studio owui install` (localhost-only API install), `studio owui
+  prompts`, and `studio smoke` (end-to-end on the real models).
+- **Scripts:** `setup` / `start` / `smoke_test` for Windows (no admin) and macOS/Linux, sharing
+  one `offline.env` (offline, no telemetry, no web search, Ollama cloud off, one model loaded,
+  RAG context in the system message, background tasks off). Open WebUI binds to 127.0.0.1 and
+  keeps its data in `.owui-data/`. Install guide: `docs/install.md`.
+- **Real Open WebUI run:** the pipe was installed through the API, then a PDF upload went to
+  `/ingest`, `/ask` answered with a citation in 7.5 s, `/digest xlsx` and an 11-slide `/deck`
+  ran, and "make the powerpoint" waited for `/approve` and returned a working PPTX download
+  link. No non-local network traffic.
+- **Two real bugs found and fixed:**
+  - FAISS and Open WebUI's torch crashed the server (duplicate OpenMP), so search is now exact
+    NumPy cosine and `faiss-cpu` is gone.
+  - The confirmation dialog auto-approved when no browser was connected (error dict was
+    truthy); it now needs a literal yes.
+
 ## Verified on a real model
 Local Ollama with qwen3:8b and nomic-embed-text, on the synthetic Acme Health Plan RFP:
 
@@ -233,8 +265,8 @@ Problems that real runs exposed and that are now fixed in code:
   the 16 GB CPU-only Windows target; prompt and output size will be tuned in Phase 9.
 - Ingesting one RFP as both PDF and DOCX duplicates excerpts. The docs should recommend one
   format per document.
-- Ollama loads the embedding and worker models together unless `OLLAMA_MAX_LOADED_MODELS=1` is
-  set; the start scripts will set it in Phase 7.
+- The Windows scripts are syntax-checked in CI but haven't been run on a real Windows 11 laptop
+  yet. The browser confirmation dialog and the light-theme step are untested by hand.
 - `pip install open-webui` is multi-GB (torch), which puts the <2 GB idle RAM budget at risk.
   Revisit in Phase 9.
 - Hermes Agent may lack a headless mode on Windows; Phase 8 will likely mark it unsupported.
@@ -242,13 +274,11 @@ Problems that real runs exposed and that are now fixed in code:
 - Rendered decks have only been checked structurally. No LibreOffice here, and Quick Look hangs
   headless, so open the CI `sample-deck` artifact in PowerPoint once to check it by eye.
 
-## Next up — Phase 7
-Open WebUI integration and setup scripts:
-- **VERIFY first** against the installed `open-webui`: Pipe/Filter structure,
-  Valves/UserValves, `__event_emitter__` status, `__event_call__` confirmation, how attached
-  files reach a pipe, how to return a downloadable file, the Prompt import format, and the
-  offline/telemetry env vars.
-- **Build:** `owui/router_pipe.py` (wrapping `Router.handle`), `owui/phi_filter.py`,
-  `owui/prompts/*.json`.
-- **Scripts:** `setup.ps1` / `start.ps1` / `smoke_test.ps1`, plus `.sh` equivalents.
-- **Docs:** `docs/install.md`.
+## Next up — Phase 8
+The agents route:
+- **VERIFY** the headless flags of opencode, claude and hermes with `--help`.
+- **Build `studio/agents/`:** config-driven adapters; a sandbox (copy files in, copy back only
+  on approval, path checks, env allowlist); plan → approve → apply; streaming; timeouts and
+  cancel; logs; a diff of changed files; Windows `.cmd` shims.
+- **Wire it up:** `owui/agents_pipe.py` (manifold), `/agent` in the router, and
+  `studio agent`.

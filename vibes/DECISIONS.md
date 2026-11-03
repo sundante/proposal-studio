@@ -231,3 +231,96 @@ Format:
 - Why: Deterministic, transparent routing that never surprises the user with slow or
   file-writing work.
 - Spec impact: §5.1 gains `/approve`, `/reject`, `/library`.
+
+## 2026-11-03 — VERIFY: Open WebUI 0.13.0 integration facts  (Phase 7)
+- Context: Verified against the `open-webui==0.13.0` wheel source (requires Python >=3.11,<3.13)
+  before writing `owui/`. Ollama env vars checked with `ollama serve --help`.
+- Findings:
+  1. Functions are Python files `exec`'d by Open WebUI; the module must define `Pipe` (or
+     `Filter`). A docstring frontmatter `requirements:` line is pip-installed on load, so our
+     functions declare none (the `studio` package is installed in the same venv instead).
+  2. `pipe(body, …)` receives only the extras it declares: `__user__` (dict; `valves` =
+     UserValves), `__chat_id__`, `__session_id__`, `__message_id__`, `__files__` (from
+     `metadata.files`), `__metadata__`, `__event_emitter__`, `__event_call__`, `__task__`,
+     `__request__`. Async pipes are awaited; returning an async generator of strings streams.
+     `Valves` load from the DB into `self.valves`.
+  3. Status events: `{"type": "status", "data": {"description", "done"}}` (matches the router).
+     `__event_call__({"type": "confirmation", "data": {"title", "message"}})` waits for the
+     user's answer → used for the approve/reject dialog (typed `/approve` stays as fallback).
+  4. Attached files arrive as items with an `id` and a `file` object; the stored copy lives at
+     `Files.get_file_by_id(id).path` (resolved by `Storage.get_file`), named `<uuid>_<name>`.
+     The pipe copies each to a temp folder under its original filename before ingesting.
+  5. Downloads: store the file with `Storage.upload_file` + `Files.insert_new_file(FileForm)`
+     and link `/api/v1/files/{id}/content` in the reply (also emitted as a `files` event).
+  6. Open WebUI runs its own RAG on attachments unless the model's `capabilities.file_context`
+     is off, and with `RAG_SYSTEM_CONTEXT=False` it *prepends* its RAG template (ending in
+     `</context>`) to the user's message. We set `RAG_SYSTEM_CONTEXT=True`, document turning
+     off File Context for the model, and the pipe strips anything up to the last `</context>`.
+  7. Task calls (title/tags/follow-ups/queries) go to the selected model — i.e. our pipe —
+     with `__task__` set; the pipe returns "" for them, and `start.*` disables those tasks.
+  8. Prompts (`/` menu): `POST /api/v1/prompts/create {command, name, content}`; commands are
+     stored without the leading `/` (the frontend strips it). Functions:
+     `POST /api/v1/functions/create {id, name, content, meta: {description}}`,
+     `/id/{id}/update`, `/id/{id}/toggle` (flips), `/id/{id}/toggle/global`; API keys are
+     `Bearer sk-…`.
+  9. Env vars used by `start.*` (names verified): `OFFLINE_MODE`, `HF_HUB_OFFLINE`,
+     `ENABLE_PERSISTENT_CONFIG=False` (env stays authoritative), `ENABLE_WEB_SEARCH`,
+     `ENABLE_IMAGE_GENERATION`, `ENABLE_COMMUNITY_SHARING`, `ENABLE_VERSION_UPDATE_CHECK`,
+     `ENABLE_OPENAI_API`, `ENABLE_DIRECT_CONNECTIONS`, `OLLAMA_BASE_URL`,
+     `RAG_EMBEDDING_ENGINE=ollama`, `RAG_EMBEDDING_MODEL=nomic-embed-text`,
+     `RAG_OLLAMA_BASE_URL`, `RAG_SYSTEM_CONTEXT=True`, `ENABLE_TITLE_GENERATION`,
+     `ENABLE_TAGS_GENERATION`, `ENABLE_FOLLOW_UP_GENERATION`, `ENABLE_SEARCH_QUERY_GENERATION`,
+     `ENABLE_RETRIEVAL_QUERY_GENERATION`, `ENABLE_AUTOCOMPLETE_GENERATION`, `ENABLE_OTEL`,
+     `DATA_DIR`; plus `ANONYMIZED_TELEMETRY`, `SCARF_NO_ANALYTICS`, `DO_NOT_TRACK` for
+     dependencies. Ollama: `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`,
+     `OLLAMA_KEEP_ALIVE=10m`, `OLLAMA_NO_CLOUD=1`.
+  10. There is no default-theme env var; light theme is a documented one-time setting.
+- Decision: Thin `owui/*.py` function files delegate to a tested `studio.owui` bridge module.
+- Spec impact: none (these are the "verify" items of §5.1, §9.5, §12).
+
+## 2026-11-03 — Drop FAISS for NumPy exact search  (Phase 7)
+- Context: Running the pipe inside a real Open WebUI 0.13.0 crashed the whole server on the
+  first `/ask`: `OMP: Error #15 … libomp.dylib already initialized`. torch (loaded by Open WebUI)
+  and faiss-cpu each bundle their own OpenMP runtime; loading both in one process aborts it.
+  The only workaround (`KMP_DUPLICATE_LIB_OK=TRUE`) is documented as unsafe and able to give
+  incorrect results. The same two-runtime situation is likely on Windows.
+- Decision: `VectorIndex` does exact cosine search with NumPy (normalised vectors, one matrix
+  product, stable sort): the same results as the FAISS flat inner-product index we used.
+  Vectors are stored in `vectors.npz`. An index in the old FAISS layout is cleared on load
+  and re-embedded by the next ingest. `faiss-cpu` is removed from the dependencies.
+- Why: Correctness and stability in the shared Open WebUI process. RFP and library indexes are
+  thousands of chunks, so search is milliseconds. If a library ever reaches hundreds of
+  thousands of chunks, an approximate index can be added out of process.
+- Spec impact: §2/§3/§7 "FAISS" → exact cosine with NumPy; BUILD_PLAN dependency list updated.
+
+## 2026-11-03 — Open WebUI pipe behaviour  (Phase 7)
+- Decision:
+  1. `owui/router_pipe.py` and `owui/phi_filter.py` are thin and delegate to the tested
+     `studio.owui` bridge (`PipeBridge`, `materialize_files`, `owui_publisher`, `install`).
+  2. The confirmation dialog only acts on a literal `True`/`False`. In a real run with no
+     browser attached, `__event_call__` returned `{"error": "Client session disconnected."}`
+     (truthy), which auto-approved a render. Now the action stays pending and the user is told
+     to type `/approve`.
+  3. Files the router produces (PPTX, XLSX, research reports) are recorded in
+     `session.last_outputs["produced"]` and offered as Open WebUI download links.
+  4. Valves: `STUDIO_HOME`, `AUTO_ROUTE`, `AUTO_THRESHOLD`; UserValves:
+     `DEFAULT_OPPORTUNITY`. Sessions are keyed per chat id.
+  5. `studio owui install` uses the verified API (functions + prompts) and refuses any
+     non-localhost URL. `owui/prompts/*.json` are generated from `routes.yaml`
+     (`studio owui prompts`), and a test keeps them in sync.
+  6. `studio smoke` (used by `smoke_test.*`) runs a synthetic RFP through the router on the real
+     models in a throwaway folder. The RFP generator moved into the package
+     (`studio.samples`) so release installs can run it.
+  7. Scripts: `offline.env` is the single source of the environment for `start.ps1` and
+     `start.sh`. Open WebUI binds to 127.0.0.1 and keeps data in `.owui-data/` (gitignored and
+     blocked by the private-path guard). CI syntax-checks the `.ps1` (PowerShell parser) and
+     `.sh` (`bash -n`) scripts.
+- Verified end to end in a real Open WebUI 0.13.0 (API-driven):
+  - install via API → model listed
+  - upload a PDF and send it → `/ingest`
+  - cited `/ask` in 7.5 s
+  - `/digest xlsx`, then `/deck` (11 slides)
+  - "make the powerpoint" → pending → `/approve`
+  - download link serves the PPTX (200, correct MIME type)
+  - no non-local network requests in the log
+- Spec impact: none.

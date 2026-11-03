@@ -53,7 +53,7 @@ Open WebUI (browser, localhost:8080, offline mode, light theme)
  │                               SAME venv as Open WebUI so the pipe can `import studio`)
  │                                 ├── router      (commands + auto classifier)
  │                                 ├── ingest      (pdf/docx/xlsx/pptx/txt → sections)
- │                                 ├── rag         (FAISS + nomic-embed-text, cited answers)
+ │                                 ├── rag         (NumPy cosine + nomic-embed-text, cited answers)
  │                                 ├── digest      (RFP → digest.json)
  │                                 ├── blocks      (harvest + block library)
  │                                 ├── deck        (storyline + slide schemas + writer)
@@ -132,7 +132,7 @@ proposal-studio/
 ├── workspace/               # gitignored; one folder per opportunity
 │   └── <opp-id>/
 │       ├── input/           # RFP files
-│       ├── index/           # FAISS index for this RFP
+│       ├── index/           # vector index for this RFP
 │       ├── digest.json
 │       ├── outline.json
 │       ├── deck.json
@@ -250,7 +250,7 @@ JSON under `workspace/.sessions/`. Survives Open WebUI restarts.
   PPTX (`python-pptx`, for past decks), TXT/MD.
 - Section-aware chunking: keep heading path + page number on every chunk (`"3.2 Scope > Data
   Integration", p.14`). Target ~800 tokens, 100 overlap. Tables → row-wise text with headers.
-- Index per opportunity in `workspace/<opp>/index/` (FAISS, cosine). Library indexes in
+- Index per opportunity in `workspace/<opp>/index/` (exact cosine with NumPy; FAISS was dropped, see DECISIONS.md). Library indexes in
   `library/.index/{proposals,reference}`. Incremental: hash files, skip unchanged.
 - `/ask`: retrieve top-k (default 6), answer with the worker model, **every claim cites
   `[section, p.N]`**, and say clearly when the RFP doesn't cover the question.
