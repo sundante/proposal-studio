@@ -1,6 +1,6 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-03 · Branch `dev` · 3 of 11 phases done · 101 tests passing_
+_Last updated: 2026-11-03 · Branch `dev` · 4 of 11 phases done · 122 tests passing_
 
 Proposal Studio is a fully local, offline proposal workbench. It turns RFP documents into an
 AI-practice proposal deck on the user's own PowerPoint template, answers RFP questions with
@@ -16,8 +16,9 @@ reasoning behind each deviation is in [DECISIONS.md](DECISIONS.md).
 | 0 | Bootstrap: repo, OSS files, CI, config, LLM client, guards, CLI | ✅ done |
 | 1 | Ingest + RAG + `/ask` | ✅ done |
 | 2 | RFP digest (`digest.json`, summary, XLSX matrix) | ✅ done |
-| 3 | Template inspector + PPTX renderer (no LLM) | ⬜ next |
-| 4–10 | Blocks/deck writer, research, router, Open WebUI, agents, hardening, release | ⬜ todo |
+| 3 | Template inspector + PPTX renderer (no LLM) | ✅ done |
+| 4 | Blocks, storyline, deck writer | ⬜ next |
+| 5–10 | Research, router, Open WebUI, agents, hardening, release | ⬜ todo |
 
 What a user can do today, from the command line (there is no chat UI until Phase 7):
 
@@ -28,6 +29,8 @@ studio ingest rfp.pdf addendum.docx             # PHI-scanned, indexed, incremen
 studio ask "When are proposals due?"            # cited answer, or "Not found in the RFP."
 studio digest --xlsx                            # structured digest + requirements matrix
 studio status                                   # files, chunks, digest (stale?), loaded model
+studio template inspect templates/firm.potx     # layouts + placeholder idx → firm.layouts.json
+studio render --deck tests/fixtures/sample_deck.json --out build/   # PPTX + QA report
 studio config set worker.model qwen3:4b         # runtime override; cloud models rejected
 ```
 
@@ -94,6 +97,30 @@ studio config set worker.model qwen3:4b         # runtime override; cloud models
   - an XLSX requirements compliance matrix (`out/<opp>-requirements-vN.xlsx`, never
     overwritten)
 
+### Phase 3 — Template inspector + renderer (no LLM)
+- **Slide schemas** (`studio/deck/schemas.py`) for all 11 storyline slide types: title, bullet
+  slides, before/after, architecture layers, maturity stages and next steps. Each carries
+  speaker notes and sources (provenance). `slide_model()` builds strict, length-limited
+  versions as the LLM schema for the Phase 4 deck writer.
+- **Template inspector:** `studio template inspect` lists layouts and placeholder idx values
+  and writes a `.layouts.json` to help fill `config/layout_map.yaml`. `.potx` files open
+  through an in-memory content-type patch (verified).
+- **Renderer** (`studio/render/renderer.py`):
+  - removes the template's own slides
+  - maps each slide type to a layout and its fields to placeholders
+  - enforces limits: word-boundary truncation, item trimming
+  - deletes unfilled placeholders
+  - draws the architecture slide as layered boxes
+  - writes the sources into speaker notes
+  - saves versioned `<opp>-vN.pptx` files
+  - returns a QA report covering errors, truncations, empty placeholders and missing
+    provenance
+- **Sample template:** an original, neutral 16:9 template generated in code
+  (`studio template sample`).
+- **Results:** the sample deck renders 11 slides in ~0.03 s with zero QA errors, no shapes off
+  the slide, no overlaps and no empty placeholders. CI uploads the rendered deck as an
+  artifact.
+
 ## Verified on a real model
 Local Ollama with qwen3:8b and nomic-embed-text, on the synthetic Acme Health Plan RFP:
 
@@ -139,12 +166,13 @@ Problems that real runs exposed and that are now fixed in code:
   Revisit in Phase 9.
 - Hermes Agent may lack a headless mode on Windows; Phase 8 will likely mark it unsupported.
 - CI hasn't yet been observed running on Windows.
+- Rendered decks have only been checked structurally. No LibreOffice here, and Quick Look hangs
+  headless, so open the CI `sample-deck` artifact in PowerPoint once to check it by eye.
 
-## Next up — Phase 3
-The template inspector (`studio template inspect`) and the PPTX renderer, with no LLM:
-- slide schemas with character limits
-- a neutral sample template generated in code
-- the `.potx` content-type handling
-- a shape-drawn architecture slide
-- versioned output with a QA report
-- a CI job that uploads the rendered sample deck
+## Next up — Phase 4
+Blocks, storyline and the deck writer:
+- `/harvest` reusable, anonymised blocks from past proposals into `library/blocks/`
+- `/outline` from `storyline.yaml` plus digest rules
+- `/deck` tailors 2–4 vetted blocks per slide into `slide_model()` output, with a shorten retry
+  and provenance
+- `/edit` with a diff

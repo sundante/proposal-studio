@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `/render`: deck.json → versioned PPTX on your template (no LLM), with layout/placeholder
+  mapping in `config/layout_map.yaml`, limit enforcement, layered architecture diagram, speaker
+  notes with sources, and a QA report. `.potx` templates supported.
+- `studio template inspect` (layouts + placeholders → `.layouts.json`) and `studio template
+  sample`; an original neutral sample template in `templates/sample/`.
+- Slide schemas for all 11 storyline slide types; CI job uploading the rendered sample deck.
 - `/digest`: map-reduce RFP digest (`digest.json`) with cited problems, before/after,
   requirements, evaluation criteria, compliance, systems, risks and open questions;
   de-duplication, verified requirement ids, conflict flags; Markdown summary; optional XLSX

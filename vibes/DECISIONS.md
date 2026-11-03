@@ -117,3 +117,30 @@ Format:
   updated to `vibes/...`.
 - Why: Cleaner root for an open-source repo.
 - Spec impact: §3 layout updated.
+
+## 2026-11-03 — Template + renderer choices  (Phase 3)
+- Context: Building §9.3/§9.5 (slide schemas, inspector, `.potx`, renderer, QA).
+- Decision:
+  1. VERIFY `.potx`: python-pptx 1.0.2 rejects a `.potx` (ValueError on the template content
+     type). `open_template` loads an in-memory copy with `[Content_Types].xml` patched from
+     `…presentationml.template.main+xml` to `…presentation.main+xml`; the file on disk is never
+     touched. Works; no "Save As .pptx" step needed.
+  2. VERIFY slide removal: dropping each `sldId` and its relationship removes the template's
+     sample slides and their parts cleanly; output reopens fine.
+  3. `layout_map.yaml` is typed: `limits` (global) + per-`slide_type` `LayoutSpec{layout,
+     placeholders: field → idx|name, limits overrides, diagram_area}`.
+  4. Schemas are lenient for loading `deck.json`; limits are checked and enforced at render time
+     (word-boundary truncation with "…", item trimming, all reported in QA). `slide_model()`
+     builds strict per-type models with `maxLength`/`maxItems` for the Phase 4 writer's schema.
+  5. Unfilled placeholders are deleted from rendered slides, so no "Click to add text" prompts
+     remain; a mapped-but-empty field is reported as an empty placeholder.
+  6. Sample template: generated in code from python-pptx's bundled generic default (no brand
+     assets), widened to 16:9 (only shapes with their own position are rescaled; inherited
+     placeholders follow the master), light palette, one accent bar, neutral footer, two
+     throwaway slides. Committed at `templates/sample/proposal-sample.pptx`; a test checks it
+     matches a fresh build.
+  7. Mapping errors (unknown slide type, layout or placeholder) skip that slide and are QA
+     errors; `studio render` exits 1 when QA has errors.
+  8. Ruff: `typer.Option`/`typer.Argument` marked immutable for B008 (typer's documented style).
+- Why: Deterministic, testable rendering on any user template.
+- Spec impact: none beyond the above clarifications.
