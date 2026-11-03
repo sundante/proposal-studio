@@ -258,3 +258,28 @@ def test_library_and_research_cli(studio_home: Path, monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert "## Summary" in result.output and "Saved:" in result.output
     assert list((studio_home / "workspace" / "research").glob("*.md"))
+
+
+def test_chat_repl(studio_home: Path, rfp_files, monkeypatch) -> None:
+    from studio import cli
+    from tests.fakes import FakeLLM
+
+    llm = FakeLLM(text="Proposals are due March 15, 2027 [1].")
+    monkeypatch.setattr(cli, "get_llm", lambda: llm)
+    monkeypatch.setenv("STUDIO_SESSION", "repl")
+    script = "\n".join(
+        [
+            "/new acme",
+            ":attach /no/such/file.pdf",
+            f":attach {rfp_files['pdf']}",
+            "",
+            "When are proposals due?",
+            ":quit",
+        ]
+    )
+    result = runner.invoke(app, ["chat"], input=script + "\n")
+    assert result.exit_code == 0, result.output
+    out = result.output
+    assert "→ routed to /new (command)" in out and "No such file" in out
+    assert "Attached acme_rfp.pdf" in out and "→ routed to /ingest (rules)" in out
+    assert "→ routed to /ask (rules)" in out and "[2 Submission Instructions, p.1]" in out
