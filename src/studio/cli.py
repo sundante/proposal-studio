@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
+import httpx
 import typer
 import yaml
 
-from studio import __version__
+from studio import __version__, ingest, rag, session
 from studio import config as cfgmod
-from studio.llm import LLMError, OllamaClient, model_is_pulled
+from studio.llm import LLMClient, LLMError, OllamaClient, model_is_pulled
+from studio.rag import VectorIndex
 
 app = typer.Typer(help="Proposal Studio: local, offline proposal workbench.", no_args_is_help=True)
 config_app = typer.Typer(help="Show or change the effective configuration.", no_args_is_help=True)
@@ -69,6 +73,173 @@ def config_reset() -> None:
     except cfgmod.ConfigError as exc:
         _fail(str(exc))
     typer.echo("Overrides cleared; using base config.")
+
+
+# --- opportunities, ingest, ask -------------------------------------------------------------
+
+
+def get_llm() -> LLMClient:
+    """The LLM backend for CLI commands (tests monkeypatch this)."""
+    return OllamaClient(cfgmod.load_config().models, on_status=_status)
+
+
+def _status(message: str) -> None:
+    typer.echo(f"… {message}", err=True)
+
+
+def _session() -> tuple[Path, session.SessionStore, session.Session]:
+    root = cfgmod.project_root()
+    store = session.SessionStore(root)
+    return root, store, store.load(os.environ.get("STUDIO_SESSION", "cli"))
+
+
+def _next(hint: str) -> None:
+    typer.echo(f"\nNext: {hint}")
+
+
+@app.command()
+def new(
+    opp_id: str, title: str = typer.Argument("", help="Optional human-readable title.")
+) -> None:
+    """Create an opportunity workspace and make it active."""
+    root, store, sess = _session()
+    try:
+        opp = session.create_opportunity(root, opp_id, title)
+    except session.SessionError as exc:
+        _fail(str(exc))
+    sess.active_opp = opp.id
+    store.save(sess)
+    typer.echo(f"Created {opp.id} at {opp.path} (now active).")
+    _next(f"`studio ingest <files>` or drop RFP files into {opp.path / 'input'}")
+
+
+@app.command()
+def use(opp_id: str = typer.Argument(None, help="Opportunity to switch to; omit to list.")) -> None:
+    """Switch the active opportunity, or list opportunities."""
+    root, store, sess = _session()
+    if not opp_id:
+        opps = session.list_opportunities(root)
+        if not opps:
+            typer.echo("No opportunities yet.")
+            _next("`studio new <opp-id> [title]`")
+            return
+        for opp in opps:
+            mark = "*" if opp.id == sess.active_opp else " "
+            typer.echo(f"{mark} {opp.id}  {opp.title}")
+        return
+    try:
+        opp = session.get_opportunity(root, opp_id)
+    except session.SessionError as exc:
+        _fail(str(exc))
+    sess.active_opp = opp.id
+    store.save(sess)
+    typer.echo(f"Active opportunity: {opp.id}")
+    _next("`studio status`")
+
+
+@app.command("ingest")
+def ingest_cmd(
+    files: list[Path] = typer.Argument(  # noqa: B008 - typer's documented pattern
+        None, help="Files or folders; omit to ingest input/."
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Continue even if possible PHI is found."),
+    opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
+) -> None:
+    """Ingest RFP files into the opportunity and build its index."""
+    root, _store, sess = _session()
+    try:
+        cfg = cfgmod.load_config()
+        opportunity = session.active_opportunity(root, sess, opp)
+        report = ingest.ingest(
+            opportunity.path,
+            files or [],
+            get_llm(),
+            cfg.rag,
+            cfg.models.roles["embed"].model,
+            confirm_phi=yes,
+            on_status=_status,
+        )
+    except (cfgmod.ConfigError, session.SessionError, ingest.IngestError, LLMError) as exc:
+        _fail(str(exc))
+
+    if report.blocked:
+        typer.echo("Possible PHI found (RFPs should not contain PHI). Nothing was ingested:")
+        for hit in report.phi_hits:
+            where = f"{hit.file}" + (f", p.{hit.page}" if hit.page else "")
+            typer.echo(f"  - {where}: {hit.kind} ({hit.excerpt})")
+        typer.echo("Check the files, then re-run with --yes to ingest anyway.")
+        raise typer.Exit(2)
+
+    for label, names in (
+        ("new", report.new),
+        ("changed", report.changed),
+        ("unchanged", report.unchanged),
+        ("removed", report.removed),
+    ):
+        if names:
+            typer.echo(f"{label}: {', '.join(names)}")
+    for name, reason in report.skipped.items():
+        typer.echo(f"skipped {name}: {reason}")
+    if report.phi_hits:
+        typer.echo(f"Warning: ingested despite {len(report.phi_hits)} possible PHI matches.")
+    typer.echo(f"Indexed {report.chunks_added} new chunks ({report.total_chunks} total).")
+    _next('`studio ask "<question>"` or `studio digest`')
+
+
+@app.command()
+def ask(
+    question: str,
+    opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
+    top_k: int = typer.Option(None, "--top-k", min=1, max=50, help="Chunks to retrieve."),
+) -> None:
+    """Answer a question from the active RFP, with citations."""
+    root, _store, sess = _session()
+    try:
+        cfg = cfgmod.load_config()
+        opportunity = session.active_opportunity(root, sess, opp)
+        index = VectorIndex(opportunity.path / "index")
+        if not len(index):
+            _fail(f"Nothing ingested for {opportunity.id} yet. Run `studio ingest <files>`.")
+        for piece in rag.answer(
+            question, index, get_llm(), cfg.rag, top_k=top_k, on_status=_status
+        ):
+            typer.echo(piece, nl=False)
+        typer.echo()
+    except (cfgmod.ConfigError, session.SessionError, LLMError) as exc:
+        _fail(str(exc))
+    _next('another `studio ask "…"`, or `studio digest`')
+
+
+@app.command()
+def status(
+    opp: str = typer.Option(None, "--opp", help="Opportunity id (default: active)."),
+) -> None:
+    """Show the active opportunity's pipeline status and the loaded model."""
+    root, _store, sess = _session()
+    try:
+        opportunity = session.active_opportunity(root, sess, opp)
+    except session.SessionError as exc:
+        _fail(str(exc))
+    info = session.opportunity_status(opportunity)
+    typer.echo(f"Opportunity: {info['id']}" + (f" — {info['title']}" if info["title"] else ""))
+    if info["files"]:
+        typer.echo(f"Ingested: {len(info['files'])} files, {info['chunks']} chunks")
+        for name, count in info["files"].items():
+            typer.echo(f"  - {name} ({count} chunks)")
+    else:
+        typer.echo("Ingested: nothing yet")
+    for key in ("digest", "outline", "deck"):
+        typer.echo(f"{key.capitalize()}: {'yes' if info[key] else 'no'}")
+    typer.echo(f"Renders: {', '.join(info['renders']) or 'none'}")
+    try:
+        loaded = OllamaClient(cfgmod.load_config().models).loaded_models()
+        typer.echo(f"Loaded model: {', '.join(loaded) or 'none'}")
+    except (cfgmod.ConfigError, LLMError, httpx.HTTPError):
+        typer.echo("Loaded model: unknown (Ollama not reachable)")
+    if not info["files"]:
+        _next("`studio ingest <files>`")
+    elif not info["digest"]:
+        _next('`studio ask "<question>"` or `studio digest`')
 
 
 # --- doctor ---------------------------------------------------------------------------------

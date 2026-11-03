@@ -67,3 +67,52 @@ def test_doctor_ollama_down(studio_home: Path) -> None:
 
     checks = run_checks(_client(handler))
     assert not checks[-1].ok and "ollama serve" in checks[-1].fix
+
+
+def test_new_ingest_ask_status_flow(studio_home: Path, rfp_files, monkeypatch) -> None:
+    from studio import cli
+    from tests.fakes import FakeLLM
+
+    llm = FakeLLM(text="Proposals are due March 15, 2027 [2 Submission Instructions, p.1].")
+    monkeypatch.setattr(cli, "get_llm", lambda: llm)
+    monkeypatch.setenv("STUDIO_SESSION", "test")
+
+    result = runner.invoke(app, ["new", "acme-demo", "Acme Health Plan AI RFP"])
+    assert result.exit_code == 0, result.output
+
+    result = runner.invoke(app, ["ingest", str(rfp_files["pdf"])])
+    assert result.exit_code == 0, result.output
+    assert "new: acme_rfp.pdf" in result.output and "Next:" in result.output
+
+    result = runner.invoke(app, ["ask", "When are proposals due?"])
+    assert result.exit_code == 0, result.output
+    assert "[2 Submission Instructions, p.1]" in result.output
+
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0, result.output
+    assert "acme_rfp.pdf" in result.output and "Digest: no" in result.output
+
+    runner.invoke(app, ["new", "beta"])
+    result = runner.invoke(app, ["use"])
+    assert "* beta" in result.output and "  acme-demo" in result.output
+    assert runner.invoke(app, ["use", "acme-demo"]).exit_code == 0
+
+
+def test_ingest_phi_exit_code(studio_home: Path, tmp_path: Path, monkeypatch) -> None:
+    from studio import cli
+    from tests.fakes import FakeLLM
+
+    monkeypatch.setattr(cli, "get_llm", FakeLLM)
+    monkeypatch.setenv("STUDIO_SESSION", "test")
+    runner.invoke(app, ["new", "acme"])
+    leaky = tmp_path / "leaky.txt"
+    leaky.write_text("Member SSN 123-45-6789\n")
+    result = runner.invoke(app, ["ingest", str(leaky)])
+    assert result.exit_code == 2 and "--yes" in result.output
+    assert runner.invoke(app, ["ingest", str(leaky), "--yes"]).exit_code == 0
+
+
+def test_ask_without_opportunity(studio_home: Path, monkeypatch) -> None:
+    monkeypatch.setenv("STUDIO_SESSION", "empty")
+    result = runner.invoke(app, ["ask", "anything"])
+    assert result.exit_code == 1 and "/new" in result.output
