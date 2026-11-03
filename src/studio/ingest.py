@@ -2,7 +2,7 @@
 
 Sections keep their heading path and page (or slide) number so every chunk can be cited as
 ``[3.2 Scope > Data Integration, p.14]``. Tables are emitted row-wise with their headers.
-Token counts are approximated as ``len(text) / 4`` (see DECISIONS.md).
+Token counts are approximated as ``len(text) / 4`` (see vibes/DECISIONS.md).
 """
 
 from __future__ import annotations

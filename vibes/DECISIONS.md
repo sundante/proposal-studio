@@ -1,6 +1,6 @@
 # Decisions log
 
-Append-only. One entry per decision or deviation from `PROJECT_SPEC.md`.
+Append-only. One entry per decision or deviation from `vibes/PROJECT_SPEC.md`.
 
 Format:
 ```
@@ -23,7 +23,7 @@ Format:
 - Spec impact: none (this is the baseline).
 
 ## 2026-11-03 — Pre-build ambiguity resolutions  (kickoff)
-- Context: Kickoff review of PROJECT_SPEC.md before Phase 0.
+- Context: Kickoff review of vibes/PROJECT_SPEC.md before Phase 0.
 - Decision:
   1. Dev Python: uv-managed 3.11 venv (`uv venv --python 3.11 .venv`). CI covers 3.11 + 3.12.
      3.11 is preferred at runtime because Open WebUI shares the venv.
@@ -107,3 +107,13 @@ Format:
 - Why: Small local models are unreliable at ids and labels; Python checks keep the digest
   trustworthy.
 - Spec impact: §8 `evidence`/`cite` fields become lists.
+
+## 2026-11-03 — Non-functional docs move to `vibes/`  (process)
+- Context: Maintainer wants planning/tracking docs out of the repo root.
+- Decision: `PROJECT_SPEC.md`, `BUILD_PLAN.md`, `PROGRESS.md`, `DECISIONS.md`, `START_HERE.md`
+  live in `vibes/`, plus a new narrative `vibes/status.md` refreshed each phase. Files tools or
+  GitHub expect at the root stay there (README, LICENSE, CHANGELOG, CONTRIBUTING,
+  CODE_OF_CONDUCT, SECURITY, CLAUDE.md, AGENTS.md, `.claude/`, `.github/`). All references
+  updated to `vibes/...`.
+- Why: Cleaner root for an open-source repo.
+- Spec impact: §3 layout updated.

@@ -4,8 +4,8 @@
 ## Test evidence
 <!-- e.g. `pytest -q` output, `studio ...` commands you ran -->
 
-## Deviations from PROJECT_SPEC.md
-<!-- None, or a link to the DECISIONS.md entry -->
+## Deviations from vibes/PROJECT_SPEC.md
+<!-- None, or a link to the vibes/DECISIONS.md entry -->
 
 ## Checklist
 - [ ] `ruff check .` and `ruff format --check .` are clean
@@ -13,4 +13,4 @@
 - [ ] **No client, personal or proprietary data added** (fixtures are synthetic)
 - [ ] Nothing under `library/`, `workspace/`, `templates/` (except `templates/sample/`) or `config/overrides.yaml`
 - [ ] No telemetry or network calls beyond local Ollama
-- [ ] `PROGRESS.md` / `CHANGELOG.md` updated
+- [ ] `vibes/PROGRESS.md` / `CHANGELOG.md` updated

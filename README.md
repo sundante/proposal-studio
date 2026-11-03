@@ -1,6 +1,6 @@
 # Proposal Studio
 
-> **Under construction.** Pre-release; see [PROGRESS.md](PROGRESS.md) for build status.
+> **Under construction.** Pre-release; see [vibes/PROGRESS.md](vibes/PROGRESS.md) for build status.
 
 A fully **local, offline** proposal workbench for pre-sales solutions architects in regulated
 industries. It turns RFP documents into a proposal deck on your own PowerPoint template, answers
@@ -23,7 +23,7 @@ studio --help
 studio doctor
 ```
 
-Design: [PROJECT_SPEC.md](PROJECT_SPEC.md) · Plan: [BUILD_PLAN.md](BUILD_PLAN.md) ·
+Design: [vibes/PROJECT_SPEC.md](vibes/PROJECT_SPEC.md) · Plan: [vibes/BUILD_PLAN.md](vibes/BUILD_PLAN.md) ·
 Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License

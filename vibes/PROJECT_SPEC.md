@@ -3,7 +3,7 @@
 > This file is the single source of truth for building Proposal Studio. Keep it in the repo root.
 > Coding agents: read this file at the start of every session. Do not re-plan what is decided here.
 > When something here conflicts with the installed version of a tool, verify against the tool's
-> own `--help` / docs, follow the tool, and record the deviation in `DECISIONS.md`.
+> own `--help` / docs, follow the tool, and record the deviation in `vibes/DECISIONS.md`.
 
 ---
 
@@ -80,10 +80,14 @@ proposal work goes through the `studio` package**, so behaviour is testable outs
 
 ```
 proposal-studio/
-├── PROJECT_SPEC.md          # this file
 ├── CLAUDE.md / AGENTS.md    # short pointers for coding agents (same content)
-├── DECISIONS.md             # deviations + decisions log (append-only)
-├── PROGRESS.md              # phase checklist, updated at end of each phase
+├── vibes/                   # non-functional project docs (planning, tracking)
+│   ├── PROJECT_SPEC.md      # this file
+│   ├── BUILD_PLAN.md        # phases
+│   ├── DECISIONS.md         # deviations + decisions log (append-only)
+│   ├── PROGRESS.md          # phase checklist, updated at end of each phase
+│   ├── START_HERE.md        # build-kit setup notes
+│   └── status.md            # narrative summary of work done
 ├── pyproject.toml           # package `studio`, python >=3.11
 ├── config/
 │   ├── models.yaml          # model registry per role
@@ -235,7 +239,7 @@ JSON under `workspace/.sessions/`. Survives Open WebUI restarts.
   user-facing message when Ollama isn't running or the model isn't pulled (`ollama pull <model>`).
 - A **single-flight lock**: only one generation at a time (16 GB machine). Queue others, emit
   "waiting for model…" status.
-- All callers depend on an `LLMClient` Protocol (see DECISIONS.md), so `FakeLLM` can stand in.
+- All callers depend on an `LLMClient` Protocol (see vibes/DECISIONS.md), so `FakeLLM` can stand in.
 - `FakeLLM` in tests returns canned structured outputs keyed by schema name.
 
 ---
@@ -328,7 +332,7 @@ One slide per LLM call, so a single slide can be regenerated (`/deck <slide_id>`
   firm template to `templates/<name>.layouts.json`, to help write `layout_map.yaml`.
 - `.potx` handling: python-pptx may refuse `.potx`; support it by copying the file and patching
   the main content type in `[Content_Types].xml` to the presentation type, or instruct the user to
-  "Save As .pptx" once. Verify which works and record in `DECISIONS.md`.
+  "Save As .pptx" once. Verify which works and record in `vibes/DECISIONS.md`.
 - Render each slide into its mapped layout/placeholders; remove the template's sample slides;
   write `out/<opp>-v<N>.pptx` (never overwrite).
 - Text-based architecture slide in v1: layered boxes drawn with python-pptx shapes from a simple
@@ -421,7 +425,7 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 - Open WebUI: offline mode on, web search off, image generation off, community sharing off,
   telemetry/analytics off where the installed version exposes it; RAG embeddings via Ollama
   (`nomic-embed-text`) so no Hugging Face model downloads; `HF_HUB_OFFLINE=1`. **Verify exact env
-  var names against the installed Open WebUI version** and record in `DECISIONS.md`.
+  var names against the installed Open WebUI version** and record in `vibes/DECISIONS.md`.
 - Ollama: `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=10m`; plus
   any setting that disables cloud models, if available.
 - Claude Code: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (in the adapter env).

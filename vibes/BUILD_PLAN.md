@@ -1,14 +1,14 @@
 # Proposal Studio — Build Plan
 
 Phases are built one per Claude Code session with `/phase <n>`. Each phase ends with commits pushed to `dev`.
-The design is in `PROJECT_SPEC.md`; progress is tracked in `PROGRESS.md`.
+The design is in `vibes/PROJECT_SPEC.md`; progress is tracked in `vibes/PROGRESS.md`.
 
 ## Allowed dependencies
 Runtime: `httpx`, `pydantic>=2`, `pyyaml`, `pymupdf`, `python-docx`, `openpyxl`, `python-pptx`,
 `faiss-cpu`, `numpy`, `typer`.
 Dev (`[dev]` extra): `pytest`, `pytest-asyncio`, `ruff`, `pre-commit`, `build`.
 Not a dependency of `studio` (installed separately by `setup.ps1`): `open-webui`.
-Optional, only if Phase 5 records a reason in DECISIONS.md: `langgraph`.
+Optional, only if Phase 5 records a reason in vibes/DECISIONS.md: `langgraph`.
 Anything else → ask first.
 
 ---
@@ -55,7 +55,7 @@ Spec: §9.3, §9.5, §16.2 (render artifact job)
 - `deck/schemas.py`: pydantic model per slide type in the §9.2 spine, char limits from
   `layout_map.yaml`, `speaker_notes` + `sources` on every slide; `Deck` model.
 - `render/inspect_template.py` + `studio template inspect <file>` → `templates/<name>.layouts.json`.
-- `.potx` support per §9.5 (try the content-type patch; record the outcome in DECISIONS.md).
+- `.potx` support per §9.5 (try the content-type patch; record the outcome in vibes/DECISIONS.md).
 - `render/renderer.py`: layouts/placeholders via `layout_map.yaml`, remove sample slides, shape-drawn
   layered architecture slide, versioned output, QA report.
 - Original neutral light template generated in code under `templates/sample/` + matching `layout_map.yaml`.
@@ -95,7 +95,7 @@ Spec: §12, §16.4
 - VERIFY first, against the installed `open-webui` package in a scratch venv (source/docs): Pipe and
   Filter structure, Valves/UserValves, `__event_emitter__` status, `__event_call__` confirmation,
   how attached files reach a pipe, how to return a downloadable file, Prompt import JSON format,
-  offline/telemetry/RAG env var names. Record in DECISIONS.md before coding.
+  offline/telemetry/RAG env var names. Record in vibes/DECISIONS.md before coding.
 - `owui/router_pipe.py`, `owui/phi_filter.py`, `owui/prompts/*.json`.
 - `scripts/setup.ps1` (idempotent, no admin), `scripts/start.ps1` (env from §12.2), `scripts/smoke_test.ps1`
   (doctor + synthetic RFP through ingest → digest → outline → deck → render on the sample template).
@@ -106,7 +106,7 @@ Spec: §12, §16.4
 Spec: §10
 - VERIFY each CLI's headless flags with `--help` (opencode, claude, hermes); update
   `config/agents.yaml`; mark any CLI without a reliable headless mode as unsupported with a clear
-  message. Record in DECISIONS.md.
+  message. Record in vibes/DECISIONS.md.
 - `studio/agents/`: config-driven adapters, sandbox (copy-in, copy-back on approval, path checks,
   env allowlist), plan → approve → apply, streaming, timeouts + cancel, logs, changed-file diff,
   Windows `.cmd` shim resolution.

@@ -9,8 +9,8 @@ way.
 - **Offline tests.** `pytest` must pass without Ollama, internet or a real template. Use
   `tests/fakes.py::FakeLLM` and the fake embedder.
 - **No telemetry** in project code. Cloud models stay blocked.
-- Read [PROJECT_SPEC.md](PROJECT_SPEC.md) before larger changes. Record design deviations in
-  [DECISIONS.md](DECISIONS.md).
+- Read [vibes/PROJECT_SPEC.md](vibes/PROJECT_SPEC.md) before larger changes. Record design deviations in
+  [vibes/DECISIONS.md](vibes/DECISIONS.md).
 
 ## Workflow
 1. Branch from `main` (`feat/<topic>`, `fix/<topic>`, or `phase/<n>-<slug>`).
@@ -21,4 +21,4 @@ way.
 
 ## Dependencies
 New runtime dependencies need discussion in an issue first. The allowed set is in
-[BUILD_PLAN.md](BUILD_PLAN.md).
+[vibes/BUILD_PLAN.md](vibes/BUILD_PLAN.md).

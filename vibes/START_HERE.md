@@ -17,18 +17,18 @@
 Kit contents:
 | File | Purpose |
 |---|---|
-| `PROJECT_SPEC.md` | The full, decided design |
-| `BUILD_PLAN.md` | Phases 0–10 that `/phase` reads |
+| `vibes/PROJECT_SPEC.md` | The full, decided design |
+| `vibes/BUILD_PLAN.md` | Phases 0–10 that `/phase` reads |
 | `CLAUDE.md` | Rules Claude Code loads automatically every session |
-| `PROGRESS.md`, `DECISIONS.md` | State that carries across sessions |
+| `vibes/PROGRESS.md`, `vibes/DECISIONS.md` | State that carries across sessions |
 | `.claude/commands/` | Slash commands: `/phase`, `/verify`, `/review`, `/resume`, `/ship` |
 
 ## 2. Kickoff prompt (paste into Claude Code once)
 
 ```
 You're building Proposal Studio, an open-source, fully local and offline proposal workbench
-(Open WebUI + Ollama + a Python package `studio`). Read CLAUDE.md, PROJECT_SPEC.md (fully),
-BUILD_PLAN.md and PROGRESS.md now.
+(Open WebUI + Ollama + a Python package `studio`). Read CLAUDE.md, vibes/PROJECT_SPEC.md (fully),
+vibes/BUILD_PLAN.md and vibes/PROGRESS.md now.
 
 Don't write code yet. Reply with:
 1. A 10-line summary of the architecture in your own words, so I can confirm you've understood it.
@@ -37,7 +37,7 @@ Don't write code yet. Reply with:
 3. Anything in the target environment (Windows 11, no admin, no Docker, offline runtime, 16 GB
    CPU-only) you think the spec handles badly.
 
-After I answer, record the resolutions in DECISIONS.md (and fix PROJECT_SPEC.md where needed),
+After I answer, record the resolutions in vibes/DECISIONS.md (and fix vibes/PROJECT_SPEC.md where needed),
 commit as "docs: resolve pre-build ambiguities", and stop. We'll start with /phase 0 in a new session.
 ```
 
