@@ -25,3 +25,14 @@ def rfp_files(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     from tests.fixtures.make_rfp import make_all
 
     return make_all(tmp_path_factory.mktemp("rfp"))
+
+
+SAMPLE_DECK = REPO_ROOT / "tests" / "fixtures" / "sample_deck.json"
+
+
+@pytest.fixture(scope="session")
+def sample_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A freshly generated sample template (not the committed copy)."""
+    from studio.render.sample_template import build_sample_template
+
+    return build_sample_template(tmp_path_factory.mktemp("tpl") / "proposal-sample.pptx")
