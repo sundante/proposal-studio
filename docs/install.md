@@ -1,5 +1,7 @@
 # Install Proposal Studio
 
+> Prefer a guided walk-through? See the [tutorial](../tutorial.html) (one offline HTML file).
+
 Proposal Studio runs entirely on your machine: [Open WebUI](https://github.com/open-webui/open-webui)
 is the chat UI, [Ollama](https://ollama.com) runs the models, and the `studio` Python package does
 the work. Internet is needed **only during setup** (Python packages and model downloads).
@@ -98,6 +100,15 @@ When are proposals due?                → routed to /ask, with [section, p.N] c
 
 Commands that write files (`/render`, `/harvest`, `/agent`) never run from plain text without
 confirmation. You'll get a confirmation dialog, or you can type `/approve`.
+
+## Optional: agent CLIs
+
+`/agent` can hand file tasks to local agent CLIs (see [agents.md](agents.md)). Install them
+while online, at user level:
+
+```bash
+npm install -g opencode-ai @anthropic-ai/claude-code   # or into a user npm prefix
+```
 
 ## 6. Check the install
 

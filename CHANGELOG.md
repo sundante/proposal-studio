@@ -53,7 +53,7 @@ First release: a fully local, offline proposal workbench on Open WebUI + Ollama.
   offline, no-telemetry environment (`scripts/offline.env`).
 - **Tools:** `studio doctor`, `studio smoke` and `studio bench` (performance against the budget).
 - **Docs:** install, commands, configuration, templates, agents, performance, troubleshooting and
-  privacy.
+  privacy, plus `tutorial.html`, a single-file offline tutorial.
 - **Open-source foundations:** Apache-2.0, contributing guide, code of conduct, security policy,
   issue/PR templates, Dependabot, pre-commit with a private-path guard, CI on Windows and Ubuntu
   (Python 3.11/3.12), and a release workflow (sdist, wheel, Windows bundle zip, install check on

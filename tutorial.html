@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposal Studio Tutorial</title>
+<meta name="description" content="Step-by-step tutorial for Proposal Studio: a fully local, offline proposal workbench on Open WebUI and Ollama.">
+<style>
+  /* Self-contained on purpose: no external fonts, scripts or images, so it works offline. */
+  :root {
+    --bg: #fbfbfa; --surface: #ffffff; --surface-2: #f3f4f2; --ink: #1f2a37; --muted: #5b6775;
+    --line: #dde2e6; --accent: #0f766e; --accent-ink: #ffffff; --accent-soft: #e6f4f1;
+    --warn: #9a5b00; --warn-soft: #fdf3e2; --danger: #b42318; --danger-soft: #fdecea;
+    --code-bg: #f3f5f7; --code-ink: #1f2a37; --user: #eef2ff; --bot: #f0fdf9;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+    --radius: 10px; --sidebar: 280px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1418; --surface: #151c22; --surface-2: #1b242c; --ink: #e5e9ed; --muted: #9aa6b2;
+      --line: #2a353f; --accent: #2bb3a3; --accent-ink: #06201d; --accent-soft: #10302d;
+      --warn: #f0b45b; --warn-soft: #2e2413; --danger: #f97066; --danger-soft: #331512;
+      --code-bg: #0b1014; --code-ink: #dbe3ea; --user: #1c2340; --bot: #10251f;
+      --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1418; --surface: #151c22; --surface-2: #1b242c; --ink: #e5e9ed; --muted: #9aa6b2;
+    --line: #2a353f; --accent: #2bb3a3; --accent-ink: #06201d; --accent-soft: #10302d;
+    --warn: #f0b45b; --warn-soft: #2e2413; --danger: #f97066; --danger-soft: #331512;
+    --code-bg: #0b1014; --code-ink: #dbe3ea; --user: #1c2340; --bot: #10251f;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); }
+  a { color: var(--accent); }
+  code, pre, kbd { font-family: var(--mono); font-size: .9em; }
+  :not(pre) > code { background: var(--code-bg); padding: .1em .35em; border-radius: 5px; border: 1px solid var(--line); }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .35em; background: var(--surface); }
+
+  /* Layout */
+  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(140%) blur(8px); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); }
+  .topbar .spacer { flex: 1; }
+  .btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px;
+    padding: 6px 10px; font: 600 13px var(--font); cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .menu-btn { display: none; }
+  .wrap { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); max-width: 1240px; margin: 0 auto; }
+  nav.toc { position: sticky; top: 53px; align-self: start; height: calc(100vh - 53px); overflow: auto;
+    padding: 20px 14px 40px 18px; border-right: 1px solid var(--line); font-size: 14px; }
+  nav.toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 6px; }
+  nav.toc a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+  nav.toc a:hover { background: var(--surface-2); }
+  nav.toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  main { padding: 28px clamp(16px, 4vw, 48px) 80px; min-width: 0; }
+  section { margin: 0 0 56px; }
+  h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; letter-spacing: -.02em; margin: 8px 0 12px; }
+  h2.sec { font-size: 26px; letter-spacing: -.01em; margin: 0 0 10px; padding-top: 4px; }
+  h3 { font-size: 19px; margin: 28px 0 8px; }
+  h4 { font-size: 16px; margin: 20px 0 6px; }
+  p { margin: 10px 0; }
+  .lead { font-size: 18px; color: var(--muted); max-width: 72ch; }
+  .muted { color: var(--muted); }
+  .num { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px; margin-right: 8px; }
+
+  /* Components */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  .card h4 { margin: 0 0 6px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .callout { border-radius: var(--radius); padding: 12px 14px; margin: 16px 0; border: 1px solid var(--line); background: var(--surface); }
+  .callout.tip { border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  .callout.warn { border-left: 4px solid var(--warn); background: var(--warn-soft); }
+  .callout.danger { border-left: 4px solid var(--danger); background: var(--danger-soft); }
+  .callout strong:first-child { display: block; margin-bottom: 2px; }
+  .code { position: relative; margin: 12px 0; }
+  pre { background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; overflow: auto; line-height: 1.5; margin: 0; }
+  .code .copy { position: absolute; top: 8px; right: 8px; opacity: .85; }
+  .code .label { position: absolute; top: -10px; left: 12px; font: 600 11px var(--font); background: var(--surface);
+    color: var(--muted); padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; }
+  pre .c { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14.5px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: block; overflow-x: auto; }
+  thead th { background: var(--surface-2); text-align: left; }
+  th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+  .tabs { margin: 14px 0; }
+  .tablist { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: -1px; }
+  .tablist button { border: 1px solid var(--line); border-bottom: 0; background: var(--surface-2); color: var(--muted);
+    border-radius: 8px 8px 0 0; padding: 7px 12px; font: 600 13px var(--font); cursor: pointer; }
+  .tablist button[aria-selected="true"] { background: var(--surface); color: var(--ink); }
+  .tabpanel { border: 1px solid var(--line); border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 6px 16px 14px; background: var(--surface); }
+  .tabpanel[hidden] { display: none; }
+  ol.steps { counter-reset: step; list-style: none; padding: 0; }
+  ol.steps > li { counter-increment: step; position: relative; padding-left: 42px; margin: 14px 0; }
+  ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+
+  /* Chat transcript */
+  .chat { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 12px; margin: 14px 0; }
+  .msg { display: flex; gap: 10px; margin: 10px 0; }
+  .msg .who { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    font: 700 12px var(--font); color: var(--accent-ink); background: var(--accent); }
+  .msg.you .who { background: #4f46e5; color: #fff; }
+  .msg .bubble { border-radius: 10px; padding: 8px 12px; background: var(--bot); border: 1px solid var(--line); min-width: 0; flex: 1; }
+  .msg.you .bubble { background: var(--user); }
+  .msg .bubble pre { margin: 6px 0; font-size: 13px; }
+  .route { font: 600 12px var(--mono); color: var(--accent); }
+  .attach { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; border: 1px dashed var(--line);
+    border-radius: 8px; padding: 2px 8px; background: var(--surface-2); }
+  .status { font-size: 12.5px; color: var(--muted); font-style: italic; }
+
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin: 14px 0; overflow-x: auto; }
+  .diagram svg { display: block; min-width: 680px; width: 100%; height: auto; }
+  .diagram text { font-family: var(--font); fill: var(--ink); }
+  .d-box { fill: var(--surface-2); stroke: var(--line); }
+  .d-accent { fill: var(--accent-soft); stroke: var(--accent); }
+  .d-line { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+  .d-small { font-size: 12px; fill: var(--muted) !important; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  .flow span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font: 600 13.5px var(--mono); }
+  .flow i { color: var(--muted); font-style: normal; }
+  details { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 10px 14px; margin: 10px 0; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  footer { border-top: 1px solid var(--line); padding: 20px 0; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    nav.toc { position: fixed; inset: 53px 0 0 0; width: min(86vw, 320px); background: var(--bg); z-index: 15;
+      transform: translateX(-102%); transition: transform .2s ease; box-shadow: var(--shadow); }
+    body.nav-open nav.toc { transform: none; }
+    .menu-btn { display: inline-block; }
+  }
+  @media print {
+    .topbar, nav.toc, .copy { display: none !important; }
+    .wrap { display: block; }
+    .tabpanel[hidden] { display: block; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="btn menu-btn" id="menuBtn" aria-label="Show contents">☰</button>
+  <div class="brand"><span class="dot"></span>Proposal Studio <span class="muted" style="font-weight:500">· Tutorial</span></div>
+  <div class="spacer"></div>
+  <a class="btn" href="README.md" style="text-decoration:none">README</a>
+  <button class="btn" id="themeBtn" aria-label="Toggle light or dark theme">◐ Theme</button>
+</header>
+
+<div class="wrap">
+<nav class="toc" id="toc" aria-label="Contents">
+  <h2>Start</h2>
+  <a href="#welcome">Welcome</a>
+  <a href="#how">How it works</a>
+  <a href="#before">Before you start</a>
+  <h2>Set up</h2>
+  <a href="#install">1. Install</a>
+  <a href="#start">2. Start it</a>
+  <a href="#connect">3. Connect to Open WebUI</a>
+  <a href="#check">4. Check everything works</a>
+  <h2>Use it</h2>
+  <a href="#first">Your first proposal</a>
+  <a href="#ingest">Ingest an RFP</a>
+  <a href="#ask">Ask questions</a>
+  <a href="#digest">The RFP digest</a>
+  <a href="#library">Build your block library</a>
+  <a href="#outline">Outline the deck</a>
+  <a href="#deck">Write the deck</a>
+  <a href="#edit">Edit slides</a>
+  <a href="#template">Use your own template</a>
+  <a href="#render">Render the PowerPoint</a>
+  <a href="#research">Research your library</a>
+  <a href="#agents">Agents</a>
+  <h2>Understand it</h2>
+  <a href="#routing">Routing &amp; confirmations</a>
+  <a href="#config">Configuration</a>
+  <a href="#commands">Command reference</a>
+  <a href="#cli">CLI reference</a>
+  <a href="#performance">Performance</a>
+  <a href="#privacy">Privacy &amp; data</a>
+  <a href="#troubleshooting">Troubleshooting</a>
+  <a href="#faq">FAQ</a>
+  <a href="#glossary">Glossary</a>
+</nav>
+
+<main>
+<!-- ====================================================================================== -->
+<section id="welcome">
+  <p class="muted" style="margin:0">Version 0.1.0 · Apache-2.0 · works fully offline</p>
+  <h1>Proposal Studio: from RFP to proposal deck, on your own machine</h1>
+  <p class="lead">Proposal Studio is a local, offline workbench for pre-sales solutions architects.
+    You attach an RFP in a chat window and get cited answers, a structured digest, a tailored
+    deck, and finally a PowerPoint on <em>your</em> firm's template. Nothing leaves your laptop.</p>
+  <div class="cards">
+    <div class="card"><h4>📄 Understand the RFP</h4><p>Ask questions and get answers with <code>[section, p.N]</code> citations, or a plain "Not found in the RFP."</p></div>
+    <div class="card"><h4>🧭 Digest it</h4><p>Problems, before/after, requirements, evaluation criteria, compliance and risks, all cited, plus an Excel requirements matrix.</p></div>
+    <div class="card"><h4>🧱 Reuse what works</h4><p>Harvest anonymised content blocks from past proposals, curate them, and let the writer tailor them to each RFP.</p></div>
+    <div class="card"><h4>🖼️ Render on your template</h4><p>A deterministic PowerPoint renderer (no AI involved) with a QA report: truncations, empty placeholders, missing sources.</p></div>
+    <div class="card"><h4>🔎 Research offline</h4><p>Multi-step research across your library and the RFP, written up as a cited markdown report.</p></div>
+    <div class="card"><h4>🤖 Sandboxed agents</h4><p>Hand file tasks to local agent CLIs with plan → approve → apply → approve, inside a sandbox.</p></div>
+  </div>
+  <div class="callout tip"><strong>How to read this tutorial</strong>
+    Set it up once (sections 1–4), then follow <a href="#first">Your first proposal</a> with the
+    built-in synthetic RFP. All examples use fictional organisations ("Acme Health Plan",
+    "Example Hospital") and real output from the default local models.</div>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="how">
+  <h2 class="sec">How it works</h2>
+  <p>Three local pieces work together. <strong>Open WebUI</strong> is the chat window in your
+    browser. <strong>Ollama</strong> runs the AI models on your machine. The
+    <strong>studio</strong> Python package does the actual work, and it's the same code whether
+    you use the chat, the terminal REPL or the CLI.</p>
+  <div class="diagram" role="img" aria-label="Architecture: Open WebUI talks to the Proposal Studio pipe, which calls the studio router. The router dispatches to ingest, ask, digest, deck, render, research and agents, which use Ollama on localhost and files in workspace and library folders.">
+    <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg">
+      <rect class="d-box" x="20" y="20" width="200" height="70" rx="10"/>
+      <text x="120" y="50" text-anchor="middle" font-weight="700">Open WebUI</text>
+      <text x="120" y="72" text-anchor="middle" class="d-small">browser · 127.0.0.1:8080</text>
+      <rect class="d-accent" x="20" y="130" width="200" height="70" rx="10"/>
+      <text x="120" y="160" text-anchor="middle" font-weight="700">Proposal Studio pipe</text>
+      <text x="120" y="182" text-anchor="middle" class="d-small">owui/router_pipe.py</text>
+      <rect class="d-box" x="20" y="240" width="200" height="70" rx="10"/>
+      <text x="120" y="270" text-anchor="middle" font-weight="700">Agent · … models</text>
+      <text x="120" y="292" text-anchor="middle" class="d-small">owui/agents_pipe.py</text>
+      <path class="d-line" d="M120 90 V130"/><path class="d-line" d="M120 200 V240"/>
+      <rect class="d-accent" x="290" y="130" width="200" height="70" rx="10"/>
+      <text x="390" y="160" text-anchor="middle" font-weight="700">Router (code, not AI)</text>
+      <text x="390" y="182" text-anchor="middle" class="d-small">rules → classifier → ask</text>
+      <path class="d-line" d="M220 165 H290"/><path class="d-line" d="M220 275 C260 275 260 180 290 180"/>
+      <g>
+        <rect class="d-box" x="560" y="20" width="150" height="40" rx="8"/><text x="635" y="45" text-anchor="middle">ingest · ask</text>
+        <rect class="d-box" x="560" y="70" width="150" height="40" rx="8"/><text x="635" y="95" text-anchor="middle">digest</text>
+        <rect class="d-box" x="560" y="120" width="150" height="40" rx="8"/><text x="635" y="145" text-anchor="middle">blocks · deck</text>
+        <rect class="d-box" x="560" y="170" width="150" height="40" rx="8"/><text x="635" y="195" text-anchor="middle">render (no AI)</text>
+        <rect class="d-box" x="560" y="220" width="150" height="40" rx="8"/><text x="635" y="245" text-anchor="middle">research</text>
+        <rect class="d-box" x="560" y="270" width="150" height="40" rx="8"/><text x="635" y="295" text-anchor="middle">agents (sandbox)</text>
+      </g>
+      <path class="d-line" d="M490 165 C525 165 525 40 560 40"/><path class="d-line" d="M490 165 C525 165 525 90 560 90"/>
+      <path class="d-line" d="M490 165 H560"/><path class="d-line" d="M490 165 C525 165 525 190 560 190"/>
+      <path class="d-line" d="M490 165 C525 165 525 240 560 240"/><path class="d-line" d="M490 165 C525 165 525 290 560 290"/>
+      <rect class="d-accent" x="760" y="60" width="120" height="80" rx="10"/>
+      <text x="820" y="92" text-anchor="middle" font-weight="700">Ollama</text>
+      <text x="820" y="112" text-anchor="middle" class="d-small">localhost:11434</text>
+      <text x="820" y="128" text-anchor="middle" class="d-small">one model at a time</text>
+      <rect class="d-box" x="760" y="190" width="120" height="100" rx="10"/>
+      <text x="820" y="220" text-anchor="middle" font-weight="700">Your files</text>
+      <text x="820" y="242" text-anchor="middle" class="d-small">workspace/</text>
+      <text x="820" y="258" text-anchor="middle" class="d-small">library/</text>
+      <text x="820" y="274" text-anchor="middle" class="d-small">templates/</text>
+      <path class="d-line" d="M710 100 H760" stroke-dasharray="4 4"/><path class="d-line" d="M710 240 H760" stroke-dasharray="4 4"/>
+      <text x="450" y="345" text-anchor="middle" class="d-small">Everything above runs on your laptop. Internet is only used during setup.</text>
+    </svg>
+  </div>
+  <h3>Design principles you'll notice</h3>
+  <ul>
+    <li><strong>The router is code, not an agent.</strong> Plain Python decides what runs. You
+      always see why: every reply starts with a line like <code>→ routed to /ask (rules)</code>.</li>
+    <li><strong>AI does only narrow jobs:</strong> extracting facts, tailoring a slide, answering
+      a question. Formatting, rendering, citations and checks are all deterministic Python.</li>
+    <li><strong>Everything is cited.</strong> Answers, digest items and slides carry their
+      sources, and the renderer puts them in the speaker notes.</li>
+    <li><strong>Nothing writes files behind your back.</strong> Rendering, harvesting and agents
+      only run when you type the command or approve.</li>
+    <li><strong>Small models, honest output.</strong> When something can't be supported by your
+      blocks or the RFP, it's flagged for review, not invented.</li>
+  </ul>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="before">
+  <h2 class="sec">Before you start</h2>
+  <table>
+    <thead><tr><th>You need</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>A laptop with 16 GB RAM</td><td>Windows 11, macOS or Linux. CPU-only is fine; a GPU just makes it faster. No admin rights or Docker needed.</td></tr>
+      <tr><td>Python 3.11 or 3.12</td><td>Installed for your user (python.org, "Install for me only"). Open WebUI doesn't support 3.13 yet.</td></tr>
+      <tr><td>Ollama</td><td>From <code>ollama.com</code>, installed for your user. It runs the models locally.</td></tr>
+      <tr><td>About 12 GB of disk</td><td>Open WebUI ≈ 3 GB, models ≈ 8 GB (<code>qwen3:8b</code>, <code>qwen3:4b</code>, <code>nomic-embed-text</code>).</td></tr>
+      <tr><td>Internet, once</td><td>Only for setup (Python packages and model downloads). After that you can work offline.</td></tr>
+      <tr><td>Optional: Node.js</td><td>Only if you want <a href="#agents">agents</a> (OpenCode, Claude Code via local Ollama).</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn"><strong>Check your organisation's rules first</strong>
+    Make sure your firm allows these open-source tools on your machine, and that you're allowed to
+    put RFPs and past proposals into them. Proposal Studio keeps everything local, but policy
+    still applies. Never commit real client material to a repository.</div>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="install">
+  <h2 class="sec"><span class="num">1</span>Install</h2>
+  <p>Get the code: either download <code>proposal-studio-&lt;version&gt;-windows.zip</code> from the
+    GitHub Releases page and unzip it, or clone the repository. Then run the setup script
+    <strong>once, while online</strong>. It's safe to run again; it only does what's missing.</p>
+  <div class="tabs" data-tabs>
+    <div class="tablist" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="win">Windows (PowerShell)</button>
+      <button role="tab" aria-selected="false" data-tab="unix">macOS / Linux</button>
+    </div>
+    <div class="tabpanel" data-panel="win">
+      <div class="code"><pre><code>cd proposal-studio
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1</code></pre></div>
+      <p class="muted">"ExecutionPolicy Bypass" applies to this one run only and needs no admin rights.</p>
+    </div>
+    <div class="tabpanel" data-panel="unix" hidden>
+      <div class="code"><pre><code>cd proposal-studio
+scripts/setup.sh</code></pre></div>
+    </div>
+  </div>
+  <p>The script:</p>
+  <ol class="steps">
+    <li>Creates a Python virtual environment in <code>.venv</code> (using <code>uv</code> if you have it).</li>
+    <li>Installs <code>open-webui==0.13.0</code> and the <code>studio</code> package into it.</li>
+    <li>Starts Ollama if needed and pulls the three models listed in <code>config/models.yaml</code>.</li>
+    <li>Prints a list of anything it couldn't do (for example "Ollama not found"), so you can fix
+      it and re-run.</li>
+  </ol>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="start">
+  <h2 class="sec"><span class="num">2</span>Start it</h2>
+  <p>From now on you can be offline. Start Proposal Studio with:</p>
+  <div class="grid2">
+    <div class="code"><span class="label">Windows</span><pre><code>powershell -ExecutionPolicy Bypass -File scripts\start.ps1</code></pre></div>
+    <div class="code"><span class="label">macOS / Linux</span><pre><code>scripts/start.sh</code></pre></div>
+  </div>
+  <p>Open <strong>http://localhost:8080</strong> and create the first account. It becomes the admin
+    and never leaves your machine.</p>
+  <p>The start script applies <code>scripts/offline.env</code> every time:</p>
+  <ul>
+    <li>Open WebUI in <strong>offline mode</strong>, listening on 127.0.0.1 only;</li>
+    <li>no web search, image generation, community sharing, OpenAI connections, update checks
+      or telemetry;</li>
+    <li>Ollama as the only model backend, with <strong>cloud features off</strong> and <strong>one
+      model loaded at a time</strong> (it matters on 16 GB);</li>
+    <li>Open WebUI's background title/tag generation off, so it doesn't compete for the model.</li>
+  </ul>
+  <div class="callout warn"><strong>Windows: quit the Ollama tray app first</strong>
+    If Ollama is already running from its tray icon, it won't pick up the settings above. Quit it
+    (right-click the icon → Quit), then run <code>start.ps1</code>, which starts Ollama with the
+    right settings.</div>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="connect">
+  <h2 class="sec"><span class="num">3</span>Connect Proposal Studio to Open WebUI</h2>
+  <div class="tabs" data-tabs>
+    <div class="tablist" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="auto">Automated (recommended)</button>
+      <button role="tab" aria-selected="false" data-tab="manual">By hand</button>
+    </div>
+    <div class="tabpanel" data-panel="auto">
+      <ol class="steps">
+        <li>In Open WebUI open <strong>Settings → Account → API keys</strong> and create a secret key (it starts with <code>sk-</code>).</li>
+        <li>In a terminal in the project folder:
+          <div class="code"><pre><code>.venv/bin/studio owui install --token sk-...<span class="c">            # Windows: .venv\Scripts\studio.exe owui install --token sk-...</span></code></pre></div>
+        </li>
+        <li>Reload Open WebUI. You'll see the <strong>Proposal Studio</strong> model, one
+          <strong>Agent · …</strong> model per installed agent, the PHI warning filter, and a
+          <code>/</code> shortcut for every command.</li>
+      </ol>
+      <p class="muted">The installer only talks to <code>localhost</code>. Re-run it after upgrading to update the functions.</p>
+    </div>
+    <div class="tabpanel" data-panel="manual" hidden>
+      <ol class="steps">
+        <li><strong>Admin Panel → Functions → +</strong>: paste <code>owui/router_pipe.py</code>, save, and switch it on.</li>
+        <li>Repeat for <code>owui/agents_pipe.py</code> and <code>owui/phi_filter.py</code>. Enable the filter globally, or for the Proposal Studio model.</li>
+        <li><strong>Workspace → Prompts → Import</strong>: choose <code>owui/prompts/all.json</code>.</li>
+      </ol>
+    </div>
+  </div>
+  <h3>Two one-time settings</h3>
+  <ol class="steps">
+    <li><strong>Turn off File Context</strong> for the model: Workspace → Models → Proposal Studio →
+      Capabilities → untick <em>File Context</em>. Proposal Studio reads attachments itself, and
+      this stops Open WebUI also running its own retrieval over them.</li>
+    <li><strong>Light theme</strong> (optional): Settings → General → Theme → Light.</li>
+  </ol>
+  <h3>Valves (settings) you can change</h3>
+  <table>
+    <thead><tr><th>Where</th><th>Valve</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Admin → Functions → Proposal Studio → ⚙</td><td><code>STUDIO_HOME</code></td><td>The project folder. The start script sets it, so you can leave it empty.</td></tr>
+      <tr><td></td><td><code>AUTO_ROUTE</code></td><td>Route plain text automatically (on by default).</td></tr>
+      <tr><td></td><td><code>AUTO_THRESHOLD</code></td><td>How confident the router must be before acting (0.7).</td></tr>
+      <tr><td>Chat → Controls (per user)</td><td><code>DEFAULT_OPPORTUNITY</code></td><td>The opportunity new chats start in.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="check">
+  <h2 class="sec"><span class="num">4</span>Check everything works</h2>
+  <div class="code"><pre><code>.venv/bin/studio doctor
+scripts/smoke_test.sh<span class="c">            # Windows: scripts\smoke_test.ps1</span></code></pre></div>
+  <p><code>doctor</code> prints a checklist (Python, config, workspace, Ollama, models). The smoke
+    test runs a synthetic RFP through the whole pipeline on your real models, in a throwaway
+    folder:</p>
+  <pre><code>[x] Python 3.11.17
+[x] Config valid
+[x] Workspace writable (…/workspace)
+[x] Ollama 0.40.14 reachable at http://localhost:11434
+[x] Ollama supports JSON-schema structured output (>= 0.5)
+[x] Model for router: qwen3:4b
+[x] Model for worker: qwen3:8b
+[x] Model for embed: nomic-embed-text
+
+PASS  create opportunity        0.0s
+PASS  ingest synthetic RFP      0.5s
+PASS  cited answer              7.9s
+PASS  digest                   56.5s
+PASS  outline                   0.0s
+PASS  deck                     11.6s
+PASS  render (QA)               0.1s
+Smoke test passed.</code></pre>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="first">
+  <h2 class="sec">Your first proposal</h2>
+  <p>The whole flow, which the rest of this tutorial goes through step by step:</p>
+  <div class="flow"><span>/new</span><i>→</i><span>attach RFP</span><i>→</i><span>ask</span><i>→</i><span>/digest</span><i>→</i><span>/outline</span><i>→</i><span>/deck</span><i>→</i><span>/edit</span><i>→</i><span>/render</span></div>
+  <p>To practise without real documents, generate the synthetic Acme Health Plan RFP:</p>
+  <div class="code"><pre><code>.venv/bin/python -m studio.samples acme-fixtures<span class="c">   # writes acme_rfp.pdf, .docx, .xlsx, .pptx</span></code></pre></div>
+  <p>In Open WebUI, pick <strong>Proposal Studio</strong> and create an <em>opportunity</em> (one
+    per RFP you're bidding on):</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble"><code>/new acme-2026 Acme Health Plan AI platform</code></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /new (command)</div>
+      Created <strong>acme-2026</strong> (now active).<br><span class="muted">Next: attach the RFP files and send <code>/ingest</code></span></div></div>
+  </div>
+  <p class="muted">Tip: type <kbd>/</kbd> in the chat box to see every command with its description.</p>
+</section>
+
+<section id="ingest">
+  <h3>Ingest an RFP</h3>
+  <p>Attach the RFP file(s) with the paperclip and send. A message with only attachments routes
+    to <code>/ingest</code> automatically.</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble"><span class="attach">📎 acme_rfp.pdf</span></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /ingest (rules)</div>
+      <div class="status">Reading acme_rfp.pdf… · Embedding 9 chunks…</div>
+      new: acme_rfp.pdf<br>Indexed 9 new chunks (9 total).<br><span class="muted">Next: ask a question, e.g. "When are proposals due?", or <code>/digest</code></span></div></div>
+  </div>
+  <ul>
+    <li>Supported formats are <strong>PDF, DOCX, XLSX, PPTX, TXT and MD</strong>. Headings and
+      page/slide numbers are kept for citations, and tables are read row by row with their
+      headers.</li>
+    <li>Re-ingesting is incremental: unchanged files are skipped.</li>
+    <li><strong>Use one format per document.</strong> The same RFP as both PDF and DOCX gives
+      duplicate excerpts.</li>
+  </ul>
+  <div class="callout danger"><strong>PHI check</strong>
+    Every file is scanned for things that look like patient data (SSNs, MRNs, dates of birth,
+    names with phone numbers). If anything turns up, <em>nothing</em> is ingested. You see the
+    file, page and kind of match (masked), and can confirm with <code>/approve</code> only if
+    it's a false positive. RFPs should never contain PHI.</div>
+</section>
+
+<section id="ask">
+  <h3>Ask questions</h3>
+  <p>Questions (ending in "?") go straight to <code>/ask</code> once an RFP is ingested. Answers
+    cite their sources, and say so when the RFP doesn't cover something.</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble">When are proposals due?</div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /ask (rules)</div>
+      Proposals are due by 5:00 PM ET on March 15, 2027 <code>[2 Submission Instructions, p.1]</code>.</div></div>
+    <div class="msg you"><div class="who">You</div><div class="bubble">Which requirements are mandatory?</div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /ask (rules)</div>
+      The mandatory requirements are:<br>• Single sign-on with the Acme identity provider <code>[4 Requirements, p.3]</code><br>• Model monitoring and drift alerts <code>[4 Requirements, p.3]</code></div></div>
+    <div class="msg you"><div class="who">You</div><div class="bubble">What is the vendor's parking policy?</div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /ask (rules)</div>Not found in the RFP.</div></div>
+  </div>
+  <p class="muted">Behind the scenes the model cites excerpt <em>numbers</em>, and Python turns
+    them into exact <code>[section, p.N]</code> labels, because small models copy long labels badly.</p>
+</section>
+
+<section id="digest">
+  <h3>The RFP digest</h3>
+  <p><code>/digest</code> reads the whole RFP in chunks and builds a structured, cited summary:
+    the opportunity facts, business and technical problems, today vs. wanted, requirements,
+    evaluation criteria, compliance, systems, risks and questions to ask the client. Add
+    <code>xlsx</code> for a requirements compliance matrix you can download.</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble"><code>/digest xlsx</code></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /digest (command)</div>
+<pre>## RFP digest — Enterprise AI Platform
+- Client: Acme Health Plan
+- Due: March 15, 2027
+- Submission: via the Acme procurement portal
+- Limits: 30 slides
+
+### Requirements — 5 mandatory of 6 (4 functional, 2 compliance)
+- R-01 Single sign-on with the Acme identity provider [4 Requirements, p.3]
+- R-02 Model monitoring and drift alerts [4 Requirements, p.3]
+- REQ-001 Ingest clinical data through FHIR R4 APIs … [3.1 Data Integration, p.2]
+…plus 1 optional
+
+### Compliance
+- HIPAA: All components must align with HIPAA requirements [3.2 Compliance, p.2]
+- HITRUST CSF: … [3.2 Compliance, p.2]
+- CMS-0057: Support CMS-0057 interoperability rules … [3.2 Compliance, p.2]</pre>
+      📎 <a href="#digest">Download acme-2026-requirements-v1.xlsx</a></div></div>
+  </div>
+  <ul>
+    <li><strong>Requirement ids are checked.</strong> The RFP's own ids (R-01…) are kept only when
+      the cited table row really has them; otherwise items are numbered REQ-001….</li>
+    <li><strong>Conflicts are flagged, not guessed.</strong> Two different due dates become a red
+      flag rather than a silent pick.</li>
+    <li>Typing <code>/digest</code> rebuilds it. Plain-text requests like "summarise the
+      requirements" show the saved digest when it's up to date.</li>
+  </ul>
+</section>
+
+<section id="library">
+  <h3>Build your block library</h3>
+  <p>The deck writer tailors <strong>vetted blocks</strong> (reusable, client-neutral content from
+    your past proposals), so it isn't inventing claims about your firm. Build the library once,
+    then top it up.</p>
+  <ol class="steps">
+    <li>Put past proposals (PPTX, DOCX, PDF) in <code>library/proposals/</code> and reference
+      documents (standards, whitepapers) in <code>library/reference/</code>.</li>
+    <li>Harvest, naming the old clients so they're anonymised:
+      <div class="code"><pre><code>/harvest Example Hospital, Old Client Inc</code></pre></div>
+      Harvesting writes files, so if you ask in plain text it waits for your <code>/approve</code>.</li>
+    <li>Review the YAML in <code>library/blocks/&lt;slide_type&gt;/</code>, edit it freely, and set
+      <code>needs_review: false</code> when it's clean.</li>
+  </ol>
+  <p>A harvested block. Client names, dates and amounts are replaced in Python <em>after</em> the
+    model has done its own pass:</p>
+  <pre><code><span class="c"># Proposal Studio block. Edit freely: harvest never overwrites edited blocks.</span>
+id: complete-ai-platform-948060
+slide_type: platform
+title: Complete AI platform
+body_points:
+- Development workbench for notebooks, prompts, and evaluation
+- MLOps and LLMOps pipelines with versioned models and prompts
+- Observability for quality, drift, and cost
+- Model registry with approvals and audit trail
+tags: [llmops, mlops, model-registry, observability]
+capability: AI platform
+source_file: example_hospital_deck.pptx
+source_ref: slide 3
+needs_review: false</code></pre>
+  <div class="callout tip"><strong>Your edits are safe</strong>
+    Harvest never overwrites a block you've edited, even if you forgot to set
+    <code>edited: true</code> (it compares content hashes). Re-harvesting only processes changed
+    slides and sections.</div>
+  <p>Search blocks with <code>/blocks mlops observability</code>, and index the library for
+    research with <code>/library index</code>.</p>
+</section>
+
+<section id="outline">
+  <h3>Outline the deck</h3>
+  <p>The deck follows a fixed storyline (<code>config/storyline.yaml</code>). Required slides are
+    always in. Optional ones are switched on by rules over the digest, and the outline says
+    which rule fired, with a citation.</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble"><code>/outline</code></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /outline (command)</div>
+<pre>## Outline — 11 of 11 slides
+1. ✅ title — required
+2. ✅ understanding — required
+3. ✅ before_after — required
+4. ✅ solution_architecture — required
+…
+7. ✅ governance — rule matched: compliance contains HIPAA [3.2 Compliance, p.2]
+…
+10. ✅ why_us — optional (no rule) — /toggle to remove</pre></div></div>
+  </div>
+  <p>Turn optional slides on or off with <code>/toggle why_us off</code>. Your choices persist
+    when the outline is rebuilt.</p>
+</section>
+
+<section id="deck">
+  <h3>Write the deck</h3>
+  <p><code>/deck</code> writes every slide in the outline: one model call per slide, using 2–4 of
+    your blocks plus the digest facts relevant to that slide. <code>/deck platform</code>
+    regenerates just one slide.</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble"><code>/deck</code></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /deck (command)</div>
+      <div class="status">Writing slide 2/11: understanding… · Writing slide 6/11: platform…</div>
+<pre># Understanding Acme Health Plan's Challenges
+- Care managers review claims and clinical notes manually in a legacy portal
+- Prior authorization turnaround averages nine days
+
+# Next Steps Timeline
+- Weeks 1-2 — Conduct discovery workshops and set data access protocols
+- Weeks 9-12 — Pilot implementation at Acme Health Plan, go/no-go review on March 15, 2027</pre>
+      <strong>Please review:</strong><br>
+      • understanding: not supported by the RFP facts: 'Leadership seeks AI solutions with strong governance frameworks'<br>
+      • next_steps: a block's {{date}} may have been filled with March 15, 2027: check</div></div>
+  </div>
+  <p>The writer checks the model's output in Python:</p>
+  <ul>
+    <li><strong>Limits</strong>: one automatic "shorten" retry, then safe truncation, flagged.</li>
+    <li><strong>Provenance</strong>: every slide records the blocks and RFP citations it used.</li>
+    <li><strong>Review flags</strong>: figures or certifications found in neither your blocks nor
+      the RFP, claims about the client the RFP doesn't support, and placeholder dates filled with
+      unrelated values. These are <em>flagged</em>, not silently removed. That's your cue to
+      <code>/edit</code>.</li>
+    <li><strong>No invention</strong>: a slide about your firm with no vetted blocks becomes a
+      visible skeleton ("Add content — no vetted blocks for <code>why_us</code>; run
+      /harvest").</li>
+  </ul>
+</section>
+
+<section id="edit">
+  <h3>Edit slides</h3>
+  <p>Revise one slide in plain English and see exactly what changed:</p>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble"><code>/edit platform make it shorter and mention FHIR R4 integration</code></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /edit (command)</div>
+<pre> # Platform — Complete AI Platform
+ - Development workbench for notebooks, prompts, and evaluation
+-- MLOps and LLMOps pipelines with versioned models and prompts
++- MLOps/LLMOps pipelines with versioned models and prompts
+ - Observability for quality, drift, and cost
+-- Model registry with approvals and audit trail
++- FHIR R4 integration with HIPAA/HITRUST compliance</pre></div></div>
+  </div>
+  <p class="muted">Each change keeps the previous deck in <code>workspace/&lt;opp&gt;/history/</code>.</p>
+</section>
+
+<section id="template">
+  <h3>Use your own template</h3>
+  <p>The renderer puts each slide into a layout from <strong>your</strong> template. Map it once:</p>
+  <ol class="steps">
+    <li>Copy your template (<code>.pptx</code> or <code>.potx</code>) into <code>templates/</code>.
+      That folder is private and never committed.</li>
+    <li>Inspect it:
+      <div class="code"><pre><code>.venv/bin/studio template inspect templates/firm.potx</code></pre></div>
+<pre>firm.potx: 13.33x7.5 in, 2 existing slides
+  [0] Title Slide: 0=CENTER_TITLE, 1=SUBTITLE
+  [1] Title and Content: 0=TITLE, 1=OBJECT
+  [4] Comparison: 0=TITLE, 1=BODY, 2=OBJECT, 3=BODY, 4=OBJECT
+  [5] Title Only: 0=TITLE</pre></li>
+    <li>Point each slide type at a layout and each field at a placeholder number in
+      <code>config/layout_map.yaml</code>:
+<pre><code>template: templates/firm.potx
+remove_existing_slides: true
+layouts:
+  understanding: { layout: Title and Content, placeholders: { title: 0, bullets: 1 } }
+  before_after:
+    layout: Comparison
+    placeholders: { title: 0, before_title: 1, before: 2, after_title: 3, after: 4 }
+  solution_architecture: { layout: Title Only, placeholders: { title: 0 } }   # boxes drawn below the title
+  why_us: { layout: Title and Content, placeholders: { title: 0, bullets: 1 }, limits: { bullet: 90 } }</code></pre></li>
+    <li>Test it with the sample deck:
+      <code>studio render --deck tests/fixtures/sample_deck.json --out build/</code>.</li>
+  </ol>
+  <p class="muted">Until you map your own, the neutral sample template in <code>templates/sample/</code> is used.</p>
+</section>
+
+<section id="render">
+  <h3>Render the PowerPoint</h3>
+  <div class="chat">
+    <div class="msg you"><div class="who">You</div><div class="bubble">make the powerpoint</div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /render (rules)</div>
+      <code>/render</code> writes files, so I won't run it automatically. <em>(A confirmation dialog appears.)</em></div></div>
+    <div class="msg you"><div class="who">You</div><div class="bubble">✔ Confirm — or type <code>/approve</code></div></div>
+    <div class="msg"><div class="who">PS</div><div class="bubble">
+<pre>## Render QA — 11 slides, ✅ no errors
+### Missing provenance (no sources)
+- why_us
+### Warnings
+- understanding: review — not supported by the RFP facts: '…'</pre>
+      📎 <a href="#render">Download acme-2026-v1.pptx</a></div></div>
+  </div>
+  <p>What the renderer does, with no AI involved:</p>
+  <ul>
+    <li>removes the template's own example slides;</li>
+    <li>fills placeholders, cutting overlong text at a word boundary and dropping extra
+      bullets (all reported);</li>
+    <li>removes unused placeholders, so there's no "Click to add text";</li>
+    <li>draws the architecture slide as layered boxes;</li>
+    <li>puts each slide's sources in the speaker notes;</li>
+    <li>saves <code>&lt;opp&gt;-v1.pptx</code>, <code>-v2</code>… and never overwrites a file.</li>
+  </ul>
+</section>
+
+<section id="research">
+  <h3>Research your library</h3>
+  <p>For questions that need your past work and reference docs, not just the RFP:</p>
+  <div class="code"><pre><code>/library index
+/research How should we approach FHIR R4 integration and HIPAA safeguards for prior authorization?</code></pre></div>
+  <p>Research is a short, bounded loop:</p>
+  <ol>
+    <li>split the question into sub-questions;</li>
+    <li>search the RFP and both library collections with several phrasings;</li>
+    <li>draft cited findings (<code>[file, p.N]</code> or <code>[file, slide N]</code>);</li>
+    <li>search once more for weak findings;</li>
+    <li>write a summary, implications for this RFP, and what the library doesn't cover.</li>
+  </ol>
+  <p>Each run has a hard cap of 12 model calls (configurable). The report is saved to
+    <code>workspace/&lt;opp&gt;/research/</code> and offered as a download.</p>
+  <pre><code>_offline · searched: RFP, Past proposals, Reference · 5 LLM calls_
+### 1. What are the key technical requirements for FHIR R4 prior authorization?
+_Evidence: strong_
+- Payer prior authorization APIs build on FHIR resources … [fhir_r4_notes.pdf, p.2]
+- The system must support CMS-0057 interoperability rules … [acme_rfp.pdf, p.2]
+- HIPAA safeguards: encryption, access control, audit logging [example_hospital_deck.pptx, slide 4]</code></pre>
+</section>
+
+<section id="agents">
+  <h3>Agents</h3>
+  <p>For file tasks like "tighten every bullet in deck.json", hand off to a local agent CLI. Install
+    one while online: <code>npm install -g opencode-ai</code> and/or
+    <code>@anthropic-ai/claude-code</code> (it runs against your <em>local</em> Ollama, never the
+    cloud).</p>
+  <div class="flow"><span>plan (throwaway copy)</span><i>→</i><span>/approve</span><i>→</i><span>apply in sandbox + diff</span><i>→</i><span>/approve</span><i>→</i><span>copy back</span></div>
+  <div class="code"><pre><code>/agent opencode tighten the bullets on the platform slide in deck.json</code></pre></div>
+  <ul>
+    <li><strong>Planning can't change anything.</strong> It runs in a copy that's deleted
+      afterwards.</li>
+    <li><strong>Apply</strong> runs in <code>workspace/&lt;opp&gt;/agent/work</code>, and you see a
+      diff. Only the second approval copies changes back, and a changed <code>deck.json</code> must
+      still be a valid deck.</li>
+    <li><strong>Locked down by default:</strong> no shell, an isolated home folder, and no API keys
+      or secrets passed in. Every run has a timeout and a log.</li>
+    <li>In Open WebUI, each agent is also a model (<strong>Agent · OpenCode (local)</strong>): plain
+      text there becomes an agent task.</li>
+  </ul>
+  <div class="callout warn"><strong>Set expectations</strong>
+    On a CPU-only laptop each step takes minutes, and small local models often don't use their
+    file tools well. Keep tasks short and specific. Hermes Agent ships disabled until it has been
+    verified offline.</div>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="routing">
+  <h2 class="sec">Routing &amp; confirmations</h2>
+  <p>You can type commands or plain English. Each message is routed in this order, and the first
+    line of the reply tells you which step decided:</p>
+  <table>
+    <thead><tr><th>Step</th><th>Example</th><th>Route line</th></tr></thead>
+    <tbody>
+      <tr><td>1. A <code>/command</code></td><td><code>/digest</code></td><td><code>→ routed to /digest (command)</code></td></tr>
+      <tr><td>2. Rules (no AI, instant)</td><td>only attachments · "render the pptx" · "When are proposals due?"</td><td><code>→ routed to /ask (rules)</code></td></tr>
+      <tr><td>3. Classifier (small model)</td><td>"which slides will be in the deck"</td><td><code>→ routed to /outline (classifier, 0.95)</code></td></tr>
+      <tr><td>4. Not sure</td><td>"hmm, the thing from before"</td><td>"Did you mean <code>/ask</code> or <code>/research</code>?"</td></tr>
+    </tbody>
+  </table>
+  <div class="callout tip"><strong>File-writing commands always wait</strong>
+    <code>/render</code>, <code>/harvest</code> and <code>/agent</code> never run from plain text
+    on their own. You get a confirmation dialog, or you can type <code>/approve</code> (alias
+    <code>/yes</code>) or <code>/reject</code> (<code>/no</code>). Typing the command yourself runs
+    it straight away. The PHI warning on ingest uses the same mechanism.</div>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="config">
+  <h2 class="sec">Configuration</h2>
+  <p>Change settings from the chat. They're validated (unknown keys and cloud models are refused)
+    and saved to <code>config/overrides.yaml</code>, which survives upgrades:</p>
+  <div class="code"><pre><code>/config                                  <span class="c"># show effective settings</span>
+/config set worker.model qwen3:4b        <span class="c"># faster, slightly weaker writer</span>
+/config set auto_threshold 0.8           <span class="c"># router must be more confident</span>
+/config set top_k 8                      <span class="c"># more excerpts per /ask</span>
+/config reset                            <span class="c"># back to defaults</span></code></pre></div>
+  <table>
+    <thead><tr><th>File</th><th>Controls</th></tr></thead>
+    <tbody>
+      <tr><td><code>models.yaml</code></td><td>Model per role (router, worker, embed), context size, temperature, optional CPU-only (<code>num_gpu: 0</code>).</td></tr>
+      <tr><td><code>routes.yaml</code></td><td>Commands, aliases, auto-route keywords, classifier examples, confidence threshold, which routes need confirmation.</td></tr>
+      <tr><td><code>rag.yaml</code></td><td>Chunk size, excerpts per answer, the "Not found" threshold, digest settings.</td></tr>
+      <tr><td><code>deck.yaml</code></td><td>Blocks per slide, minimum block relevance, whether to use blocks still marked <code>needs_review</code>.</td></tr>
+      <tr><td><code>storyline.yaml</code></td><td>The deck spine and its <code>include_if</code> rules.</td></tr>
+      <tr><td><code>layout_map.yaml</code></td><td>Your template and the slide → layout mapping.</td></tr>
+      <tr><td><code>research.yaml</code></td><td>Research call cap, sub-questions, sources.</td></tr>
+      <tr><td><code>agents.yaml</code></td><td>Agent commands, environment, timeout.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="commands">
+  <h2 class="sec">Command reference</h2>
+  <table>
+    <thead><tr><th>Command</th><th>What it does</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>/help</code></td><td>List commands with examples</td><td><code>/help</code></td></tr>
+      <tr><td><code>/new</code></td><td>Create an opportunity and make it active</td><td><code>/new acme-2026 Acme AI RFP</code></td></tr>
+      <tr><td><code>/use</code></td><td>Switch opportunity (alone: list them)</td><td><code>/use acme-2026</code></td></tr>
+      <tr><td><code>/status</code></td><td>Files, chunks, digest/outline/deck/renders, loaded model</td><td><code>/status</code></td></tr>
+      <tr><td><code>/ingest</code></td><td>Ingest attached files (or <code>input/</code>) and build the index</td><td><span class="attach">📎 rfp.pdf</span></td></tr>
+      <tr><td><code>/ask</code></td><td>Cited answer from the active RFP</td><td><code>/ask Which requirements are mandatory?</code></td></tr>
+      <tr><td><code>/digest</code></td><td>Build/refresh the digest; <code>xlsx</code> adds the matrix; <code>show</code> displays the saved one</td><td><code>/digest xlsx</code></td></tr>
+      <tr><td><code>/harvest</code></td><td>Extract anonymised blocks from <code>library/proposals</code></td><td><code>/harvest Example Hospital</code></td></tr>
+      <tr><td><code>/blocks</code></td><td>List or search blocks</td><td><code>/blocks mlops</code></td></tr>
+      <tr><td><code>/outline</code></td><td>Decide which storyline slides go in, and why</td><td><code>/outline</code></td></tr>
+      <tr><td><code>/toggle</code></td><td>Turn an optional slide on/off</td><td><code>/toggle why_us off</code></td></tr>
+      <tr><td><code>/deck</code></td><td>Write all slides, or one</td><td><code>/deck platform</code></td></tr>
+      <tr><td><code>/edit</code></td><td>Revise one slide; shows a diff</td><td><code>/edit platform shorter</code></td></tr>
+      <tr><td><code>/render</code></td><td>PPTX on your template + QA report + download</td><td><code>/render</code></td></tr>
+      <tr><td><code>/research</code></td><td>Offline multi-step research with a cited report</td><td><code>/research How did we handle MLOps?</code></td></tr>
+      <tr><td><code>/library</code></td><td>Index or show the local library</td><td><code>/library index</code></td></tr>
+      <tr><td><code>/agent</code></td><td>Sandboxed local agent (alone: list agents)</td><td><code>/agent opencode tidy deck.json</code></td></tr>
+      <tr><td><code>/config</code></td><td>Show or change settings</td><td><code>/config set worker.model qwen3:4b</code></td></tr>
+      <tr><td><code>/approve</code></td><td>Run the action waiting for confirmation (alias <code>/yes</code>)</td><td><code>/approve</code></td></tr>
+      <tr><td><code>/reject</code></td><td>Cancel it (alias <code>/no</code>)</td><td><code>/reject</code></td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Short aliases: <code>/q</code> = <code>/ask</code>, <code>/d</code> = <code>/digest</code>,
+    <code>/r</code> = <code>/render</code>, <code>/h</code> = <code>/help</code>. The canonical list is
+    <a href="docs/commands.md">docs/commands.md</a>, generated from <code>config/routes.yaml</code>.</p>
+</section>
+
+<section id="cli">
+  <h2 class="sec">CLI reference</h2>
+  <p>Everything in the chat also works from a terminal (<code>.venv/bin/studio</code>, or
+    <code>.venv\Scripts\studio.exe</code> on Windows), which is handy for scripting and testing.</p>
+  <div class="code"><pre><code>studio --help                         <span class="c"># all commands</span>
+studio chat                           <span class="c"># the chat in a terminal (:attach &lt;file&gt;, :quit)</span>
+studio doctor | smoke | bench [--cpu] <span class="c"># environment check · end-to-end test · timings</span>
+studio new acme-2026 "Acme AI RFP"    <span class="c"># and: use, status, ingest &lt;files&gt;, ask "…"</span>
+studio digest --xlsx                  <span class="c"># and: outline, toggle, deck [slide], edit &lt;slide&gt; "…"</span>
+studio render [--deck path --out dir] <span class="c"># render any deck.json</span>
+studio harvest --client "Old Client"  <span class="c"># and: blocks [query]</span>
+studio library index | status         <span class="c"># and: research "…"</span>
+studio agent [name] ["task"]          <span class="c"># list agents, or run one (asks before each step)</span>
+studio template inspect &lt;file&gt; | sample
+studio owui install --token sk-…      <span class="c"># and: owui prompts</span>
+studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
+</section>
+
+<!-- ====================================================================================== -->
+<section id="performance">
+  <h2 class="sec">Performance</h2>
+  <p>Measured with <code>studio bench</code> (qwen3:8b worker) on an Apple-silicon Mac. The third
+    column forces CPU-only inference to approximate a 16 GB laptop with no GPU:</p>
+  <table>
+    <thead><tr><th>Step</th><th>Default</th><th>CPU only</th><th>Budget</th></tr></thead>
+    <tbody>
+      <tr><td>Rules routing</td><td>0.0 s</td><td>0.0 s</td><td>&lt; 1 s ✅</td></tr>
+      <tr><td>Classifier routing</td><td>4.4 s</td><td>11.7 s</td><td>&lt; 15 s ✅</td></tr>
+      <tr><td><code>/ask</code> first token</td><td>5.7 s</td><td>17.8 s</td><td>&lt; 60 s ✅</td></tr>
+      <tr><td><code>/digest</code> (3-page RFP)</td><td>51 s</td><td>99 s</td><td>—</td></tr>
+      <tr><td>One slide</td><td>6.0 s</td><td>21.3 s</td><td>&lt; 2 min ✅</td></tr>
+      <tr><td><code>/render</code></td><td>0.1 s</td><td>0.1 s</td><td>&lt; 10 s ✅</td></tr>
+      <tr><td>Open WebUI + studio idle RAM</td><td colspan="2">736 MB</td><td>&lt; 2 GB ✅</td></tr>
+    </tbody>
+  </table>
+  <p>On an Intel CPU-only laptop, expect the CPU-only column to be 2–4× slower; a full deck takes
+    roughly 10–15 minutes. If that's too slow: <code>/config set worker.model qwen3:4b</code>,
+    ingest only the documents that matter, and regenerate single slides rather than the whole
+    deck. More in <a href="docs/performance.md">docs/performance.md</a>.</p>
+</section>
+
+<section id="privacy">
+  <h2 class="sec">Privacy &amp; data</h2>
+  <div class="grid2">
+    <div class="card"><h4>Stays on your machine</h4><p>Models (local Ollama, cloud models refused), the UI (offline mode, 127.0.0.1), embeddings, agents (local models, isolated, no keys passed). No telemetry in Proposal Studio's code.</p></div>
+    <div class="card"><h4>Where your data lives</h4><p><code>workspace/</code> (RFPs, decks, reports) · <code>library/</code> (past proposals, blocks) · <code>templates/</code> · <code>.owui-data/</code> (chats). All gitignored, and commit hooks block them.</p></div>
+  </div>
+  <h4>Before using real documents</h4>
+  <ul>
+    <li>☐ Your organisation permits these tools and models on this machine.</li>
+    <li>☐ You start with <code>scripts/start.*</code>, so the offline environment is applied.</li>
+    <li>☐ File Context is off for the Proposal Studio model.</li>
+    <li>☐ The Ollama tray app isn't overriding the settings (Windows).</li>
+    <li>☐ Real client files stay in <code>workspace/</code> and <code>library/</code>, never in a repository.</li>
+  </ul>
+  <p class="muted">The PHI scan and the anonymisation are safety nets, not de-identification tools.
+    Details: <a href="docs/privacy.md">docs/privacy.md</a>.</p>
+</section>
+
+<section id="troubleshooting">
+  <h2 class="sec">Troubleshooting</h2>
+  <p>Always start with <code>studio doctor</code>.</p>
+  <details><summary>"Ollama isn't running" / "Model qwen3:8b isn't pulled"</summary>
+    <p>Start Ollama (<code>scripts/start.*</code> does it), or <code>ollama serve</code>. While online, pull the missing model: <code>ollama pull qwen3:8b</code>.</p></details>
+  <details><summary>The Proposal Studio model doesn't appear in Open WebUI</summary>
+    <p>Admin Panel → Functions: make sure it's enabled. Re-run <code>studio owui install --token …</code>. If you see <code>ModuleNotFoundError: studio</code>, Open WebUI is running from a different Python environment: start it with <code>scripts/start.*</code>.</p></details>
+  <details><summary>"can't find its project folder"</summary>
+    <p>Set the <code>STUDIO_HOME</code> valve to your proposal-studio folder, or start Open WebUI with <code>scripts/start.*</code>.</p></details>
+  <details><summary>Open WebUI answers from its own retrieval, or /commands aren't recognised with attachments</summary>
+    <p>Turn off <em>File Context</em> for the model (Workspace → Models → Proposal Studio → Capabilities), and use the start script, which sets <code>RAG_SYSTEM_CONTEXT=True</code>.</p></details>
+  <details><summary>Answers repeat the same excerpt twice</summary>
+    <p>The same RFP was ingested as both PDF and DOCX. Keep one format: remove one from <code>workspace/&lt;opp&gt;/input/</code> and send <code>/ingest</code>.</p></details>
+  <details><summary>Slides say "Add content — no vetted blocks"</summary>
+    <p>Build your library first: put past proposals in <code>library/proposals/</code>, run <code>/harvest</code>, review the YAML, and set <code>needs_review: false</code>.</p></details>
+  <details><summary>Render QA errors about layouts</summary>
+    <p>The mapping doesn't match your template. Run <code>studio template inspect</code> and fix <code>config/layout_map.yaml</code>. The error lists the template's layout names.</p></details>
+  <details><summary>RAM fills up / several models loaded</summary>
+    <p>Quit the Ollama tray app and let the start script launch Ollama so <code>OLLAMA_MAX_LOADED_MODELS=1</code> applies. <code>studio doctor</code> warns when this happens.</p></details>
+  <details><summary>Windows: "running scripts is disabled on this system"</summary>
+    <p>Use <code>powershell -ExecutionPolicy Bypass -File scripts\setup.ps1</code>. It needs no admin rights.</p></details>
+  <p>More in <a href="docs/troubleshooting.md">docs/troubleshooting.md</a>.</p>
+</section>
+
+<section id="faq">
+  <h2 class="sec">FAQ</h2>
+  <details><summary>Does any of my data go to the cloud?</summary><p>No. At runtime everything talks to <code>localhost</code>: Ollama for the models and Open WebUI for the UI. Cloud models are refused by name, and Ollama's cloud features are switched off. Internet is only used for setup.</p></details>
+  <details><summary>Can I use a different or bigger model?</summary><p>Yes: <code>/config set worker.model &lt;model&gt;</code> after <code>ollama pull &lt;model&gt;</code>. Bigger models need more RAM, and only one is loaded at a time. Cloud models (<code>:cloud</code>) are always refused.</p></details>
+  <details><summary>Why does it flag things instead of fixing them?</summary><p>Small local models sometimes import claims from a past client or invent a figure. Python checks catch these and show them to you. Silently deleting content could hide a real problem, and the final judgement should be yours.</p></details>
+  <details><summary>Will it overwrite my files?</summary><p>No. Renders and exports are versioned (<code>-v1</code>, <code>-v2</code>…), deck changes keep history, harvest never overwrites edited blocks, and agents only copy back after your second approval.</p></details>
+  <details><summary>Can I use it without Open WebUI?</summary><p>Yes. <code>studio chat</code> is the same chat in a terminal, and every command also exists as <code>studio &lt;command&gt;</code>.</p></details>
+  <details><summary>How do I upgrade?</summary><p>Download the new release (or <code>git pull</code>), re-run <code>setup</code>, then <code>studio owui install</code>. Your <code>library/</code>, <code>workspace/</code>, <code>templates/</code>, <code>config/overrides.yaml</code> and <code>.owui-data/</code> are kept.</p></details>
+</section>
+
+<section id="glossary">
+  <h2 class="sec">Glossary</h2>
+  <table>
+    <tbody>
+      <tr><td><strong>Opportunity</strong></td><td>One bid you're working on, with its own folder <code>workspace/&lt;id&gt;/</code> holding the RFP files, index, digest, deck and renders.</td></tr>
+      <tr><td><strong>Digest</strong></td><td>The structured, cited summary of the RFP (<code>digest.json</code>) that feeds the outline and the deck.</td></tr>
+      <tr><td><strong>Block</strong></td><td>A reusable, client-neutral piece of content (title + points + tags) harvested from past proposals and curated by you.</td></tr>
+      <tr><td><strong>Storyline / outline</strong></td><td>The fixed deck spine (<code>storyline.yaml</code>), and the per-RFP decision of which slides are in (<code>outline.json</code>).</td></tr>
+      <tr><td><strong>Provenance</strong></td><td>The blocks and RFP citations a slide was built from, kept in <code>deck.json</code> and the speaker notes.</td></tr>
+      <tr><td><strong>Review flag</strong></td><td>Something a person should check: an unsupported claim, a figure from nowhere, a filled placeholder, a truncation.</td></tr>
+      <tr><td><strong>Pipe / Function / Valve</strong></td><td>Open WebUI terms. A pipe is a custom "model" (here, Proposal Studio); functions are the plugins that provide it; valves are their settings.</td></tr>
+      <tr><td><strong>Router role / worker role</strong></td><td>The small model that routes messages (<code>qwen3:4b</code>), and the model that writes and extracts (<code>qwen3:8b</code>).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  Proposal Studio 0.1.0 · Apache-2.0 · This tutorial is a single offline file: no scripts, fonts or images are loaded from the internet.
+  · <a href="README.md">README</a> · <a href="docs/install.md">Install guide</a> · <a href="docs/commands.md">Commands</a>
+</footer>
+</main>
+</div>
+
+<script>
+  // Theme toggle (remembered per browser; works without storage too).
+  (function () {
+    var root = document.documentElement, key = "ps-tutorial-theme";
+    try { var saved = localStorage.getItem(key); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+    document.getElementById("themeBtn").addEventListener("click", function () {
+      var dark = root.getAttribute("data-theme") === "dark" ||
+        (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      var next = dark ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem(key, next); } catch (e) {}
+    });
+  })();
+
+  // Mobile menu.
+  document.getElementById("menuBtn").addEventListener("click", function () { document.body.classList.toggle("nav-open"); });
+  document.querySelectorAll("nav.toc a").forEach(function (a) { a.addEventListener("click", function () { document.body.classList.remove("nav-open"); }); });
+
+  // Tabs.
+  document.querySelectorAll("[data-tabs]").forEach(function (box) {
+    var buttons = box.querySelectorAll("[data-tab]"), panels = box.querySelectorAll("[data-panel]");
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        buttons.forEach(function (x) { x.setAttribute("aria-selected", String(x === b)); });
+        panels.forEach(function (p) { p.hidden = p.getAttribute("data-panel") !== b.getAttribute("data-tab"); });
+      });
+    });
+  });
+
+  // Copy buttons on code blocks.
+  document.querySelectorAll(".code").forEach(function (box) {
+    var pre = box.querySelector("pre"); if (!pre) return;
+    var btn = document.createElement("button"); btn.className = "btn copy"; btn.textContent = "Copy";
+    btn.addEventListener("click", function () {
+      var text = pre.innerText.replace(/\s+#.*$/gm, "").trim();
+      var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1200); };
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+    });
+    box.appendChild(btn);
+  });
+
+  // Highlight the current section in the contents.
+  (function () {
+    var links = {}; document.querySelectorAll("nav.toc a").forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+    if (!("IntersectionObserver" in window)) return;
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && links[e.target.id]) {
+          Object.values(links).forEach(function (a) { a.classList.remove("active"); });
+          links[e.target.id].classList.add("active");
+        }
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    document.querySelectorAll("main section[id]").forEach(function (s) { obs.observe(s); });
+  })();
+</script>
+</body>
+</html>

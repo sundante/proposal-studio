@@ -32,3 +32,21 @@ def test_bench_with_fake_models(tmp_path: Path) -> None:
     assert [t.label for t in timings] == list(BUDGET)
     assert all(t.ok is not False for t in timings), lines
     assert lines[0].startswith("Benchmark — default")
+
+
+def test_tutorial_is_complete_offline_and_linked() -> None:
+    import re
+
+    html = (REPO_ROOT / "tutorial.html").read_text(encoding="utf-8")
+    routes = cfgmod.load_config(REPO_ROOT).routes
+    for name in routes.commands:
+        assert f"<code>/{name}</code>" in html, f"tutorial is missing /{name}"
+    # nothing loaded from the network (it must work offline)
+    assert not re.search(r"<(script|link|img)[^>]+(src|href)=[\"']https?://", html)
+    assert "@import" not in html
+    ids = set(re.findall(r'id="([^"]+)"', html))
+    for anchor in re.findall(r'href="#([^"]+)"', html):
+        assert anchor in ids, f"broken anchor #{anchor}"
+    for target in re.findall(r'href="([^"#:]+\.md)"', html):
+        assert (REPO_ROOT / target).exists(), f"tutorial links to missing {target}"
+    assert "README.md" in html and "tutorial.html" in (REPO_ROOT / "README.md").read_text()

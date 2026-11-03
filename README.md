@@ -31,6 +31,12 @@ It all runs on a 16 GB laptop with no admin rights, no Docker and no internet at
 The full guide is in [docs/install.md](docs/install.md). Check the install with
 `scripts/smoke_test.*`.
 
+> **New here?** The [step-by-step tutorial](tutorial.html) walks through install, your first
+> proposal, building a block library, mapping your own template, research and agents, with
+> worked examples. Download it and open it in a browser; it's a single offline file. To read it
+> online, enable GitHub Pages for the repo (Settings → Pages → branch `main`, folder `/`), then open
+> `<pages-url>/tutorial.html`.
+
 ## Daily workflow
 
 Pick the **Proposal Studio** model and:
@@ -88,7 +94,7 @@ Details are in [docs/privacy.md](docs/privacy.md).
 
 ## Docs
 
-[Install](docs/install.md) · [Commands](docs/commands.md) · [Configuration](docs/config.md) ·
+[Tutorial](tutorial.html) · [Install](docs/install.md) · [Commands](docs/commands.md) · [Configuration](docs/config.md) ·
 [Templates](docs/templates.md) · [Agents](docs/agents.md) ·
 [Performance](docs/performance.md) · [Troubleshooting](docs/troubleshooting.md) ·
 [Privacy](docs/privacy.md)

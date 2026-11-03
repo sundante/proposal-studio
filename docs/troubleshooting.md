@@ -16,6 +16,7 @@ whether Ollama is reachable (and its version), and whether each configured model
 | "Possible PHI found" on ingest | RFPs shouldn't contain PHI. Check the listed file/page; re-run with `/approve` (or `--yes`) only if it's a false positive. |
 | `/render` QA errors about layouts | The mapping in `config/layout_map.yaml` doesn't match the template. See [templates.md](templates.md) (`studio template inspect`). |
 | Slides say "Add content — no vetted blocks" | Harvest and curate blocks first: `/harvest`, then review `library/blocks/*.yaml`. |
+| Answers repeat the same excerpt twice | You ingested the same RFP as both PDF and DOCX. Keep one format per document: remove one from `workspace/<opp>/input/` and send `/ingest`. |
 | Everything is slow | Expected on CPU-only laptops. See [performance.md](performance.md). Use `qwen3:4b` for the worker (`/config set worker.model qwen3:4b`), and keep RFP files focused. |
 | An agent "isn't installed" | Install its CLI (see [agents.md](agents.md)) and make sure it's on PATH. |
 | Windows: "running scripts is disabled" | Run with `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`. No admin is needed. |

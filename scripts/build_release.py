@@ -24,6 +24,7 @@ INCLUDE_DIRS = ("src/", "scripts/", "owui/", "config/", "templates/sample/", "do
 INCLUDE_FILES = (
     "pyproject.toml",
     "README.md",
+    "tutorial.html",
     "LICENSE",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
