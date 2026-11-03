@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import tempfile
@@ -12,7 +13,7 @@ import httpx
 import typer
 import yaml
 
-from studio import __version__, ingest, rag, session
+from studio import __version__, ingest, rag, session, views
 from studio import blocks as blockmod
 from studio import config as cfgmod
 from studio import digest as digestmod
@@ -85,6 +86,14 @@ def config_reset() -> None:
     except cfgmod.ConfigError as exc:
         _fail(str(exc))
     typer.echo("Overrides cleared; using base config.")
+
+
+def loaded_models() -> list[str] | None:
+    """Models loaded in Ollama, or None if it isn't reachable."""
+    try:
+        return OllamaClient(cfgmod.load_config().models).loaded_models()
+    except (cfgmod.ConfigError, LLMError, httpx.HTTPError):
+        return None
 
 
 # --- opportunities, ingest, ask -------------------------------------------------------------
@@ -173,26 +182,10 @@ def ingest_cmd(
         _fail(str(exc))
 
     if report.blocked:
-        typer.echo("Possible PHI found (RFPs should not contain PHI). Nothing was ingested:")
-        for hit in report.phi_hits:
-            where = f"{hit.file}" + (f", p.{hit.page}" if hit.page else "")
-            typer.echo(f"  - {where}: {hit.kind} ({hit.excerpt})")
+        typer.echo(views.phi_blocked_text(report))
         typer.echo("Check the files, then re-run with --yes to ingest anyway.")
         raise typer.Exit(2)
-
-    for label, names in (
-        ("new", report.new),
-        ("changed", report.changed),
-        ("unchanged", report.unchanged),
-        ("removed", report.removed),
-    ):
-        if names:
-            typer.echo(f"{label}: {', '.join(names)}")
-    for name, reason in report.skipped.items():
-        typer.echo(f"skipped {name}: {reason}")
-    if report.phi_hits:
-        typer.echo(f"Warning: ingested despite {len(report.phi_hits)} possible PHI matches.")
-    typer.echo(f"Indexed {report.chunks_added} new chunks ({report.total_chunks} total).")
+    typer.echo(views.ingest_report_text(report))
     _next('`studio ask "<question>"` or `studio digest`')
 
 
@@ -231,29 +224,8 @@ def status(
     except session.SessionError as exc:
         _fail(str(exc))
     info = session.opportunity_status(opportunity)
-    typer.echo(f"Opportunity: {info['id']}" + (f" — {info['title']}" if info["title"] else ""))
-    if info["files"]:
-        typer.echo(f"Ingested: {len(info['files'])} files, {info['chunks']} chunks")
-        for name, count in info["files"].items():
-            typer.echo(f"  - {name} ({count} chunks)")
-    else:
-        typer.echo("Ingested: nothing yet")
-    stale = " (stale: files changed since; re-run `studio digest`)" if info["digest_stale"] else ""
-    typer.echo(f"Digest: {'yes' + stale if info['digest'] else 'no'}")
-    for key in ("outline", "deck"):
-        typer.echo(f"{key.capitalize()}: {'yes' if info[key] else 'no'}")
-    typer.echo(f"Renders: {', '.join(info['renders']) or 'none'}")
-    try:
-        loaded = OllamaClient(cfgmod.load_config().models).loaded_models()
-        typer.echo(f"Loaded model: {', '.join(loaded) or 'none'}")
-    except (cfgmod.ConfigError, LLMError, httpx.HTTPError):
-        typer.echo("Loaded model: unknown (Ollama not reachable)")
-    if not info["files"]:
-        _next("`studio ingest <files>`")
-    elif not info["digest"] or info["digest_stale"]:
-        _next('`studio ask "<question>"` or `studio digest`')
-    elif not info["outline"]:
-        _next("`studio outline`")
+    typer.echo(views.status_text(info, loaded_models()))
+    _next(views.status_next(info).replace("`/", "`studio "))
 
 
 @app.command("digest")
@@ -304,15 +276,7 @@ def harvest_cmd(
         )
     except (cfgmod.ConfigError, blockmod.BlockError, LLMError) as exc:
         _fail(str(exc))
-    typer.echo(
-        f"Blocks: {len(report.new)} new, {len(report.refreshed)} refreshed, "
-        f"{len(report.protected)} protected (edited), {report.unchanged} unchanged sources, "
-        f"{report.skipped} skipped (not reusable)."
-    )
-    if report.flagged:
-        typer.echo(f"Needs review ({len(report.flagged)}): {', '.join(report.flagged)}")
-    for failure in report.failed:
-        typer.echo(f"Failed: {failure}")
+    typer.echo(views.harvest_report_text(report))
     where = blockmod.blocks_dir(root)
     _next(f"review YAML in {where} (set needs_review: false), then `studio blocks`")
 
@@ -340,10 +304,7 @@ def blocks_cmd(
         typer.echo("No blocks yet.")
         _next("`studio harvest`")
         return
-    for block, score in hits:
-        flag = " ⚠ needs review" if block.needs_review else ""
-        shown = f" ({score:.2f})" if query else ""
-        typer.echo(f"- [{block.slide_type}] {block.id}{shown}: {block.title}{flag}")
+    typer.echo(views.blocks_text(hits, show_scores=bool(query)))
 
 
 def _opp_dir(opp: str | None) -> tuple[Path, Path, str]:
@@ -392,10 +353,7 @@ def toggle_cmd(
 
 def _print_flags(flagged: dict[str, list[str]]) -> None:
     if flagged:
-        typer.echo("\nPlease review:")
-        for slide_id, flags in flagged.items():
-            for flag in flags:
-                typer.echo(f"  - {slide_id}: {flag}")
+        typer.echo("\n" + views.flags_text(flagged))
 
 
 @app.command("deck")
@@ -466,18 +424,9 @@ def library_index_cmd(
             )
             if report.blocked:
                 typer.echo(f"{name}: possible PHI found; nothing indexed. Re-run with --yes:")
-                for hit in report.phi_hits:
-                    typer.echo(
-                        f"  - {hit.file}"
-                        + (f", p.{hit.page}" if hit.page else "")
-                        + f": {hit.kind}"
-                    )
+                typer.echo(views.phi_hits_text(report.phi_hits))
                 raise typer.Exit(2)
-            parts = [f"{len(report.new)} new", f"{len(report.changed)} changed"]
-            parts += [f"{len(report.unchanged)} unchanged", f"{len(report.removed)} removed"]
-            typer.echo(f"{name}: {', '.join(parts)}; {report.total_chunks} chunks indexed.")
-            for file, reason in report.skipped.items():
-                typer.echo(f"  skipped {file}: {reason}")
+            typer.echo(views.library_report_text(name, report))
     except (cfgmod.ConfigError, ingest.IngestError, LLMError) as exc:
         _fail(str(exc))
     _next('`studio research "<question>"`')
@@ -486,12 +435,7 @@ def library_index_cmd(
 @library_app.command("status")
 def library_status_cmd() -> None:
     """Show what is indexed in each library collection."""
-    root = cfgmod.project_root()
-    for name in rag.LIBRARY_COLLECTIONS:
-        index = rag.library_index(root, name)
-        typer.echo(f"{name}: {len(index.files())} files, {len(index)} chunks")
-        for file in index.files():
-            typer.echo(f"  - {file} ({index.file_chunk_count(file)} chunks)")
+    typer.echo(views.library_status_text(cfgmod.project_root()))
 
 
 @app.command("research")
@@ -522,6 +466,54 @@ def research_cmd(
     path = researchmod.save_report(report, out_dir)
     typer.echo(report.to_markdown())
     typer.echo(f"\nSaved: {path}")
+
+
+# --- chat ------------------------------------------------------------------------------------
+
+
+@app.command("chat")
+def chat_cmd() -> None:
+    """Chat REPL over the router (same behaviour as the Open WebUI model).
+
+    `:attach <path>` attaches a file to your next message; `:quit` exits.
+    """
+    from studio.router import Router, RouterContext
+
+    router = Router(RouterContext(cfgmod.project_root(), get_llm, allow_local_paths=True))
+    sess = router.session(os.environ.get("STUDIO_SESSION", "cli-chat"))
+    attachments: list[Path] = []
+    typer.echo("Proposal Studio chat — `/help` for commands, `:quit` to exit.")
+
+    async def run(message: str, files: list[Path]) -> None:
+        async for chunk in router.handle(message, files, sess, emit=_emit_status):
+            typer.echo(chunk, nl=False)
+        typer.echo()
+
+    while True:
+        try:
+            line = input("you> ")
+        except (EOFError, KeyboardInterrupt):
+            break
+        if line.strip() in (":quit", ":q", ":exit"):
+            break
+        if line.startswith(":attach "):
+            path = Path(line.removeprefix(":attach ").strip()).expanduser()
+            if not path.exists():
+                typer.echo(f"No such file: {path}")
+                continue
+            attachments.append(path)
+            typer.echo(f"Attached {path.name} (sent with your next message).")
+            continue
+        if not line.strip() and not attachments:
+            continue
+        asyncio.run(run(line, attachments))
+        attachments = []
+
+
+def _emit_status(event: dict) -> None:
+    data = event.get("data", {})
+    if not data.get("done"):
+        _status(data.get("description", ""))
 
 
 # --- templates and render -------------------------------------------------------------------
