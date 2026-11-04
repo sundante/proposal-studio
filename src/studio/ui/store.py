@@ -40,6 +40,7 @@ class ChatMessage(BaseModel):
     content: str
     files: list[str] = Field(default_factory=list)  # names attached by the user
     outputs: list[str] = Field(default_factory=list)  # files produced (names in out/)
+    sources: list[dict[str, Any]] = Field(default_factory=list)  # cited passages (file, page…)
     created: str = Field(default_factory=now)
 
 

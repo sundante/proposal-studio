@@ -293,8 +293,11 @@ def answer(
     *,
     top_k: int | None = None,
     on_status: StatusFn | None = None,
+    on_hits: Callable[[list[Hit]], None] | None = None,
 ) -> Iterator[str]:
     """Stream a cited answer to ``question`` from the index, or :data:`NOT_FOUND`.
+
+    ``on_hits`` receives the excerpts the answer was written from (the UI opens them).
 
     No LLM call is made when nothing retrieved clears ``cfg.min_score``. The model cites excerpt
     numbers, which are rewritten to ``[section, p.N]`` here. If the answer has no valid
@@ -308,6 +311,8 @@ def answer(
         yield NOT_FOUND
         return
 
+    if on_hits:
+        on_hits(hits)
     status(f"Answering from {len(hits)} excerpts…")
     stream = llm.generate_text("worker", build_messages(question, hits), stream=True)
     buffered = ""

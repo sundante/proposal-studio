@@ -313,7 +313,21 @@ def h_ask(c: Call) -> Iterator[str]:
     if not len(index):
         yield f"Nothing ingested for {opp.id} yet." + _next("attach the RFP and send `/ingest`")
         return
-    yield from answer(c.args, index, c.llm, c.cfg.rag, on_status=c.status)
+
+    def keep(hits: list) -> None:
+        c.session.last_outputs["sources"] = [
+            {
+                "n": i + 1,
+                "file": h.chunk.file,
+                "page": h.chunk.page,
+                "section": h.chunk.section,
+                "label": str(h.chunk.cite).strip("[]"),
+                "text": " ".join(h.chunk.text.split())[:300],
+            }
+            for i, h in enumerate(hits)
+        ]
+
+    yield from answer(c.args, index, c.llm, c.cfg.rag, on_status=c.status, on_hits=keep)
     yield _next("another question, or `/digest`")
 
 

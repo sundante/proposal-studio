@@ -40,6 +40,7 @@ from studio.guards import GuardError, check_model_allowed, resolve_in_sandbox, s
 from studio.llm import LLMClient
 from studio.rag import VectorIndex
 from studio.router import Router, RouterContext
+from studio.ui import docview
 from studio.ui.store import (
     ChatMessage,
     ChatStore,
@@ -346,9 +347,12 @@ class StudioApp:
                 if Path(item).is_file() and Path(item).resolve().parent == out_dir
             ]
             pending = sess.last_outputs.get("pending")
+            sources = sess.last_outputs.pop("sources", [])
             self.router.store.save(sess)
             chat.messages.append(
-                ChatMessage(role="assistant", content="".join(reply), outputs=outputs)
+                ChatMessage(
+                    role="assistant", content="".join(reply), outputs=outputs, sources=sources
+                )
             )
             chat.updated = now()
             self.chats.save(chat)
@@ -358,6 +362,8 @@ class StudioApp:
                 if path.name not in keep:
                     path.unlink(missing_ok=True)
 
+        if sources:
+            send("sources", {"sources": sources})
         if pending:
             send("pending", {"command": pending["command"]})
         send("done", {"outputs": outputs})
@@ -393,6 +399,13 @@ class Handler(BaseHTTPRequestHandler):
             ("POST", r"/api/projects/([^/]+)/chats", "create_chat"),
             ("PUT", r"/api/projects/([^/]+)/uploads/([^/]+)", "upload"),
             ("DELETE", r"/api/projects/([^/]+)/files/([^/]+)", "delete_file"),
+            ("GET", r"/api/projects/([^/]+)/files/([^/]+)/meta", "file_meta"),
+            ("GET", r"/api/projects/([^/]+)/files/([^/]+)/raw", "file_raw"),
+            ("POST", r"/api/projects/([^/]+)/files/([^/]+)/open", "file_open"),
+            ("GET", r"/api/projects/([^/]+)/files/([^/]+)/sections", "file_sections"),
+            ("GET", r"/api/projects/([^/]+)/files/([^/]+)/find", "file_find"),
+            ("GET", r"/api/projects/([^/]+)/files/([^/]+)/pages/(\d+)\.png", "page_png"),
+            ("GET", r"/api/projects/([^/]+)/files/([^/]+)/pages/(\d+)/words", "page_words"),
             ("GET", r"/api/projects/([^/]+)/digest", "get_digest"),
             ("GET", r"/api/projects/([^/]+)/deck", "get_deck"),
             ("GET", r"/api/projects/([^/]+)/out/([^/]+)", "download"),
@@ -474,7 +487,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": str(exc), **exc.extra}, exc.status)
         except trust.TrustError as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
-        except (StoreError, sessmod.SessionError) as exc:
+        except (StoreError, sessmod.SessionError, docview.ViewError) as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -741,6 +754,53 @@ class Handler(BaseHTTPRequestHandler):
     def api_delete_file(self, project: str, name: str) -> None:
         self.app.remove_file(project, name)
         self._json(self.app.project(project))
+
+    # -- document viewer --
+
+    def _input_file(self, project: str, name: str) -> tuple[sessmod.Opportunity, Path]:
+        opp = self.app.opp(project)
+        target = safe_name(opp.path / "input", name)
+        if not target.is_file():
+            raise ApiError(HTTPStatus.NOT_FOUND, f"No file {name} in this project.")
+        return opp, target
+
+    def _bytes(self, data: bytes, ctype: str) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "private, max-age=300")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def api_file_meta(self, project: str, name: str) -> None:
+        self._json(docview.meta(self._input_file(project, name)[1]))
+
+    def api_file_raw(self, project: str, name: str) -> None:
+        self._file(self._input_file(project, name)[1], download=True)
+
+    def api_file_open(self, project: str, name: str) -> None:
+        target = self._input_file(project, name)[1]
+        self.app.reveal(target)  # the OS opens it in its default app
+        self._json({"path": str(target)})
+
+    def api_file_sections(self, project: str, name: str) -> None:
+        self._json({"sections": docview.sections(self._input_file(project, name)[1])})
+
+    def api_file_find(self, project: str, name: str) -> None:
+        q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+        self._json({"query": q, "hits": docview.find(self._input_file(project, name)[1], q)})
+
+    def api_page_png(self, project: str, name: str, n: str) -> None:
+        opp, target = self._input_file(project, name)
+        width = parse_qs(urlparse(self.path).query).get("w", ["900"])[0]
+        try:
+            px = int(width)
+        except ValueError as exc:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Width must be a number.") from exc
+        self._bytes(docview.render_page(target, int(n), px, opp.path), "image/png")
+
+    def api_page_words(self, project: str, name: str, n: str) -> None:
+        self._json(docview.page_words(self._input_file(project, name)[1], int(n)))
 
     def api_get_digest(self, project: str) -> None:
         opp = self.app.opp(project)
