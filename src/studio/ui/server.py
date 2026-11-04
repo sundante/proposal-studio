@@ -36,7 +36,7 @@ from studio import config as cfgmod
 from studio import digest as digestmod
 from studio import session as sessmod
 from studio.deck.writer import DECK_FILE
-from studio.guards import scan_phi
+from studio.guards import GuardError, resolve_in_sandbox, scan_phi
 from studio.llm import LLMClient
 from studio.rag import VectorIndex
 from studio.router import Router, RouterContext
@@ -51,6 +51,15 @@ from studio.ui.store import (
 )
 
 STATIC = Path(__file__).parent / "static"
+# Explicit types: on Windows the registry can map .js to text/plain, which breaks module scripts.
+STATIC_TYPES = {
+    ".html": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+}
 MAX_UPLOAD = 200 * 1024 * 1024
 MAX_JSON = 1024 * 1024
 Send = Callable[[str, dict[str, Any]], None]
@@ -170,8 +179,10 @@ class StudioApp:
                 {
                     "id": opp.id,
                     "title": opp.title or opp.id,
+                    "description": opp.description,
                     "path": str(opp.path),
                     "missing": False,
+                    "files": len([p for p in (opp.path / "input").glob("*") if p.is_file()]),
                     "created": opp.created,
                     "updated": chats[0].updated if chats else opp.created,
                     "chats": [c.summary() for c in chats],
@@ -194,6 +205,7 @@ class StudioApp:
         return {
             "id": opp.id,
             "title": opp.title or opp.id,
+            "description": opp.description,
             "path": str(opp.path),
             "status": info,
             "files": [{"name": n, "chunks": info["files"].get(n, 0)} for n in files],
@@ -421,7 +433,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _file(self, path: Path, *, download: bool = False) -> None:
         data = path.read_bytes()
-        ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        ctype = STATIC_TYPES.get(path.suffix.lower()) or (
+            mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        )
         if ctype.startswith("text/") or ctype == "application/javascript":
             ctype += "; charset=utf-8"
         self.send_response(HTTPStatus.OK)
@@ -462,10 +476,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        name = "index.html" if path in ("", "/") else path.lstrip("/")
+        rel = "index.html" if path in ("", "/") else path.lstrip("/")
+        parts = rel.split("/")
+        bad = any(p in ("", ".", "..") or p.startswith(".") or "\\" in p for p in parts)
+        if bad or Path(rel).suffix.lower() not in STATIC_TYPES:
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.")
         try:
-            target = safe_name(STATIC, name)
-        except StoreError as exc:
+            target = resolve_in_sandbox(STATIC, rel)
+        except GuardError as exc:
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.") from exc
         if not target.is_file():
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.")
@@ -533,8 +551,22 @@ class Handler(BaseHTTPRequestHandler):
                 "project": (folder / sessmod.OPP_FILE).is_file(),
                 "empty": not any(folder.iterdir()),
                 "home": str(Path.home()),
+                "places": self._places(),
+                "studio_home": str(self.app.home),
             }
         )
+
+    def _places(self) -> list[dict[str, str]]:
+        """Quick locations for the folder picker (only those that exist)."""
+        home = Path.home()
+        candidates = [
+            ("Home", home),
+            ("Documents", home / "Documents"),
+            ("Desktop", home / "Desktop"),
+            ("Downloads", home / "Downloads"),
+            ("Proposal Studio", self.app.home),
+        ]
+        return [{"label": label, "path": str(p)} for label, p in candidates if p.is_dir()]
 
     def api_make_dir(self) -> None:
         body = self._payload()
@@ -596,8 +628,11 @@ class Handler(BaseHTTPRequestHandler):
         self._json(self.app.project(project))
 
     def api_rename_project(self, project: str) -> None:
-        self.app.opp(project)
-        sessmod.rename_opportunity(self.app.root, project, str(self._payload().get("title", "")))
+        opp = self.app.opp(project)
+        body = self._payload()
+        title = str(body["title"]) if "title" in body else opp.title
+        description = str(body["description"]) if "description" in body else None
+        sessmod.rename_opportunity(self.app.root, project, title, description)
         self._json(self.app.project(project))
 
     def api_delete_project(self, project: str) -> None:

@@ -52,7 +52,7 @@ def test_release_bundle_contains_only_public_files(tmp_path) -> None:
     assert (
         "pyproject.toml" in files
         and "scripts/setup.ps1" in files
-        and "src/studio/ui/static/app.js" in files
+        and "src/studio/ui/static/index.html" in files
     )
     assert "templates/sample/proposal-sample.pptx" in files
     assert not [f for f in files if guard.is_private(f) or f.startswith(("vibes/", ".github/"))]

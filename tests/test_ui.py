@@ -69,9 +69,7 @@ def new_project(client: httpx.Client, name: str = "Acme Health Plan RFP") -> tup
 def test_serves_the_app(client: httpx.Client) -> None:
     page = client.get("/")
     assert page.status_code == 200 and "<title>Proposal Studio</title>" in page.text
-    assert client.get("/app.js").headers["content-type"].startswith("text/javascript") or (
-        "javascript" in client.get("/app.js").headers["content-type"]
-    )
+    assert client.get("/js/main.js").headers["content-type"].startswith("text/javascript")
     assert client.get("/nope.js").status_code == 404
     health = client.get("/api/health").json()
     assert health["ollama"] is None and health["version"]
@@ -354,3 +352,27 @@ def test_chat_cannot_change_agent_commands(client: httpx.Client) -> None:
         )
     )
     assert "can't be changed from chat" in reply_text(evts)
+
+
+def test_static_subfolders_and_types(client: httpx.Client) -> None:
+    js = client.get("/js/main.js")
+    assert js.status_code == 200 and js.headers["content-type"].startswith("text/javascript")
+    assert client.get("/css/tokens.css").headers["content-type"].startswith("text/css")
+    import http.client
+    from urllib.parse import urlparse
+
+    url = urlparse(str(client.base_url))
+    for bad in ("/js/../index.html", "/js/%2e%2e/index.html", "/.hidden.js", "/js/x.py", "/js/"):
+        conn = http.client.HTTPConnection(url.hostname, url.port, timeout=10)
+        conn.request("GET", bad)  # raw path: no client-side normalisation of ".."
+        assert conn.getresponse().status == 404, bad
+        conn.close()
+
+
+def test_folder_places_and_description(client: httpx.Client, tmp_path: Path, ws: Path) -> None:
+    listing = client.get("/api/fs", params={"path": str(tmp_path)}).json()
+    labels = {p["label"]: p["path"] for p in listing["places"]}
+    assert labels["Proposal Studio"] == str(ws) and listing["studio_home"] == str(ws)
+    pid, _ = new_project(client, "Acme")
+    out = client.patch(f"/api/projects/{pid}", json={"description": "Medicaid AI platform"}).json()
+    assert out["description"] == "Medicaid AI platform" and out["title"] == "Acme"

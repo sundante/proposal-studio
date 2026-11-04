@@ -40,6 +40,7 @@ class Opportunity(BaseModel):
 
     id: str
     title: str = ""
+    description: str = ""
     created: str = ""
     path: Path = Field(exclude=True)
 
@@ -256,10 +257,14 @@ def _guard_delete(root: Path, path: Path) -> None:
         raise SessionError(f"Refusing to delete {resolved}.")
 
 
-def rename_opportunity(root: Path, opp_id: str, title: str) -> Opportunity:
-    """Change an opportunity's display title (the folder keeps its name)."""
+def rename_opportunity(
+    root: Path, opp_id: str, title: str, description: str | None = None
+) -> Opportunity:
+    """Change an opportunity's title and, optionally, description (the folder keeps its name)."""
     opp = get_opportunity(root, opp_id)
     opp.title = title.strip() or opp.id
+    if description is not None:
+        opp.description = description.strip()[:2000]
     (opp.path / OPP_FILE).write_text(opp.model_dump_json(indent=2), encoding="utf-8")
     return opp
 
