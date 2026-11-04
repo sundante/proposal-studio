@@ -169,21 +169,34 @@ Spec: §1, §2, §4.2, §12 (as updated)
 - Server: static sub-folders with explicit MIME types; `/api/fs` returns places; projects have a
   description.
 
-## Phase 14 — Document workbench
+## Phase 14 — Navigation, composer, models and modes (done)
+- Sidebar: Search (Ctrl/⌘+K, `/api/search`), Outputs/Templates/Customize links, collapsible
+  Pinned + Recents, file marker, back/forward, profile footer (name in `settings.json`).
+- Composer: "+" menu, mode chip (Auto · Ask the RFP · Research · Draft · Chat), model chip with
+  Fast/Thinking; choices stored per chat (`Chat.prefs`) and applied with a per-message LLM factory.
+- New `/chat` route (free conversation with history; Draft mode adds project context, and
+  `<slide_id> <instruction>` edits that slide). Temporary chats (not listed, purged).
+
+## Phase 15 — Outputs, Templates and Customize
+- See the approved plan: outputs gallery + home strip; templates (upload, inspect, set active,
+  slide-type → layout mapping with test render); customize (storyline, content blocks, routing,
+  library).
+
+## Phase 16 — Document workbench
 - Document tab in the side panel: PDF pages rendered by pymupdf with a selectable text layer;
   DOCX/XLSX/PPTX/TXT reading view from `ingest.extract_sections`; find in document.
 - Citations open the source: `rag.answer(on_hits=…)` → SSE `sources` → chip click jumps to the
   page and highlights the passage.
 - Select text → Ask about this / Explain / Add to notes / Research this.
 
-## Phase 15 — Research in the workbench + living notes
+## Phase 17 — Research in the workbench + living notes
 - `projects/<id>/notes.md` edited in a Notes tab, autosaved, snapshotted before appends, and indexed
   so answers can cite it; "Add to notes" on replies, selections and research results.
 - Research tab over RFP / notes / library, with **opt-in** web search (`studio.web`, off by
   default, PHI-checked query only, every request logged in `.studio/web-log.jsonl`; VERIFY the
   provider first). Records a deviation from the offline rule in DECISIONS.md.
 
-## Phase 16 — Model router and suggestions
+## Phase 18 — Model router and suggestions
 - `config/model_catalog.yaml` + `studio.modelrouter`: task per command → best pulled model that
   fits RAM, preferring the loaded one; suggestion chip in the composer; per-chat role overrides
   (never switches automatically).

@@ -507,3 +507,24 @@ Format:
   5. Projects gain an optional `description` (shown on cards, editable on the project page).
 - Why: the first UI was functional but visually rough, and the folder chooser was confusing.
 - Spec impact: none beyond §12 UI wording.
+
+## 2026-11-04 — Working modes, per-chat models, /chat, search, pinned and temporary chats  (Phase 14)
+- Decision:
+  1. **Modes** (composer): Auto (router as before), Ask the RFP (`/ask`), Research (`/research`),
+     Draft (`/chat` with a short project context — key digest facts and deck outline — or `/edit`
+     when the message starts with a slide id), Chat (`/chat`, no RFP). Explicit `/commands` always
+     win. Modes are applied after the "files + text → ingest first" step.
+  2. **`/chat`** is a new route (excluded from the classifier, so Auto never picks it): the worker
+     model with the last 8 turns (router plumbing stripped) and a footer saying it is uncited.
+  3. **Per-chat model and effort**: `Chat.prefs = {mode, model, think}`; the server builds a
+     per-message factory (`StudioApp.llm_for(ModelsConfig)` with the worker model / `think`
+     replaced) passed to `Router.handle(..., llm_factory=...)`. Cloud models are still refused
+     (`check_model_allowed`). "Fast/Thinking" maps to Ollama's `think`.
+  4. **Search** is a substring scan over projects and chats (titles + message text) with
+     snippets — no index needed at this scale. **Pinned** is a chat flag. **Temporary chats** belong
+     to a project but are never listed or searched; they are deleted when left, when another
+     temporary chat starts, and at server start. "Keep this chat" clears the flag.
+  5. **Profile name** lives in the per-user `settings.json` and is used in the greeting/sidebar.
+  6. Voice input was **not** built: browser speech recognition sends audio to a cloud service.
+- Why: parity with the desktop-app reference the maintainer shared, within the offline rules.
+- Spec impact: §5.1 adds `/chat`; §12 UI.

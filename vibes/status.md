@@ -183,3 +183,20 @@ The folder chooser is now a Finder-style picker. The New project dialog asks exp
 create a new folder inside the chosen one, use it as-is, or add an existing project. Checked live on
 qwen3:8b, including a full Build slides run, with headless-Chrome screenshots in light, dark and
 phone layouts. 215 tests pass.
+
+## Phase 14 — Navigation, composer, models and modes (2026-11-04)
+Gaps against the desktop-app reference were closed:
+- **Sidebar:** Search (Ctrl/⌘+K) finds projects and chats by any word in the conversation, with
+  snippets. Chats can be pinned. The Pinned and Recents sections collapse, and chats with files are
+  marked. There are back and forward buttons, and a profile footer with your name, which the home
+  screen also uses in its greeting.
+- **Composer:** a "+" menu, a **mode** chip (Auto, Ask the RFP, Research, Draft, Chat) and a
+  **model** chip with Fast/Thinking. Choices are remembered per chat.
+- **Home:** a "Project or folder" picker under the box searches projects, creates one from what you
+  type, or adds an existing folder.
+- **Temporary chats:** not saved or listed, and deleted when you leave.
+
+Draft and Chat use a new `/chat` route. Draft grounds the reply in the RFP summary and the deck, and
+labels it as uncited. Outputs, Templates and Customize have sidebar entries now; their pages are
+Phase 15. Voice input was left out because it would send audio off the machine. Checked live on
+qwen3:8b (a Draft-mode email, search, pin and the temporary chat). 221 tests pass.

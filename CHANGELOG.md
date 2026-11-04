@@ -19,6 +19,12 @@ All notable changes to this project are documented here. The format follows
   what (router, worker, embeddings).
 - Router: commands pasted in code blocks work; files sent with a question are ingested first.
 
+- **Search** (Ctrl/⌘+K), **pinned chats**, collapsible sidebar sections, back/forward buttons and
+  your name in the greeting.
+- **Modes and models in the composer:** Auto, Ask the RFP, Research, Draft and Chat; pick the
+  model and Fast/Thinking per chat. New `/chat` command for free conversation.
+- **Temporary chats** that aren't saved.
+
 ### Changed
 - **New look and layout:** the app was rebuilt with a calmer warm-paper design, serif headings and
   dark mode. It has a Projects page with cards, a project page, a Settings page, and in-app

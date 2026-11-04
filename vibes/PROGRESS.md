@@ -18,15 +18,17 @@
 | 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
 | 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
 | 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | e231132 |
-| 14 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
-| 15 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
-| 16 | Model router and suggestions | ⬜ todo | |
+| 14 | Navigation, composer, models and modes | ✅ done | (this commit) |
+| 15 | Outputs, Templates and Customize | ⬜ todo | |
+| 16 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
+| 17 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
+| 18 | Model router and suggestions | ⬜ todo | |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
-- Phase in progress: none (13 done)
-- Next step: Phase 14 — document workbench (see vibes/BUILD_PLAN.md).
+- Phase in progress: none (14 done)
+- Next step: Phase 15 — Outputs, Templates and Customize (see vibes/BUILD_PLAN.md).
 - Open WebUI build archived on branch `archive/open-webui` (a11c3e6).
 
 ## Docs
