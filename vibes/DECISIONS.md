@@ -538,3 +538,20 @@ Format:
 - Why: the automation added noise (failing Ubuntu jobs, Node deprecation warnings) without being
   used in the maintainer's manual flow.
 - Spec impact: §16.2, §16.3.
+
+## 2026-11-04 — Document viewer in the side panel; new phase order  (Phase 15)
+- Decision:
+  1. Render PDFs server-side with pymupdf (`import pymupdf`, already a dependency) to PNG at the
+     panel's width × devicePixelRatio, cached in `<project>/.studio-cache/pages/` keyed by file
+     size + mtime; a transparent, absolutely positioned word layer (`page.get_text("words")`)
+     makes text selectable. No pdf.js (would mean vendoring a large library).
+  2. Office/text files use the same `extract_sections` output that was indexed, so what you read
+     is what answers are based on; rendered with `textContent` only.
+  3. Answers keep their sources: `rag.answer(on_hits=…)`; `h_ask` stores `{n, file, page,
+     section, label, text}`; the server streams an SSE `sources` event and saves them on the
+     message. Chips whose text equals a source label open the viewer; the passage's first words
+     are searched on that page (fallback: the section heading).
+  4. Phase order changed at the maintainer's request: 16 shared drives (via desktop sync apps,
+     not a Drive API — offline rule kept), 17 notebook (sources + notes), then 18 Outputs/
+     Templates/Customize, 19 research + opt-in web, 20 model-router suggestions.
+- Spec impact: §12 UI.

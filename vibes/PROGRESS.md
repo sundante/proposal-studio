@@ -19,16 +19,18 @@
 | 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
 | 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | e231132 |
 | 14 | Navigation, composer, models and modes | ✅ done | a1a2ffd |
-| 15 | Outputs, Templates and Customize | ⬜ todo | |
-| 16 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
-| 17 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
-| 18 | Model router and suggestions | ⬜ todo | |
+| 15 | Open files in the side panel (viewer, clickable citations) | ✅ done | (this commit) |
+| 16 | Shared drives and co-working (sync folders, presence, lock) | ⬜ todo | |
+| 17 | Notebook (sources + notes, generate briefs) | ⬜ todo | |
+| 18 | Outputs, Templates and Customize | ⬜ todo | |
+| 19 | Research in the workbench + opt-in web | ⬜ todo | |
+| 20 | Model router and suggestions | ⬜ todo | |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
-- Phase in progress: none (14 done)
-- Next step: Phase 15 — Outputs, Templates and Customize (see vibes/BUILD_PLAN.md).
+- Phase in progress: none (15 done)
+- Next step: Phase 16 — shared drives and co-working (see vibes/BUILD_PLAN.md).
 - Open WebUI build archived on branch `archive/open-webui` (a11c3e6).
 
 ## Docs
@@ -36,6 +38,9 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - Project docs: `vibes/` (spec, build plan, decisions, progress, status).
 
 ## Known issues
+- Viewer: a citation from a table chunk can't be matched word-for-word on the PDF page, so the
+  section heading is highlighted instead. The PDF text layer is approximate (selection works
+  word by word; exotic fonts may misalign slightly).
 - The last CI run (before CI was removed) failed on Ubuntu only; the cause is unknown because the
   log needs a logged-in `gh`. Tests pass on macOS (and passed on Windows in CI). Re-check on Linux
   before a Linux release.

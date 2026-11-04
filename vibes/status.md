@@ -200,3 +200,20 @@ Draft and Chat use a new `/chat` route. Draft grounds the reply in the RFP summa
 labels it as uncited. Outputs, Templates and Customize have sidebar entries now; their pages are
 Phase 15. Voice input was left out because it would send audio off the machine. Checked live on
 qwen3:8b (a Draft-mode email, search, pin and the temporary chat). 221 tests pass.
+
+## Phase 15 — Open files in the side panel (2026-11-04)
+The RFP can now be read next to the chat. The side panel has a **Document** tab:
+- **PDFs** show as real pages. Text can be selected, there's zoom, and find highlights matches.
+- **Word, Excel, PowerPoint and text files** show as a clean reading view. It's built from the
+  same text that was indexed, so what you read is what the answers are based on.
+
+**Citations open their source.** Clicking a chip such as "4 Requirements, p.3" opens the file at
+that page and highlights the passage, or its heading. Attachments in the chat and files on the
+project page open the same way.
+
+**Selecting text** pops up Ask about this (quotes it into the message box with file and page),
+Copy, and Add to notes. Add to notes copies the passage with its source for now, until the
+notebook arrives in Phase 17.
+
+Next: shared drives and co-working (16), then the notebook (17). Checked live on qwen3:8b with
+screenshots; 226 tests pass.

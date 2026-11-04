@@ -180,26 +180,45 @@ Spec: §1, §2, §4.2, §12 (as updated)
 - New `/chat` route (free conversation with history; Draft mode adds project context, and
   `<slide_id> <instruction>` edits that slide). Temporary chats (not listed, purged).
 
-## Phase 15 — Outputs, Templates and Customize
+## Phase 15 — Open files in the side panel (done)
+- `src/studio/ui/docview.py`: PDF page PNGs (pymupdf, cached per page/width in
+  `<project>/.studio-cache/`), word boxes for a selectable text layer, find with rects; reading
+  view for DOCX/XLSX/PPTX/TXT/MD via `ingest.extract_sections`; raw download and open in the
+  default app.
+- Citations are clickable: `rag.answer(on_hits=)` → `h_ask` stores sources → SSE `sources` →
+  saved on the message; chips open the file at the cited page and highlight the passage (or its
+  section heading).
+- Document tab in the side panel (also from the project page): file switcher, zoom, find,
+  selection toolbar (Ask about this, Copy, Add to notes → Phase 17).
+
+## Phase 16 — Shared drives and co-working
+- Sync-folder places (Google Drive for desktop, OneDrive/SharePoint, network drives), import with
+  linked origins, presence, work lock, per-person chats, conflict-copy detection.
+
+## Phase 17 — Notebook (sources + notes)
+- Notes (answers, passages, own notes) with citations, indexed for answers; Generate briefing /
+  FAQ / win themes / exec summary from selected notes; export to Markdown and Word.
+
+## Phase 18 — Outputs, Templates and Customize
 - See the approved plan: outputs gallery + home strip; templates (upload, inspect, set active,
   slide-type → layout mapping with test render); customize (storyline, content blocks, routing,
   library).
 
-## Phase 16 — Document workbench
+## Phase 15b — (merged into Phase 15) Document workbench details
 - Document tab in the side panel: PDF pages rendered by pymupdf with a selectable text layer;
   DOCX/XLSX/PPTX/TXT reading view from `ingest.extract_sections`; find in document.
 - Citations open the source: `rag.answer(on_hits=…)` → SSE `sources` → chip click jumps to the
   page and highlights the passage.
 - Select text → Ask about this / Explain / Add to notes / Research this.
 
-## Phase 17 — Research in the workbench + living notes
+## Phase 19 — Research in the workbench + opt-in web (notes → Phase 17 notebook)
 - `projects/<id>/notes.md` edited in a Notes tab, autosaved, snapshotted before appends, and indexed
   so answers can cite it; "Add to notes" on replies, selections and research results.
 - Research tab over RFP / notes / library, with **opt-in** web search (`studio.web`, off by
   default, PHI-checked query only, every request logged in `.studio/web-log.jsonl`; VERIFY the
   provider first). Records a deviation from the offline rule in DECISIONS.md.
 
-## Phase 18 — Model router and suggestions
+## Phase 20 — Model router and suggestions
 - `config/model_catalog.yaml` + `studio.modelrouter`: task per command → best pulled model that
   fits RAM, preferring the loaded one; suggestion chip in the composer; per-chat role overrides
   (never switches automatically).

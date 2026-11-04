@@ -25,6 +25,9 @@ All notable changes to this project are documented here. The format follows
   model and Fast/Thinking per chat. New `/chat` command for free conversation.
 - **Temporary chats** that aren't saved.
 
+- **Read files beside the chat:** PDFs, Word, Excel and PowerPoint open in the side panel with
+  find, zoom and text selection. Citation chips open the cited page and highlight the passage.
+
 ### Changed
 - **New look and layout:** the app was rebuilt with a calmer warm-paper design, serif headings and
   dark mode. It has a Projects page with cards, a project page, a Settings page, and in-app
