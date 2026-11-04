@@ -65,7 +65,8 @@
 
 /* ---------- composer ---------- */
 .composer { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-xl); box-shadow: var(--shadow); padding: 14px 12px 10px 16px; transition: border-color .15s, box-shadow .15s; }
-.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong)); box-shadow: var(--shadow), var(--focus); }
+.composer:focus-within { border-color: var(--faint); }
+.composer textarea:focus, .composer textarea:focus-visible { outline: none; box-shadow: none; }
 .composer textarea { display: block; width: 100%; border: 0; outline: 0; resize: none; background: none; padding: 2px 4px 8px 2px; min-height: 28px; max-height: 40vh; font-size: 15.5px; line-height: 1.5; }
 .composer textarea::placeholder { color: var(--faint); }
 .composer-files { display: flex; flex-wrap: wrap; gap: 8px; }

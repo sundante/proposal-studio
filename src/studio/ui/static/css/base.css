@@ -16,6 +16,9 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
 :focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-xs); }
+/* text boxes show focus with their own border, never a ring */
+textarea:focus-visible, input:focus-visible { box-shadow: none; }
+.input:focus-visible, .textarea:focus-visible, .select:focus-visible { box-shadow: var(--focus); }
 ::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 svg.i.sm { width: 16px; height: 16px; }
