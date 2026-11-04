@@ -3,138 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Proposal Studio</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <script>
+    // Apply the saved theme before first paint (no flash).
+    try { const t = localStorage.getItem('ps.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
 </head>
 <body>
   <div id="app">
-    <aside id="sidebar" aria-label="Projects and chats">
-      <div class="side-top">
-        <a class="brand" href="#/" title="Proposal Studio home">
-          <img src="logo.svg" alt="" width="22" height="22"><span>Proposal Studio</span>
-        </a>
-        <button class="icon-btn only-mobile" id="close-sidebar" title="Close sidebar" aria-label="Close sidebar">
-          <svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>
-        </button>
-        <button class="icon-btn only-desktop" id="collapse-sidebar" title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">
-          <svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M8 3.5v13"/></svg>
-        </button>
-      </div>
-      <button class="new-chat" id="new-chat" title="New project">
-        <svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg><span>New project</span>
-      </button>
-      <nav class="side-scroll">
-        <div class="side-label">Projects</div>
-        <ul id="project-list" class="side-list"></ul>
-        <div class="side-label">Recent chats</div>
-        <ul id="recent-list" class="side-list"></ul>
-      </nav>
-      <div class="side-foot">
-        <button id="health" class="health" title="Models"><i></i><span>Checking model…</span></button>
-        <span class="spacer"></span>
-        <button class="icon-btn" id="open-settings" title="Settings and folders" aria-label="Settings and folders">
-          <svg viewBox="0 0 20 20"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
-        </button>
-        <button class="icon-btn" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light or dark theme">
-          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6L16 16M4 16l1.4-1.4M14.6 5.4L16 4"/></svg>
-        </button>
-      </div>
-    </aside>
+    <aside id="sidebar" aria-label="Navigation"></aside>
     <div id="scrim" class="scrim"></div>
-
     <main id="main">
-      <header class="topbar">
-        <button class="icon-btn only-mobile" id="open-sidebar" title="Menu" aria-label="Open sidebar">
-          <svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
-        </button>
-        <div class="crumbs" id="crumbs"></div>
-        <button class="icon-btn" id="toggle-panel" title="Project panel" aria-label="Toggle project panel" hidden>
-          <svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M12 3.5v13"/></svg>
-        </button>
-      </header>
-
-      <section id="home" class="home" hidden>
-        <img src="logo.svg" alt="" class="home-logo" width="40" height="40">
-        <h1 class="greeting">What are we bidding on?</h1>
-        <p class="home-sub">Drop an RFP to start a project in a folder you choose, then ask anything about it.</p>
-        <div id="home-composer-slot"></div>
-        <div class="home-hints">
-          <button class="hint" data-fill="When is the proposal due?">When is the proposal due?</button>
-          <button class="hint" data-fill="What are the mandatory requirements?">What are the mandatory requirements?</button>
-          <button class="hint" data-fill="Which compliance frameworks are mentioned?">Which compliance frameworks are mentioned?</button>
-        </div>
-      </section>
-
-      <section id="chat" class="chat" hidden>
-        <div class="thread-scroll" id="thread-scroll">
-          <div class="thread" id="thread"></div>
-        </div>
-        <div class="composer-dock">
-          <div class="actions" id="actions">
-            <button class="action" data-action="analyse">
-              <svg viewBox="0 0 20 20"><path d="M4 3.5h8l4 4v9H4z"/><path d="M7 10h6M7 13h4"/></svg>Analyse RFP
-            </button>
-            <button class="action" data-action="slides">
-              <svg viewBox="0 0 20 20"><rect x="2.5" y="4" width="15" height="10" rx="1.5"/><path d="M10 14v3M7 17h6"/></svg>Build slides
-            </button>
-            <a class="action" id="download-pptx" hidden download>
-              <svg viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg><span>Download PPTX</span>
-            </a>
-          </div>
-          <div id="chat-composer-slot"></div>
-          <p class="disclaimer">Runs entirely on this computer. Answers can be wrong — check the cited sources.</p>
-        </div>
-      </section>
+      <header class="topbar" id="topbar"></header>
+      <div id="view"></div>
     </main>
-
-    <div id="panel-resizer" class="resizer" hidden role="separator" aria-orientation="vertical" aria-label="Resize panel" title="Drag to resize · double-click to widen"></div>
-    <aside id="panel" class="panel" hidden aria-label="Project panel">
-      <div class="panel-head">
-        <div class="tabs" role="tablist">
-          <button class="tab" data-tab="files" role="tab">Files</button>
-          <button class="tab" data-tab="summary" role="tab">RFP summary</button>
-          <button class="tab" data-tab="slides" role="tab">Slides</button>
-        </div>
-        <button class="icon-btn" id="close-panel" title="Close panel" aria-label="Close panel">
-          <svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>
-        </button>
-      </div>
-      <div class="panel-body" id="panel-body"></div>
-    </aside>
+    <div id="resizer" class="resizer" hidden role="separator" aria-orientation="vertical" aria-label="Resize panel" tabindex="0" title="Drag to resize · double-click to widen"></div>
+    <aside id="panel" hidden aria-label="Project panel"></aside>
   </div>
-
-  <template id="composer-tpl">
-    <form class="composer">
-      <div class="chips"></div>
-      <textarea rows="1" placeholder="Ask about the RFP, or drop files here…" aria-label="Message"></textarea>
-      <div class="composer-row">
-        <button type="button" class="icon-btn attach" title="Attach files" aria-label="Attach files">
-          <svg viewBox="0 0 20 20"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
-        </button>
-        <input type="file" multiple hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md">
-        <span class="spacer"></span>
-        <button type="submit" class="send" title="Send" aria-label="Send">
-          <svg viewBox="0 0 20 20"><path d="M10 16V4M5 9l5-5 5 5"/></svg>
-        </button>
-      </div>
-    </form>
-  </template>
-
-  <div id="modal" class="modal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div class="modal-head">
-        <h2 id="modal-title"></h2>
-        <button class="icon-btn" id="modal-close" title="Close" aria-label="Close">
-          <svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>
-        </button>
-      </div>
-      <div class="modal-body" id="modal-body"></div>
-    </div>
-  </div>
-
-  <div id="drop" class="drop" hidden><div>Drop files to add them to this project</div></div>
-  <div id="toast" class="toast" hidden></div>
-  <script src="app.js"></script>
+  <noscript>Proposal Studio needs JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
