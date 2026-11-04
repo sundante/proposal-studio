@@ -77,6 +77,19 @@ def set_home(path: str | Path) -> Path:
     return folder
 
 
+def user_name() -> str:
+    """The name the app greets you with ("" until you set one)."""
+    return str(_load().get("name") or "")
+
+
+def set_user_name(name: str) -> str:
+    """Remember your name (trimmed, at most 40 characters)."""
+    data = _load()
+    data["name"] = " ".join(name.split())[:40]
+    _save(data)
+    return data["name"]
+
+
 def check_candidate(path: str | Path) -> Path:
     """The absolute folder for ``path``, or :class:`TrustError` if it's unsafe to use."""
     raw = str(path).strip()

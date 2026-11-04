@@ -36,7 +36,7 @@ from studio import config as cfgmod
 from studio import digest as digestmod
 from studio import session as sessmod
 from studio.deck.writer import DECK_FILE
-from studio.guards import GuardError, resolve_in_sandbox, scan_phi
+from studio.guards import GuardError, check_model_allowed, resolve_in_sandbox, scan_phi
 from studio.llm import LLMClient
 from studio.rag import VectorIndex
 from studio.router import Router, RouterContext
@@ -99,6 +99,8 @@ class StudioApp:
     home: Path  # the Proposal Studio folder: library/ + .studio/ (project list, sessions)
     token: str | None = None  # per-launch API token (None: no token check, e.g. tests)
     reveal: Callable[[Path], None] = reveal
+    # Builds a client for a per-chat model/thinking choice (None: overrides are ignored).
+    llm_for: Callable[[cfgmod.ModelsConfig], LLMClient] | None = None
     router: Router = field(init=False)
     chats: ChatStore = field(init=False)
     _locks: dict[str, threading.Lock] = field(default_factory=dict, init=False)
@@ -120,6 +122,7 @@ class StudioApp:
         self.home = folder
         self.router = Router(ctx)
         self.chats = ChatStore(folder)
+        self.chats.purge_temporary()  # temporary chats never outlive a session
         with self._locks_guard:
             self._locks.clear()
 
@@ -132,6 +135,7 @@ class StudioApp:
             "home": str(self.home),
             "library": str(self.home / sessmod.LIBRARY_DIR),
             "user_dir": str(trust.user_dir()),
+            "name": trust.user_name(),
             "user_home": str(Path.home()),
             "sep": "\\" if sys.platform == "win32" else "/",
         }
@@ -141,7 +145,13 @@ class StudioApp:
         cfg = cfgmod.load_config(self.app_root)
         roles = {name: tagged(rc.model) for name, rc in cfg.models.roles.items()}
         ram = sysinfo.total_ram_bytes()
-        info: dict[str, Any] = {"roles": roles, "ram": ram, "ollama": None, "models": []}
+        info: dict[str, Any] = {
+            "roles": roles,
+            "think": cfg.models.think,
+            "ram": ram,
+            "ollama": None,
+            "models": [],
+        }
         fn = getattr(self.llm_factory(), "model_details", None)
         if fn is None:
             return info
@@ -157,6 +167,42 @@ class StudioApp:
             m["fits"] = None if budget is None else m["size"] * 1.2 <= budget
         info["models"] = details
         return info
+
+    def apply_prefs(self, chat: Any, body: dict[str, Any]) -> None:
+        """Remember the composer's mode / model / thinking choices on the chat."""
+        prefs = chat.prefs
+        if "mode" in body:
+            mode = str(body["mode"])
+            if mode not in ("auto", "ask", "research", "chat", "draft"):
+                raise ApiError(HTTPStatus.BAD_REQUEST, f"Unknown mode '{mode}'.")
+            prefs.mode = mode
+        if "model" in body:
+            model = str(body["model"] or "").strip()
+            if model:
+                cfg = cfgmod.load_config(self.app_root)
+                try:
+                    check_model_allowed(model, block_cloud=cfg.models.block_cloud_models)
+                except GuardError as exc:
+                    raise ApiError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
+            prefs.model = model
+        if "think" in body:
+            prefs.think = None if body["think"] is None else bool(body["think"])
+
+    def factory_for(self, chat: Any) -> Callable[[], LLMClient] | None:
+        """An LLM factory honouring the chat's model/thinking choice (None = the default)."""
+        prefs = chat.prefs
+        if self.llm_for is None or (not prefs.model and prefs.think is None):
+            return None
+        models = cfgmod.load_config(self.app_root).models
+        roles = dict(models.roles)
+        if prefs.model:
+            roles["worker"] = roles["worker"].model_copy(update={"model": prefs.model})
+        update: dict[str, Any] = {"roles": roles}
+        if prefs.think is not None:
+            update["think"] = prefs.think
+        chosen = models.model_copy(update=update)
+        make = self.llm_for
+        return lambda: make(chosen)
 
     def lock(self, project: str) -> threading.Lock:
         """One message at a time per project (the index and outputs are shared)."""
@@ -239,6 +285,9 @@ class StudioApp:
             raise ApiError(HTTPStatus.BAD_REQUEST, f"Upload missing: {', '.join(missing)}")
         if not display and not files:
             raise ApiError(HTTPStatus.BAD_REQUEST, "Empty message.")
+        self.apply_prefs(chat, body)
+        factory = self.factory_for(chat)
+        history = chat.history(turns=8)
 
         with self.lock(opp.id):
             if not chat.messages:
@@ -273,7 +322,16 @@ class StudioApp:
                         chunk("\n\n---\n\n")
                     failed = False
                     attached = files if i == 0 else []
-                    async for piece in self.router.handle(step, attached, sess, emit):
+                    stream = self.router.handle(
+                        step,
+                        attached,
+                        sess,
+                        emit,
+                        mode=chat.prefs.mode,
+                        history=history,
+                        llm_factory=factory,
+                    )
+                    async for piece in stream:
                         failed = failed or piece.lstrip().startswith("⚠")
                         chunk(piece)
                     if failed or "pending" in sess.last_outputs:
@@ -318,6 +376,8 @@ class Handler(BaseHTTPRequestHandler):
             ("GET", r"/api/health", "health"),
             ("GET", r"/api/settings", "get_settings"),
             ("POST", r"/api/settings/home", "set_home"),
+            ("POST", r"/api/settings/profile", "set_profile"),
+            ("GET", r"/api/search", "search"),
             ("POST", r"/api/library/reveal", "reveal_library"),
             ("POST", r"/api/home/reveal", "reveal_home"),
             ("GET", r"/api/fs", "list_dirs"),
@@ -513,6 +573,23 @@ class Handler(BaseHTTPRequestHandler):
     def api_get_settings(self) -> None:
         self._json(self.app.settings())
 
+    def api_set_profile(self) -> None:
+        trust.set_user_name(str(self._payload().get("name") or ""))
+        self._json(self.app.settings())
+
+    def api_search(self) -> None:
+        q = parse_qs(urlparse(self.path).query).get("q", [""])[0].strip()
+        projects = []
+        if q:
+            low = q.lower()
+            projects = [
+                {"id": p["id"], "title": p["title"], "path": p["path"]}
+                for p in self.app.projects()
+                if not p["missing"]
+                and (low in p["title"].lower() or low in (p.get("description") or "").lower())
+            ][:10]
+        self._json({"query": q, "projects": projects, "chats": self.app.chats.search(q)})
+
     def api_set_home(self) -> None:
         body = self._payload()
         if body.get("trust") is not True:
@@ -648,7 +725,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_create_chat(self, project: str) -> None:
         self.app.opp(project)
-        self._json(self.app.chats.create(project).model_dump(), 201)
+        temporary = bool(self._payload().get("temporary"))
+        if temporary:
+            self.app.chats.purge_temporary()  # only one temporary chat at a time
+        self._json(self.app.chats.create(project, temporary=temporary).model_dump(), 201)
 
     def api_upload(self, project: str, name: str) -> None:
         opp = self.app.opp(project)
@@ -692,7 +772,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_rename_chat(self, chat_id: str) -> None:
         chat = self.app.chats.get(chat_id)
-        chat.title = str(self._payload().get("title") or "").strip() or chat.title
+        body = self._payload()
+        if "title" in body:
+            chat.title = str(body.get("title") or "").strip() or chat.title
+        if "pinned" in body:
+            chat.pinned = bool(body["pinned"])
+        if "temporary" in body and not body["temporary"]:
+            chat.temporary = False  # "keep this chat"
         self.app.chats.save(chat)
         self._json(chat.summary())
 
@@ -735,13 +821,16 @@ def make_server(
     home: Path,
     token: str | None = None,
     reveal_fn: Callable[[Path], None] = reveal,
+    llm_for: Callable[[cfgmod.ModelsConfig], LLMClient] | None = None,
 ) -> ThreadingHTTPServer:
     """A ready-to-serve UI server on 127.0.0.1:``port`` (0 picks a free port).
 
     ``home`` is the Proposal Studio folder (created if missing). ``token`` (``studio ui`` passes a
     random one) protects the API; see :class:`Handler`.
     """
-    app = StudioApp(app_root, llm_factory, home=home, token=token, reveal=reveal_fn)
+    app = StudioApp(
+        app_root, llm_factory, home=home, token=token, reveal=reveal_fn, llm_for=llm_for
+    )
     handler = type("StudioHandler", (Handler,), {"app": app})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     server.daemon_threads = True

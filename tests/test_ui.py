@@ -376,3 +376,86 @@ def test_folder_places_and_description(client: httpx.Client, tmp_path: Path, ws:
     pid, _ = new_project(client, "Acme")
     out = client.patch(f"/api/projects/{pid}", json={"description": "Medicaid AI platform"}).json()
     assert out["description"] == "Medicaid AI platform" and out["title"] == "Acme"
+
+
+# --- phase 14: search, pin, temporary chats, profile, modes, per-chat models -----------------
+
+
+def say(c: httpx.Client, chat: str, **body) -> str:
+    """Post a message and return the reply text (or the raw body on an error)."""
+    resp = c.post(f"/api/chats/{chat}/messages", json=body)
+    return reply_text(events(resp)) or resp.text
+
+
+def test_search_pin_and_profile(client: httpx.Client) -> None:
+    pid, chat = new_project(client, "Acme Health")
+    client.patch(f"/api/projects/{pid}", json={"description": "Medicaid platform"})
+    client.post(f"/api/chats/{chat}/messages", json={"text": "/chat draft a kickoff email"})
+    found = client.get("/api/search", params={"q": "kickoff"}).json()
+    assert [c["id"] for c in found["chats"]] == [chat]
+    assert client.get("/api/search", params={"q": "medicaid"}).json()["projects"][0]["id"] == pid
+    assert client.get("/api/search", params={"q": "zzz-nothing"}).json()["chats"] == []
+    pinned = client.patch(f"/api/chats/{chat}", json={"pinned": True}).json()
+    assert pinned["pinned"] is True and pinned["title"]
+    assert client.get("/api/chats").json()[0]["pinned"] is True
+    assert client.post("/api/settings/profile", json={"name": "  Sun   Dante "}).json()["name"] == (
+        "Sun Dante"
+    )
+    assert client.get("/api/settings").json()["name"] == "Sun Dante"
+
+
+def test_temporary_chats_are_hidden_and_purged(client: httpx.Client) -> None:
+    pid, _ = new_project(client, "Acme")
+    temp = client.post(f"/api/projects/{pid}/chats", json={"temporary": True}).json()
+    client.post(f"/api/chats/{temp['id']}/messages", json={"text": "/chat hello"})
+    assert all(c["id"] != temp["id"] for c in client.get("/api/chats").json())
+    assert client.get("/api/search", params={"q": "hello"}).json()["chats"] == []
+    detail = client.get(f"/api/projects/{pid}").json()
+    assert all(c["id"] != temp["id"] for c in detail["chats"])
+    other = client.post(f"/api/projects/{pid}/chats", json={"temporary": True}).json()
+    assert client.get(f"/api/chats/{temp['id']}").status_code == 400  # replaced → purged
+    kept = client.patch(f"/api/chats/{other['id']}", json={"temporary": False}).json()
+    assert kept["temporary"] is False
+
+
+def test_modes_route_plain_text(client: httpx.Client) -> None:
+    _, chat = new_project(client, "Acme")
+    out = reply_text(
+        events(client.post(f"/api/chats/{chat}/messages", json={"text": "hi", "mode": "chat"}))
+    )
+    assert "→ routed to /chat (command)" in out and "no citations" in out
+    out = reply_text(
+        events(client.post(f"/api/chats/{chat}/messages", json={"text": "due?", "mode": "ask"}))
+    )
+    assert "→ routed to /ask (command)" in out
+    assert client.get(f"/api/chats/{chat}").json()["prefs"]["mode"] == "ask"  # remembered
+    bad = client.post(f"/api/chats/{chat}/messages", json={"text": "x", "mode": "nope"})
+    assert "Unknown mode" in bad.text
+
+
+def test_per_chat_model_and_thinking(home: Path, ws: Path) -> None:
+    _, llm = make(home)
+    seen: list = []
+
+    def llm_for(models):
+        seen.append((models.roles["worker"].model, models.think))
+        return llm
+
+    server, base = serve(home, llm, home=ws, llm_for=llm_for)
+    try:
+        with httpx.Client(base_url=base, timeout=30) as c:
+            _, chat = new_project(c, "Acme")
+            c.post(
+                f"/api/chats/{chat}/messages",
+                json={"text": "/chat a", "model": "qwen3:4b", "think": True},
+            )
+            assert seen == [("qwen3:4b", True)]
+            c.post(f"/api/chats/{chat}/messages", json={"text": "/chat b"})  # prefs remembered
+            assert seen[-1] == ("qwen3:4b", True)
+            cloud = c.post(
+                f"/api/chats/{chat}/messages", json={"text": "x", "model": "gpt-oss:120b-cloud"}
+            )
+            assert "cloud" in cloud.text.lower()
+    finally:
+        server.shutdown()
+        server.server_close()

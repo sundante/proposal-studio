@@ -538,6 +538,7 @@ def ui_cmd(
             port,
             home=home,
             token=token,
+            llm_for=OllamaClient,
         )
     except OSError as exc:
         _fail(f"Can't listen on port {port} ({exc}). Try `studio ui --port {port + 1}`.")
