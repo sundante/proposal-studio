@@ -18,7 +18,7 @@
 | 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
 | 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
 | 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | e231132 |
-| 14 | Navigation, composer, models and modes | ✅ done | (this commit) |
+| 14 | Navigation, composer, models and modes | ✅ done | a1a2ffd |
 | 15 | Outputs, Templates and Customize | ⬜ todo | |
 | 16 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
 | 17 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
