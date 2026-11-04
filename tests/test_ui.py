@@ -3,27 +3,22 @@
 import json
 import threading
 from collections.abc import Iterator
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
 import pytest
 
+from studio import trust
 from studio.ui.server import make_server
 from studio.ui.store import title_from
 from tests.test_router import make
 
 
-@pytest.fixture
-def client(home: Path) -> Iterator[httpx.Client]:
-    _, llm = make(home)
-    server = make_server(home, lambda: llm, port=0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    base = f"http://127.0.0.1:{server.server_address[1]}"
-    with httpx.Client(base_url=base, timeout=30) as c:
-        yield c
-    server.shutdown()
-    server.server_close()
+def serve(home: Path, llm, **kwargs) -> tuple[ThreadingHTTPServer, str]:
+    server = make_server(home, lambda: llm, port=0, **kwargs)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_address[1]}"
 
 
 @pytest.fixture
@@ -31,6 +26,22 @@ def home(studio_home: Path) -> Path:
     from tests.test_router import home as router_home
 
     return router_home.__wrapped__(studio_home)
+
+
+@pytest.fixture
+def ws(home: Path) -> Path:
+    """A trusted workspace folder (data lives here; config stays in ``home``)."""
+    return trust.trust(home.parent / f"{home.name}-ws")
+
+
+@pytest.fixture
+def client(home: Path, ws: Path) -> Iterator[httpx.Client]:
+    _, llm = make(home)
+    server, base = serve(home, llm, workspace=ws)
+    with httpx.Client(base_url=base, timeout=30) as c:
+        yield c
+    server.shutdown()
+    server.server_close()
 
 
 def events(resp: httpx.Response) -> list[tuple[str, dict]]:
@@ -64,7 +75,7 @@ def test_serves_the_app(client: httpx.Client) -> None:
     assert health["ollama"] is None and health["version"]
 
 
-def test_drop_ask_analyse_build_download(client: httpx.Client, home: Path, rfp_files) -> None:
+def test_drop_ask_analyse_build_download(client: httpx.Client, ws: Path, rfp_files) -> None:
     project, chat = new_project(client)
     assert project == "acme-health-plan-rfp"
     assert client.get("/api/projects").json()[0]["title"] == "Acme Health Plan RFP"
@@ -86,7 +97,8 @@ def test_drop_ask_analyse_build_download(client: httpx.Client, home: Path, rfp_f
     detail = client.get(f"/api/projects/{project}").json()
     assert [f["name"] for f in detail["files"]] == ["acme_rfp.pdf"]
     assert detail["status"]["chunks"] > 0
-    assert not list((home / "workspace" / project / ".uploads").glob("*"))  # cleaned up
+    assert not list((ws / "projects" / project / ".uploads").glob("*"))  # cleaned up
+    assert (ws / "projects" / project / "input" / "acme_rfp.pdf").exists()
 
     saved = client.get(f"/api/chats/{chat}").json()
     assert saved["title"] == "When are proposals due?"
@@ -169,3 +181,129 @@ def test_title_from_message_or_file() -> None:
     assert title_from("", ["acme_rfp-2026.pdf"]) == "acme rfp 2026"
     assert title_from("/digest", ["a.pdf"]) == "a"
     assert title_from("x" * 80, []).endswith("…")
+
+
+# --- workspace, trust, token, folders, models (phase 12) ----------------------------------
+
+
+def test_needs_a_trusted_workspace_first(home: Path, tmp_path: Path) -> None:
+    _, llm = make(home)
+    server, base = serve(home, llm)
+    try:
+        with httpx.Client(base_url=base, timeout=30) as c:
+            blocked = c.get("/api/projects")
+            assert blocked.status_code == 409 and blocked.json()["needs_workspace"] is True
+            target = tmp_path / "Bids" / "Acme"
+            ask = c.post("/api/workspace", json={"path": str(target)})
+            assert ask.status_code == 400 and ask.json()["needs_trust"] == str(target.resolve())
+            assert not target.exists()  # nothing is created before trust
+            opened = c.post("/api/workspace", json={"path": str(target), "trust": True}).json()
+            assert opened["active"] == str(target.resolve())
+            assert (target / ".studio" / "workspace.json").exists()
+            project = c.post("/api/projects", json={"name": "Acme"}).json()["project"]["id"]
+            assert (target / "projects" / project / "opportunity.json").exists()
+            assert not (home / "workspace").exists()  # nothing written to the app folder
+            assert c.get("/api/workspace").json()["trusted"][0]["path"] == str(target.resolve())
+            assert c.post("/api/workspace", json={"path": "/", "trust": True}).status_code == 400
+            gone = c.post("/api/workspace/forget", json={"path": str(target)}).json()
+            assert gone["active"] is None and c.get("/api/projects").status_code == 409
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_token_cookie_and_header_required(home: Path, ws: Path) -> None:
+    _, llm = make(home)
+    server, base = serve(home, llm, workspace=ws, token="s3cret")
+    port = server.server_address[1]
+    try:
+        with httpx.Client(base_url=base, timeout=30) as c:
+            assert c.get("/api/health").status_code == 401
+            wrong = c.get("/?t=nope", follow_redirects=False)
+            assert wrong.status_code == 302 and "set-cookie" not in wrong.headers
+            ok = c.get("/?t=s3cret", follow_redirects=False)
+            cookie = ok.headers["set-cookie"]
+            assert f"studio_{port}=s3cret" in cookie and "HttpOnly" in cookie
+            assert "SameSite=Strict" in cookie
+            assert c.get("/api/health").status_code == 200  # reads: the cookie is enough
+            assert c.post("/api/projects", json={"name": "x"}).status_code == 401  # writes: +header
+            made = c.post("/api/projects", json={"name": "x"}, headers={"X-Studio": "1"})
+            assert made.status_code == 201
+            assert c.get("/").status_code == 200  # the page itself needs no token
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_folder_browser_lists_and_creates(client: httpx.Client, tmp_path: Path) -> None:
+    tmp_path = tmp_path / "browse"
+    (tmp_path / "Bids").mkdir(parents=True)
+    (tmp_path / ".hidden").mkdir()
+    (tmp_path / "file.txt").write_text("x")
+    listing = client.get("/api/fs", params={"path": str(tmp_path)}).json()
+    assert listing["dirs"] == ["Bids"] and listing["parent"]
+    made = client.post("/api/fs/mkdir", json={"path": str(tmp_path / "Bids"), "name": "Acme"})
+    assert made.status_code == 201 and (tmp_path / "Bids" / "Acme").is_dir()
+    for bad in ("../x", ".x", "a/b", ""):
+        r = client.post("/api/fs/mkdir", json={"path": str(tmp_path), "name": bad})
+        assert r.status_code == 400
+    assert client.get("/api/fs", params={"path": "relative"}).status_code == 404
+
+
+class ModelsLLM:
+    """FakeLLM stand-in that also reports models."""
+
+    def __init__(self, inner) -> None:
+        self.inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def model_details(self) -> list[dict]:
+        return [
+            {"name": "qwen3:8b", "size": 5_200_000_000, "loaded": True},
+            {"name": "qwen3:4b", "size": 2_600_000_000, "loaded": False},
+            {"name": "huge:70b", "size": 40_000_000_000, "loaded": False},
+            {"name": "nomic-embed-text:latest", "size": 270_000_000, "loaded": False},
+        ]
+
+
+def test_models_list_and_role_change(home: Path, ws: Path, monkeypatch) -> None:
+    from studio import sysinfo
+
+    monkeypatch.setattr(sysinfo, "total_ram_bytes", lambda: 16 * 1024**3)
+    _, llm = make(home)
+    server, base = serve(home, ModelsLLM(llm), workspace=ws)
+    try:
+        with httpx.Client(base_url=base, timeout=30) as c:
+            info = c.get("/api/models").json()
+            by_name = {m["name"]: m for m in info["models"]}
+            assert info["ollama"] is True and info["roles"]["worker"] == "qwen3:8b"
+            assert by_name["qwen3:8b"]["roles"] == ["worker"] and by_name["qwen3:8b"]["fits"]
+            assert by_name["huge:70b"]["fits"] is False
+            assert by_name["nomic-embed-text:latest"]["roles"] == ["embed"]  # untagged = :latest
+            assert (
+                c.post("/api/models/role", json={"role": "worker", "model": "x:1b"}).status_code
+                == 400
+            )
+            assert (
+                c.post("/api/models/role", json={"role": "boss", "model": "qwen3:4b"}).status_code
+                == 400
+            )
+            changed = c.post("/api/models/role", json={"role": "worker", "model": "qwen3:4b"})
+            assert changed.json()["roles"]["worker"] == "qwen3:4b"
+            assert "qwen3:4b" in (home / "config" / "overrides.yaml").read_text()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_chat_cannot_change_agent_commands(client: httpx.Client) -> None:
+    _, chat = new_project(client, "Acme")
+    evts = events(
+        client.post(
+            f"/api/chats/{chat}/messages",
+            json={"text": '/config set agents.agents.opencode.plan_cmd ["sh","-c","id"]'},
+        )
+    )
+    assert "can't be changed from chat" in reply_text(evts)

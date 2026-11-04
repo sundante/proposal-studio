@@ -1,6 +1,6 @@
 """Opportunities (``workspace/<opp-id>/``) and per-chat session state.
 
-Sessions are keyed by Open WebUI chat id (fallback: user id; the CLI uses ``cli``) and persisted
+Sessions are keyed by chat id (``ui-<chat>`` in the app; the CLI uses ``cli``) and persisted
 as JSON under ``workspace/.sessions/`` so they survive restarts.
 """
 
@@ -43,9 +43,18 @@ class Session(BaseModel):
     last_outputs: dict[str, Any] = Field(default_factory=dict)
 
 
+MARKER_DIR = ".studio"  # in a trusted UI workspace: settings, cache, logs
+MARKER_FILE = "workspace.json"
+
+
+def is_ui_workspace(root: Path) -> bool:
+    """True for a folder set up (and trusted) by ``studio ui``."""
+    return (root / MARKER_DIR / MARKER_FILE).is_file()
+
+
 def workspace_dir(root: Path) -> Path:
-    """The ``workspace/`` folder under the project root."""
-    return root / "workspace"
+    """Where opportunities live: ``projects/`` in a UI workspace, else ``workspace/`` (CLI)."""
+    return root / ("projects" if is_ui_workspace(root) else "workspace")
 
 
 def validate_opp_id(opp_id: str) -> str:

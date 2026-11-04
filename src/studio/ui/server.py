@@ -4,11 +4,17 @@
 in ``static/`` and a small JSON API. Message replies stream as Server-Sent Events: ``status``
 (progress line), ``chunk`` (reply text), ``pending`` (an action waits for Approve/Reject) and
 ``done`` (files produced). Nothing is fetched from the internet; there is no telemetry.
+
+Data lives in a **trusted workspace folder** the user picks in the UI (see :mod:`studio.trust`);
+until one is open, data endpoints answer 409 ``{"needs_workspace": true}``. Config and templates
+come from the app folder. With a per-launch ``token``, every ``/api/*`` request needs the
+session cookie (set by visiting ``/?t=<token>``) and an ``X-Studio: 1`` header.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import mimetypes
 import re
@@ -16,12 +22,14 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from http import HTTPStatus
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
-from studio import __version__
+from studio import __version__, sysinfo, trust
+from studio import config as cfgmod
 from studio import digest as digestmod
 from studio import session as sessmod
 from studio.deck.writer import DECK_FILE
@@ -48,25 +56,104 @@ Send = Callable[[str, dict[str, Any]], None]
 class ApiError(Exception):
     """An HTTP error with a user-facing message."""
 
-    def __init__(self, status: int, message: str) -> None:
+    def __init__(self, status: int, message: str, **extra: Any) -> None:
         super().__init__(message)
         self.status = status
+        self.extra = extra
+
+
+def tagged(model: str) -> str:
+    """Ollama names without a tag mean ``:latest`` (``nomic-embed-text`` = ``…:latest``)."""
+    return model if ":" in model else f"{model}:latest"
+
+
+def no_workspace() -> ApiError:
+    return ApiError(HTTPStatus.CONFLICT, "Choose a workspace folder first.", needs_workspace=True)
 
 
 @dataclass
 class StudioApp:
     """Everything the request handler needs; one per server."""
 
-    root: Path
+    app_root: Path  # config/ and templates/
     llm_factory: Callable[[], LLMClient]
-    router: Router = field(init=False)
-    chats: ChatStore = field(init=False)
+    workspace: Path | None = None  # the trusted data folder; None until the user picks one
+    token: str | None = None  # per-launch API token (None: no token check, e.g. tests)
+    _router: Router | None = field(default=None, init=False)
+    _chats: ChatStore | None = field(default=None, init=False)
     _locks: dict[str, threading.Lock] = field(default_factory=dict, init=False)
     _locks_guard: threading.Lock = field(default_factory=threading.Lock, init=False)
 
     def __post_init__(self) -> None:
-        self.router = Router(RouterContext(self.root, self.llm_factory, allow_local_paths=False))
-        self.chats = ChatStore(self.root)
+        if self.workspace is not None:
+            self.activate(self.workspace)
+
+    def activate(self, folder: Path) -> None:
+        """Open a trusted workspace folder (all data reads and writes go there)."""
+        if not trust.is_trusted(folder):
+            raise ApiError(HTTPStatus.FORBIDDEN, f"{folder} isn't a trusted workspace.")
+        ctx = RouterContext(
+            folder,
+            self.llm_factory,
+            allow_local_paths=False,
+            app_root=self.app_root,
+            allow_agent_config=False,
+        )
+        self.workspace = folder
+        self._router = Router(ctx)
+        self._chats = ChatStore(folder)
+        with self._locks_guard:
+            self._locks.clear()
+        trust.touch(folder)
+
+    @property
+    def root(self) -> Path:
+        if self.workspace is None:
+            raise no_workspace()
+        return self.workspace
+
+    @property
+    def router(self) -> Router:
+        if self._router is None:
+            raise no_workspace()
+        return self._router
+
+    @property
+    def chats(self) -> ChatStore:
+        if self._chats is None:
+            raise no_workspace()
+        return self._chats
+
+    def workspace_info(self) -> dict[str, Any]:
+        return {
+            "active": str(self.workspace) if self.workspace else None,
+            "name": self.workspace.name if self.workspace else None,
+            "trusted": trust.trusted(),
+            "open_last": trust.open_last(),
+            "home": str(Path.home()),
+        }
+
+    def models(self) -> dict[str, Any]:
+        """Pulled and loaded models, role assignments and whether each fits this machine."""
+        cfg = cfgmod.load_config(self.app_root)
+        roles = {name: tagged(rc.model) for name, rc in cfg.models.roles.items()}
+        ram = sysinfo.total_ram_bytes()
+        info: dict[str, Any] = {"roles": roles, "ram": ram, "ollama": None, "models": []}
+        fn = getattr(self.llm_factory(), "model_details", None)
+        if fn is None:
+            return info
+        try:
+            details = fn()
+        except Exception:  # noqa: BLE001 - any failure means Ollama isn't reachable
+            info["ollama"] = False
+            return info
+        info["ollama"] = True
+        budget = sysinfo.model_budget(ram)
+        for m in details:
+            m["roles"] = [r for r, model in roles.items() if model == tagged(m["name"])]
+            m["fits"] = None if budget is None else m["size"] * 1.2 <= budget
+        info["models"] = details
+        return info
 
     def lock(self, project: str) -> threading.Lock:
         """One message at a time per project (the index and outputs are shared)."""
@@ -213,6 +300,13 @@ class Handler(BaseHTTPRequestHandler):
         (m, re.compile(f"^{p}$"), h)
         for m, p, h in [
             ("GET", r"/api/health", "health"),
+            ("GET", r"/api/workspace", "get_workspace"),
+            ("POST", r"/api/workspace", "open_workspace"),
+            ("POST", r"/api/workspace/forget", "forget_workspace"),
+            ("GET", r"/api/fs", "list_dirs"),
+            ("POST", r"/api/fs/mkdir", "make_dir"),
+            ("GET", r"/api/models", "get_models"),
+            ("POST", r"/api/models/role", "set_role_model"),
             ("GET", r"/api/projects", "list_projects"),
             ("POST", r"/api/projects", "create_project"),
             ("GET", r"/api/projects/([^/]+)", "get_project"),
@@ -260,11 +354,32 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         return method == "GET" or not origin or urlparse(origin).netloc in allowed
 
+    @property
+    def _cookie_name(self) -> str:
+        return f"studio_{self.server.server_address[1]}"
+
+    def _authorised(self, method: str) -> bool:
+        """Per-launch token in a ``SameSite=Strict`` cookie (never sent cross-site); writes also
+        need an ``X-Studio: 1`` header, which a cross-site form can't add."""
+        token = self.app.token
+        if token is None:
+            return True
+        sent = SimpleCookie(self.headers.get("Cookie", "")).get(self._cookie_name)
+        if sent is None or not hmac.compare_digest(sent.value, token):
+            return False
+        return method == "GET" or self.headers.get("X-Studio") == "1"
+
     def _dispatch(self, method: str) -> None:
         path = urlparse(self.path).path
         try:
             if not self._local_request(method):
                 raise ApiError(HTTPStatus.FORBIDDEN, "Only local requests are allowed.")
+            if path.startswith("/api/") and not self._authorised(method):
+                raise ApiError(
+                    HTTPStatus.UNAUTHORIZED,
+                    "Open Proposal Studio from the link `studio ui` printed in the terminal.",
+                    needs_login=True,
+                )
             if not path.startswith("/api/"):
                 if method != "GET":
                     raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "Not allowed.")
@@ -277,7 +392,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.")
         except ApiError as exc:
-            self._json({"error": str(exc)}, exc.status)
+            self._json({"error": str(exc), **exc.extra}, exc.status)
+        except trust.TrustError as exc:
+            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except (StoreError, sessmod.SessionError) as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         except (BrokenPipeError, ConnectionResetError):
@@ -326,6 +443,18 @@ class Handler(BaseHTTPRequestHandler):
         return data
 
     def _static(self, path: str) -> None:
+        offered = parse_qs(urlparse(self.path).query).get("t", [""])[0]
+        if path in ("", "/") and offered and self.app.token:
+            self.send_response(HTTPStatus.FOUND)
+            if hmac.compare_digest(offered, self.app.token):
+                self.send_header(
+                    "Set-Cookie",
+                    f"{self._cookie_name}={self.app.token}; HttpOnly; SameSite=Strict; Path=/",
+                )
+            self.send_header("Location", "/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         name = "index.html" if path in ("", "/") else path.lstrip("/")
         try:
             target = safe_name(STATIC, name)
@@ -347,7 +476,95 @@ class Handler(BaseHTTPRequestHandler):
                 ollama = loaded is not None
         except Exception:  # noqa: BLE001 - any failure means "not reachable"
             ollama = False
-        self._json({"version": __version__, "ollama": ollama, "loaded": loaded or []})
+        self._json(
+            {
+                "version": __version__,
+                "ollama": ollama,
+                "loaded": loaded or [],
+                "workspace": str(self.app.workspace) if self.app.workspace else None,
+            }
+        )
+
+    def api_get_workspace(self) -> None:
+        self._json(self.app.workspace_info())
+
+    def api_open_workspace(self) -> None:
+        body = self._payload()
+        path = str(body.get("path") or "")
+        folder = trust.check_candidate(path)
+        if not trust.is_trusted(folder):
+            if body.get("trust") is not True:
+                raise ApiError(
+                    HTTPStatus.BAD_REQUEST, f"Trust {folder} first.", needs_trust=str(folder)
+                )
+            folder = trust.trust(folder)
+        if "open_last" in body:
+            trust.set_open_last(bool(body["open_last"]))
+        self.app.activate(folder)
+        self._json(self.app.workspace_info())
+
+    def api_forget_workspace(self) -> None:
+        folder = Path(str(self._payload().get("path") or "")).expanduser()
+        trust.untrust(folder)
+        if self.app.workspace and self.app.workspace == folder.resolve():
+            self.app.workspace, self.app._router, self.app._chats = None, None, None
+        self._json(self.app.workspace_info())
+
+    def api_list_dirs(self) -> None:
+        raw = parse_qs(urlparse(self.path).query).get("path", [""])[0]
+        folder = Path(raw).expanduser() if raw else Path.home()
+        if not folder.is_absolute() or not folder.is_dir():
+            raise ApiError(HTTPStatus.NOT_FOUND, f"No folder {raw}.")
+        folder = folder.resolve()
+        try:
+            dirs = sorted(
+                (p.name for p in folder.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                key=str.lower,
+            )[:500]
+        except PermissionError as exc:
+            raise ApiError(HTTPStatus.FORBIDDEN, f"Can't open {folder}.") from exc
+        self._json(
+            {
+                "path": str(folder),
+                "parent": str(folder.parent) if folder.parent != folder else None,
+                "dirs": dirs,
+                "trusted": trust.is_trusted(folder),
+                "home": str(Path.home()),
+            }
+        )
+
+    def api_make_dir(self) -> None:
+        body = self._payload()
+        parent = Path(str(body.get("path") or "")).expanduser()
+        name = str(body.get("name") or "").strip()
+        if not parent.is_absolute() or not parent.is_dir():
+            raise ApiError(HTTPStatus.NOT_FOUND, "Pick a folder first.")
+        if not name or name in (".", "..") or Path(name).name != name or name.startswith("."):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Use a plain folder name.")
+        target = parent.resolve() / name
+        target.mkdir(exist_ok=True)
+        self._json({"path": str(target)}, 201)
+
+    def api_get_models(self) -> None:
+        self._json(self.app.models())
+
+    def api_set_role_model(self) -> None:
+        body = self._payload()
+        role, model = str(body.get("role") or ""), str(body.get("model") or "").strip()
+        if role not in ("router", "worker", "embed") or not model:
+            raise ApiError(
+                HTTPStatus.BAD_REQUEST, "Choose a role (router, worker, embed) and model."
+            )
+        pulled = {m["name"] for m in self.app.models()["models"]}
+        if pulled and tagged(model) not in {tagged(n) for n in pulled}:
+            raise ApiError(
+                HTTPStatus.BAD_REQUEST, f"{model} isn't pulled. Run `ollama pull {model}`."
+            )
+        try:
+            cfgmod.set_value(f"models.roles.{role}.model", model, self.app.app_root)
+        except cfgmod.ConfigError as exc:
+            raise ApiError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
+        self._json(self.app.models())
 
     def api_list_projects(self) -> None:
         self._json(self.app.projects())
@@ -448,10 +665,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def make_server(
-    root: Path, llm_factory: Callable[[], LLMClient], port: int = 8765
+    app_root: Path,
+    llm_factory: Callable[[], LLMClient],
+    port: int = 8765,
+    *,
+    workspace: Path | None = None,
+    token: str | None = None,
 ) -> ThreadingHTTPServer:
-    """A ready-to-serve UI server on 127.0.0.1:``port`` (0 picks a free port)."""
-    app = StudioApp(root, llm_factory)
+    """A ready-to-serve UI server on 127.0.0.1:``port`` (0 picks a free port).
+
+    ``workspace`` opens a trusted folder straight away; otherwise the UI asks for one.
+    ``token`` (``studio ui`` passes a random one) protects the API; see :class:`Handler`.
+    """
+    app = StudioApp(app_root, llm_factory, workspace=workspace, token=token)
     handler = type("StudioHandler", (Handler,), {"app": app})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     server.daemon_threads = True

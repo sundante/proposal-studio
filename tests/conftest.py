@@ -10,6 +10,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def _user_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never touch the real per-user trust registry."""
+    monkeypatch.setenv("STUDIO_USER_DIR", str(tmp_path_factory.mktemp("user")))
+
+
 @pytest.fixture
 def studio_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A throwaway project root with a copy of the default config, set as $STUDIO_HOME."""

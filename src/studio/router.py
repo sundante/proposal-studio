@@ -1,7 +1,7 @@
 """Chat router: parse ``/commands``, auto-route plain text, dispatch to the ``studio`` modules.
 
 The router is code, not an agent. ``Router.handle()`` is the single entry point used by the
-``studio chat`` REPL and (Phase 7) the Open WebUI pipe:
+``studio chat`` REPL and the ``studio ui`` app:
 
 - ``/command args`` → that command (aliases from ``routes.yaml``).
 - Plain text → rules first (attachments, keywords, "?" with an indexed RFP), then the router
@@ -134,13 +134,20 @@ class Decision:
 class RouterContext:
     """What the router needs from its host."""
 
-    root: Path
+    root: Path  # data: projects and library (the trusted workspace folder in the UI)
     llm_factory: Callable[[], LLMClient]
     allow_local_paths: bool = False  # REPL: True. Chat UI: files arrive as attachments.
-    route_overrides: dict[str, Any] = field(default_factory=dict)  # e.g. Open WebUI Valves
+    route_overrides: dict[str, Any] = field(default_factory=dict)
+    app_root: Path | None = None  # config/ and templates/; defaults to ``root``
+    allow_agent_config: bool = True  # chat UI: False (agent commands only change in YAML)
+
+    @property
+    def config_root(self) -> Path:
+        """Where ``config/`` and ``templates/`` live."""
+        return self.app_root or self.root
 
     def config(self) -> StudioConfig:
-        cfg = cfgmod.load_config(self.root)
+        cfg = cfgmod.load_config(self.config_root)
         if self.route_overrides:
             cfg = cfg.model_copy(
                 update={"routes": cfg.routes.model_copy(update=self.route_overrides)}
@@ -411,7 +418,7 @@ def h_render(c: Call) -> Iterator[str]:
         return
     deck = Deck.model_validate_json(deck_path.read_text(encoding="utf-8"))
     template = Path(c.cfg.layout_map.template)
-    template = template if template.is_absolute() else c.ctx.root / template
+    template = template if template.is_absolute() else c.ctx.config_root / template
     c.status("Rendering…")
     report = render(deck, c.cfg.layout_map, template, opp.path / "out", deck.opportunity)
     c.session.last_outputs["render"] = str(report.path) if report.path else ""
@@ -425,7 +432,7 @@ def h_research(c: Call) -> Iterator[str]:
     report = researchmod.run_research(
         c.args, c.ctx.root, c.llm, c.cfg, opp_dir=opp_dir, on_status=c.status
     )
-    out_dir = opp_dir / "research" if opp_dir else c.ctx.root / "workspace" / "research"
+    out_dir = opp_dir / "research" if opp_dir else sessmod.workspace_dir(c.ctx.root) / "research"
     path = researchmod.save_report(report, out_dir)
     c.produced(path)
     yield report.to_markdown() + f"\n\nSaved: `{path}`"
@@ -526,12 +533,17 @@ def h_config(c: Call) -> Iterator[str]:
             "`/config set <key> <value>` (e.g. `worker.model qwen3:4b`) or `/config reset`"
         )
     elif parts[0] == "set" and len(parts) == 3:
-        cfgmod.set_value(parts[1], parts[2], c.ctx.root)
+        path = cfgmod.resolve_key(parts[1], cfgmod.load_effective(c.ctx.config_root))
+        if path[0] == "agents" and not c.ctx.allow_agent_config:
+            raise RouterError(
+                "Agent settings can't be changed from chat. Edit `config/agents.yaml` instead."
+            )
+        cfgmod.set_value(parts[1], parts[2], c.ctx.config_root)
         yield f"Set `{parts[1]}` = `{parts[2]}` (saved to config/overrides.yaml)." + _next(
             "`/config`"
         )
     elif parts[0] == "reset":
-        cfgmod.reset(c.ctx.root)
+        cfgmod.reset(c.ctx.config_root)
         yield "Overrides cleared; using the base config." + _next("`/config`")
     else:
         raise RouterError("Usage: `/config`, `/config set <key> <value>` or `/config reset`.")

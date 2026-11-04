@@ -351,6 +351,11 @@ def _validate(raw: dict[str, Any]) -> StudioConfig:
         raise ConfigError(f"Invalid config: {errors}") from exc
 
 
+def load_effective(root: Path | None = None) -> dict[str, Any]:
+    """Base config merged with overrides, as plain dicts (before validation)."""
+    return _deep_merge(load_base(root), load_overrides(root))
+
+
 def load_config(root: Path | None = None) -> StudioConfig:
     """Load base YAML + overrides and validate. Raises :class:`ConfigError` on problems."""
     return _validate(_deep_merge(load_base(root), load_overrides(root)))
