@@ -16,7 +16,7 @@
 | 11a | Studio UI: local chat app (`studio ui`) | ✅ done | 0f4b457 |
 | 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | fd00b3c |
 | 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
-| 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | (this commit) |
+| 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
 | 13 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
 | 14 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
 | 15 | Model router and suggestions | ⬜ todo | |
