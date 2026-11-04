@@ -157,21 +157,33 @@ Spec: §1, §2, §4.2, §12 (as updated)
   resizable/collapsible right panel (drag, double-click, Ctrl/⌘+J); Models view.
 - Remove Open WebUI everywhere (code, scripts, release job, docs, tutorial, spec).
 
-## Phase 13 — Document workbench
+## Phase 13 — UI rebuild (done)
+- Front end rewritten from scratch as ES modules (no build step, no dependencies):
+  `static/{index.html, css/{tokens,base,components,layout}.css, js/{main,api,state,dom,markdown,
+  actions}.js, js/ui/, js/views/, js/panels/, js/dialogs/}`.
+- Warm paper + ink design system (serif headings, ink-blue accent, light/dark); desktop-app layout
+  with sidebar (rail), home with project chip, Projects grid, project page, chat with side panel,
+  Settings page; in-app dialogs/menus/toasts (no browser confirm/prompt).
+- Finder-style folder picker (places, breadcrumbs, select vs open, new folder) and a New project
+  dialog with explicit "new folder inside / use this folder / add existing project" choices.
+- Server: static sub-folders with explicit MIME types; `/api/fs` returns places; projects have a
+  description.
+
+## Phase 14 — Document workbench
 - Document tab in the side panel: PDF pages rendered by pymupdf with a selectable text layer;
   DOCX/XLSX/PPTX/TXT reading view from `ingest.extract_sections`; find in document.
 - Citations open the source: `rag.answer(on_hits=…)` → SSE `sources` → chip click jumps to the
   page and highlights the passage.
 - Select text → Ask about this / Explain / Add to notes / Research this.
 
-## Phase 14 — Research in the workbench + living notes
+## Phase 15 — Research in the workbench + living notes
 - `projects/<id>/notes.md` edited in a Notes tab, autosaved, snapshotted before appends, and indexed
   so answers can cite it; "Add to notes" on replies, selections and research results.
 - Research tab over RFP / notes / library, with **opt-in** web search (`studio.web`, off by
   default, PHI-checked query only, every request logged in `.studio/web-log.jsonl`; VERIFY the
   provider first). Records a deviation from the offline rule in DECISIONS.md.
 
-## Phase 15 — Model router and suggestions
+## Phase 16 — Model router and suggestions
 - `config/model_catalog.yaml` + `studio.modelrouter`: task per command → best pulled model that
   fits RAM, preferring the loaded one; suggestion chip in the composer; per-chat role overrides
   (never switches automatically).

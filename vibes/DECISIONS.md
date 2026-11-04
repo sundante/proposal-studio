@@ -488,3 +488,22 @@ Format:
   5. The per-user trusted-workspaces list and `studio ui --workspace` are removed (unreleased).
 - Why: two nested concepts confused users and hid where files went.
 - Spec impact: §1, §2, §4.2, §12.3 updated.
+
+## 2026-11-04 — Front end rebuilt; warm paper + ink design  (Phase 13)
+- Decision:
+  1. Rebuild the UI from scratch as **native ES modules** served by the stdlib server (no bundler,
+     no npm, nothing vendored). The server now serves static sub-folders, checking each path
+     segment (no `..`/hidden segments, `resolve_in_sandbox`) and allowing only html/css/js/svg/png/
+     ico with **explicit MIME types** (Windows can map `.js` to `text/plain`, which breaks modules).
+  2. Visual direction chosen by the maintainer: **warm paper + ink** — canvas `#F7F5F0`, ink-blue
+     accent `#2F5D8A`, system serif (Iowan/Charter/Georgia) for titles and greetings, system sans
+     elsewhere; warm charcoal dark mode. Layout and interactions follow familiar desktop chat apps;
+     name, logo and colours are our own.
+  3. **Folder picker** is its own dialog with places, breadcrumbs, select-vs-open and New folder;
+     it returns a choice instead of silently using the folder it opened in (the old bug). The New
+     project dialog then offers "new folder inside", "use this folder itself" (refused for the
+     home, Proposal Studio and library folders) or "add existing project".
+  4. In-app confirm/prompt dialogs replace `window.confirm/prompt`; dialogs close on navigation.
+  5. Projects gain an optional `description` (shown on cards, editable on the project page).
+- Why: the first UI was functional but visually rough, and the folder chooser was confusing.
+- Spec impact: none beyond §12 UI wording.

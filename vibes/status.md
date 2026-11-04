@@ -165,3 +165,21 @@ the project. Its path shows in the sidebar and in full in the Files tab, with **
 list (files kept) and Delete project and its folder. Settings shows the Proposal Studio folder,
 which holds the shared library, and where app settings live. Starting from the home screen asks for
 the project name and folder first. Checked live with headless-Chrome screenshots; 213 tests pass.
+
+## Phase 13 — UI rebuild (2026-11-04)
+The front end was rebuilt from scratch, still with no build step and no dependencies. It is now
+split into small modules, with a warm paper + ink look: serif headings, an ink-blue accent, and
+light and dark modes. It has:
+- a sidebar that collapses to an icon rail;
+- a home screen with a greeting and a project chip on the composer;
+- a searchable Projects grid with cards;
+- a project page with chats, files, folder and progress;
+- a chat view with live status, file cards, a PPTX download card and a resizable panel (Files,
+  RFP summary, Slides);
+- a full Settings page (theme, folders, models);
+- in-app dialogs for every confirm and rename.
+
+The folder chooser is now a Finder-style picker. The New project dialog asks explicitly whether to
+create a new folder inside the chosen one, use it as-is, or add an existing project. Checked live on
+qwen3:8b, including a full Build slides run, with headless-Chrome screenshots in light, dark and
+phone layouts. 215 tests pass.

@@ -20,6 +20,11 @@ All notable changes to this project are documented here. The format follows
 - Router: commands pasted in code blocks work; files sent with a question are ingested first.
 
 ### Changed
+- **New look and layout:** the app was rebuilt with a calmer warm-paper design, serif headings and
+  dark mode. It has a Projects page with cards, a project page, a Settings page, and in-app
+  dialogs instead of browser pop-ups.
+- **Choosing folders:** a proper folder picker with places and breadcrumbs. New project asks
+  whether to make a new folder inside the chosen one or use it directly.
 - `scripts/start.*` now open the app; setup no longer installs Open WebUI; Python 3.13 allowed.
 
 ### Removed
