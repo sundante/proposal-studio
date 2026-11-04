@@ -5,7 +5,8 @@ import { $, copyText, fileTag, h, icon, store } from '../dom.js';
 import { md } from '../markdown.js';
 import { filesCard, folderCard, latestRender, outUrl, progressCard } from '../panels/files.js';
 import { slidesView, summaryView } from '../panels/insights.js';
-import { emit, go, state } from '../state.js';
+import { openDocument, renderViewer } from '../panels/viewer.js';
+import { emit, go, on, state } from '../state.js';
 import { Composer } from '../ui/composer.js';
 import { toast } from '../ui/overlay.js';
 import { modeOf, prefChips, rememberDefaults } from '../ui/prefs.js';
@@ -37,6 +38,8 @@ export async function renderChat(view, topbar, id) {
   }
   state.chat = chat;
   state.project = project;
+  state.projectPage = false;
+  if (state.viewer && state.viewer.project !== project.id) state.viewer = null;
   document.title = `${chat.title} · ${project.title}`;
   emit('lists');
 
@@ -70,6 +73,7 @@ export async function renderChat(view, topbar, id) {
   renderPanel();
   composer.focus();
 
+  if (state.pendingFill) { composer.fill(state.pendingFill); state.pendingFill = null; }
   if (state.pendingSend) {
     const msg = state.pendingSend;
     state.pendingSend = null;
@@ -92,18 +96,39 @@ function renderThread() {
   }
   thread.replaceChildren(...msgs.map((m, i) => (m.role === 'user'
     ? userMsg(m.content, m.files)
-    : assistantMsg(m.content, m.outputs, i === msgs.length - 1 ? state.chat.pending : null))));
+    : assistantMsg(m.content, m.outputs, i === msgs.length - 1 ? state.chat.pending : null, m.sources))));
   scrollDown(true);
 }
 
 function userMsg(text, files = []) {
   return h('div', { class: 'msg user' },
-    files.length ? h('div', { class: 'files' }, files.map((n) => h('div', { class: 'attach-card' }, fileTag(n), h('span', { class: 'nm ellipsis', text: n })))) : null,
+    files.length ? h('div', { class: 'files' }, files.map((n) => h('button', {
+      class: 'attach-card openable', type: 'button', title: `Open ${n}`,
+      onclick: () => openDocument(n),
+    }, fileTag(n), h('span', { class: 'nm ellipsis', text: n })))) : null,
     text ? h('div', { class: 'bubble', text }) : null);
 }
 
-function assistantMsg(text, outputs = [], pending = null) {
+/** Make citation chips open the cited passage in the viewer. */
+function wireCites(el, sources) {
+  if (!sources?.length) return;
+  for (const chip of el.querySelectorAll('.cite')) {
+    const label = chip.textContent.trim();
+    const src = sources.find((s) => s.label === label) || sources.find((s) => String(s.n) === label);
+    if (!src) continue;
+    chip.classList.add('link');
+    chip.setAttribute('role', 'button');
+    chip.tabIndex = 0;
+    chip.title = `Open ${src.file}${src.page ? `, page ${src.page}` : ''}`;
+    const open = () => openDocument(src.file, { page: src.page, text: src.text, section: src.section });
+    chip.addEventListener('click', open);
+    chip.addEventListener('keydown', (e) => { if (e.key === 'Enter') open(); });
+  }
+}
+
+function assistantMsg(text, outputs = [], pending = null, sources = []) {
   const el = h('div', { class: 'msg assistant' }, h('div', { class: 'prose', html: md(text) }));
+  wireCites(el, sources);
   if (outputs?.length) el.append(outputCards(outputs));
   if (pending) el.append(confirmRow(pending));
   el.append(tools(() => text));
@@ -163,6 +188,7 @@ export async function send({ text = '', files = [], display, steps }) {
   let reply = '';
   let outputs = [];
   let pending = null;
+  let sources = [];
   let frame = 0;
   const paint = () => {
     frame = 0;
@@ -180,6 +206,7 @@ export async function send({ text = '', files = [], display, steps }) {
       chunk: (t) => { reply += t; if (!frame) frame = requestAnimationFrame(paint); },
       status: setStatus,
       pending: (cmd) => { pending = cmd; },
+      sources: (d) => { sources = d.sources || []; },
       done: (d) => { outputs = d.outputs || []; },
       error: (t) => msgEl.append(h('div', { class: 'err-line', text: t })),
     }, controller.signal);
@@ -189,6 +216,7 @@ export async function send({ text = '', files = [], display, steps }) {
   } finally {
     if (frame) cancelAnimationFrame(frame);
     paint();
+    wireCites(msgEl, sources);
     status.remove();
     if (outputs.length) msgEl.append(outputCards(outputs));
     if (pending) msgEl.append(confirmRow(pending));
@@ -267,13 +295,16 @@ let panelToken = 0;
 export function renderPanel() {
   const panel = $('#panel');
   const wide = isWide();
-  const open = Boolean(state.chat) && state.panelOpen && (wide || mobilePanel);
+  const onChat = Boolean(state.chat);
+  const onProject = !onChat && state.projectPage && Boolean(state.viewer);
+  const open = ((onChat && state.panelOpen) || onProject) && (wide || mobilePanel);
   panel.hidden = !open;
   $('#resizer').hidden = !open || !wide;
   $('#panel-toggle')?.classList.toggle('active', open);
   if (!open) return;
   const p = state.project;
-  const tabs = [['files', 'Files'], ['summary', 'RFP summary'], ['slides', 'Slides']];
+  const tabs = onChat ? [['files', 'Files'], ['document', 'Document'], ['summary', 'RFP summary'], ['slides', 'Slides']] : [['document', 'Document']];
+  if (!onChat) state.panelTab = 'document';
   const body = h('div', { class: 'panel-body' });
   panel.replaceChildren(
     h('div', { class: 'panel-head' },
@@ -282,12 +313,21 @@ export function renderPanel() {
         onclick: () => showTab(k),
       }, label))),
       h('span', { class: 'grow' }),
-      h('button', { class: 'icon-btn', type: 'button', title: 'Close panel', 'aria-label': 'Close panel', onclick: () => { mobilePanel = false; if (wide) { state.panelOpen = false; store.set('ps.panelOpen', '0'); } renderPanel(); } }, icon('x'))),
+      h('button', { class: 'icon-btn', type: 'button', title: 'Close panel', 'aria-label': 'Close panel', onclick: () => {
+        mobilePanel = false;
+        if (!onChat) state.viewer = null;
+        else if (wide) { state.panelOpen = false; store.set('ps.panelOpen', '0'); }
+        renderPanel();
+      } }, icon('x'))),
     body);
   const busy = Boolean(state.streaming);
+  if (state.panelTab === 'document') {
+    renderViewer(body, { onAsk: onChat ? (t) => composer?.fill(t) : (t) => askInChat(t) });
+    return;
+  }
   if (state.panelTab === 'files') {
     body.append(
-      filesCard(p, { onAdd: (files) => send({ text: '', files }), onChanged: (proj) => { state.project = proj; renderPanel(); renderActions(); } }),
+      filesCard(p, { onAdd: (files) => send({ text: '', files }), onChanged: (proj) => { state.project = proj; renderPanel(); renderActions(); }, onOpen: (n) => openDocument(n) }),
       folderCard(p), progressCard(p));
     return;
   }
@@ -299,6 +339,17 @@ export function renderPanel() {
   fn.then((node) => { if (token === panelToken) body.replaceChildren(node); })
     .catch((e) => { if (token === panelToken) body.replaceChildren(h('div', { class: 'empty', text: e.message })); });
 }
+
+/** From the project page: open the newest chat with `text` in its composer. */
+async function askInChat(text) {
+  try {
+    const chat = state.project.chats[0] || await api('POST', `/api/projects/${enc(state.project.id)}/chats`);
+    state.pendingFill = text;
+    go(`#/chat/${chat.id}`);
+  } catch (e) { toast(e.message); }
+}
+
+on('show-document', () => showTab('document'));
 
 export function setupResizer() {
   const resizer = $('#resizer');

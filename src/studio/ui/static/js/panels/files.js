@@ -14,7 +14,7 @@ export function latestRender(project) {
 export const outUrl = (projectId, name) => `/api/projects/${enc(projectId)}/out/${enc(name)}`;
 
 /** Files with delete, plus an add zone. onAdd(files) uploads + ingests; onChanged(project) after a delete. */
-export function filesCard(project, { onAdd, onChanged }) {
+export function filesCard(project, { onAdd, onChanged, onOpen = null }) {
   const picker = h('input', { type: 'file', multiple: true, hidden: true, accept: ACCEPT });
   picker.addEventListener('change', () => { const f = [...picker.files]; picker.value = ''; if (f.length) onAdd(f); });
   const zone = h('div', {
@@ -29,8 +29,11 @@ export function filesCard(project, { onAdd, onChanged }) {
     if (f.length) onAdd(f);
   });
 
-  const rows = project.files.map((f) => h('div', { class: 'file-row' }, fileTag(f.name),
-    h('span', { class: 'nm', text: f.name, title: f.name }),
+  const rows = project.files.map((f) => h('div', {
+    class: `file-row${onOpen ? ' openable' : ''}`, title: onOpen ? `Open ${f.name}` : f.name,
+    onclick: (e) => { if (onOpen && !e.target.closest('button')) onOpen(f.name); },
+  }, fileTag(f.name),
+    h('span', { class: 'nm', text: f.name }),
     h('span', { class: 'sub', text: f.chunks ? `${f.chunks} passages` : 'not indexed' }),
     h('button', {
       class: 'icon-btn sm', type: 'button', title: `Remove ${f.name}`, 'aria-label': `Remove ${f.name}`,

@@ -21,13 +21,14 @@ async function route() {
   const hash = location.hash || '#/';
   if (state.chat) await leaveChat(hash);
   let m;
-  const offChat = () => { state.chat = null; hidePanel(); };
+  const offChat = () => { state.chat = null; state.projectPage = false; hidePanel(); };
   try {
     if ((m = hash.match(/^#\/chat\/([0-9a-f]{12})$/))) {
       await renderChat(view(), topbar(), m[1]);
     } else if ((m = hash.match(/^#\/project\/([a-z0-9-]+)$/))) {
       offChat();
       await renderProject(view(), topbar(), m[1]);
+      renderPanel();
     } else if (hash === '#/projects') {
       offChat(); state.project = null;
       renderProjects(view(), topbar());

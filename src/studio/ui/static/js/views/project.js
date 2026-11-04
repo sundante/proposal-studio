@@ -3,6 +3,7 @@ import { chatMenu, newChat, projectMenu } from '../actions.js';
 import { api, enc, loadLists } from '../api.js';
 import { h, icon, timeAgo } from '../dom.js';
 import { filesCard, folderCard, progressCard } from '../panels/files.js';
+import { openDocument } from '../panels/viewer.js';
 import { go, state } from '../state.js';
 import { promptDialog, toast } from '../ui/overlay.js';
 
@@ -15,8 +16,10 @@ export async function renderProject(view, topbar, id) {
     go('#/projects');
     return;
   }
+  if (state.viewer && state.viewer.project !== project.id) state.viewer = null;
   state.project = project;
   state.chat = null;
+  state.projectPage = true;
   document.title = `${project.title} · Proposal Studio`;
 
   const more = h('button', { class: 'icon-btn', type: 'button', 'aria-haspopup': 'menu', title: 'Project options', 'aria-label': 'Project options' }, icon('more'));
@@ -61,7 +64,7 @@ export async function renderProject(view, topbar, id) {
           }))
           : h('div', { class: 'empty' }, h('h3', { text: 'No chats yet' }), 'Start a chat to ask about the RFP, analyse it or build slides.')),
       h('aside', {},
-        filesCard(project, { onAdd: addFiles, onChanged: () => renderProject(view, topbar, id) }),
+        filesCard(project, { onAdd: addFiles, onChanged: () => renderProject(view, topbar, id), onOpen: (n) => openDocument(n) }),
         folderCard(project),
         progressCard(project)))));
 }
