@@ -157,7 +157,7 @@ def test_paths_refused_without_local_access(home: Path, rfp_files) -> None:
     router = Router(RouterContext(home, lambda: llm, allow_local_paths=False))
     router.reply("/new acme")
     out = router.reply(f"/ingest {rfp_files['pdf']}")
-    assert "Attach the files to your message" in out
+    assert "attach the files and send `/ingest`" in out
 
 
 def test_config_agent_help_status(home: Path) -> None:
@@ -214,3 +214,38 @@ def test_auto_digest_shows_saved_digest(home: Path, rfp_files) -> None:
     out = router.reply("list what they need from us")  # classifier → digest
     assert "Showing the saved digest" in out
     assert len([c for c in llm.calls if c["schema"] == "DigestPart"]) == built  # no rebuild
+
+
+def test_fenced_and_backticked_commands_parse(home: Path) -> None:
+    routes = cfgmod.load_config(home).routes
+    assert parse("```\n/new acme-2026 Acme Health Plan RFP\n```", routes) == Command(
+        "new", "acme-2026 Acme Health Plan RFP"
+    )
+    assert parse("```text\n/status\n```", routes) == Command("status", "")
+    assert parse("`/use acme`", routes) == Command("use", "acme")
+    assert parse("use `code` here", routes) is None
+
+
+def test_files_with_text_ingest_then_route(home: Path, rfp_files) -> None:
+    router, _ = make(home)
+    router = Router(RouterContext(home, router.ctx.llm_factory, allow_local_paths=False))
+    sess = router.session("ui-1")
+    router.reply("/new acme", session=sess)
+    out = router.reply("When are proposals due?", [rfp_files["pdf"]], session=sess)
+    assert out.startswith("→ routed to /ingest (rules)") and "new: acme_rfp.pdf" in out
+    assert "→ routed to /ask (rules)" in out and "March 15, 2027" in out
+
+
+def test_ingest_with_words_and_file_ingests_then_routes(home: Path, rfp_files) -> None:
+    router, _ = make(home)
+    router = Router(RouterContext(home, router.ctx.llm_factory, allow_local_paths=False))
+    sess = router.session("ui-2")
+    router.reply("/new acme", session=sess)
+    out = router.reply("/ingest when are proposals due?", [rfp_files["pdf"]], session=sess)
+    assert "new: acme_rfp.pdf" in out and "→ routed to /ask (rules)" in out
+
+
+def test_use_with_a_question_explains(home: Path) -> None:
+    router, _ = make(home)
+    out = router.reply("/use when is the proposal due??")
+    assert "`/use` expects an opportunity id" in out

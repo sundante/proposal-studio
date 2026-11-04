@@ -12,19 +12,27 @@
 | 7 | Open WebUI integration + setup scripts | ✅ done | 2b4e1b9 |
 | 8 | Agents route | ✅ done | 0761ec7 |
 | 9 | Hardening + docs | ✅ done | 6dd79d4 |
-| 10 | Release pipeline + v0.1.0 | 🟡 ready to tag (after dev → main) | 415d709 |
+| 10 | Release pipeline + v0.1.0 | ⏸ superseded — v0.1.0 (Open WebUI) not shipped | 415d709 |
+| 11a | Studio UI: local chat app (`studio ui`) | ✅ done | (this commit) |
+| 11b | Remove Open WebUI, rewrite docs for the Studio UI | ⬜ todo | |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
-- Phase in progress: none
-- Next step: promote `dev` → `main`, then `/ship 0.1.0` (creates the tag; CI publishes the release)
+- Phase in progress: 11b (remove Open WebUI; docs for the Studio UI)
+- Next step: delete `owui/` + `src/studio/owui.py` + `owui-*` CLI commands and the open-webui
+  install in `scripts/`; make `start.*` run `studio ui`; rewrite README/install/tutorial/spec.
+- Open WebUI build archived on branch `archive/open-webui` (a11c3e6).
 
 ## Docs
 - User docs: `README.md`, `tutorial.html` (step-by-step, offline single file), `docs/*.md`.
 - Project docs: `vibes/` (spec, build plan, decisions, progress, status).
 
 ## Known issues
+- Studio UI: Stop closes the stream but the model finishes the current step in the background
+  (the reply is saved to the chat); a second message in the same project waits for it.
+- Studio UI front-end JS has no automated tests (server/API are covered by `tests/test_ui.py`);
+  checked by hand with headless Chrome screenshots.
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
   troubleshooting.md and the tutorial recommend one format per document).
 - Performance measured with `studio bench` (docs/performance.md); the Intel CPU-only target

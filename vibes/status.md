@@ -130,3 +130,15 @@ Then pick **Proposal Studio** in Open WebUI. Typical flow:
 - **Hermes Agent:** enable it once a live offline run is verified.
 - **Before publishing:** confirm your employment terms allow a personal open-source project in
   this area, and that your firm allows these tools on work machines.
+
+## Phase 11a — Studio UI (2026-11-04)
+Open WebUI was too hard to use for this job, so it is being replaced by our own local chat app,
+`studio ui`. It needs no new dependencies (Python's built-in web server and a single HTML/JS
+page). You drop an RFP on the home screen and a project is created and indexed. You then ask
+questions in plain language and get cited answers. **Analyse RFP** and **Build slides** run the
+pipeline, and **Download PPTX** saves the deck. A side panel shows the files, the RFP summary
+and slide previews. It works in light and dark mode and at phone width. The router now also
+accepts commands pasted in code blocks and ingests files sent together with a question. A real
+run on qwen3:8b answered "when is it due" in ~10 s and built an 11-slide PPTX in ~75 s. The
+Open WebUI build is archived on the `archive/open-webui` branch. Phase 11b removes it from the
+repo and rewrites the docs.

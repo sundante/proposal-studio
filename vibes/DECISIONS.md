@@ -401,3 +401,33 @@ Format:
      on `main` by `/ship 0.1.0` after the maintainer promotes `dev` (the only `main` action).
 - Verified locally: bundle 223 KB with no private paths; `python -m build` → sdist + wheel;
   unzip → `setup.sh` (models skipped) → `studio 0.1.0`, open-webui imports, 198 tests pass.
+
+## 2026-11-04 — Replace Open WebUI with our own Studio UI  (Phase 11)
+- Decision:
+  1. The chat front end is a new `studio ui` app: `src/studio/ui/` (stdlib `ThreadingHTTPServer`
+     on 127.0.0.1, Server-Sent Events, one vanilla HTML/CSS/JS page, nothing vendored, no CDN).
+     Its layout follows the familiar chat-app pattern (projects and chats in a sidebar, a
+     composer with drag-and-drop, a toggleable side panel) with our own name, logo and colours.
+  2. Users never type opp-ids: a project is an opportunity whose id is a slug of its display
+     name (`session.create_project`, dedupes with `-2`…). Chats live in
+     `workspace/<project>/chats/<id>.json`; the router session key is `ui-<chat id>`. Dropping
+     an RFP on the home screen creates the project, uploads and ingests it.
+  3. Buttons replace the command chain: **Analyse RFP** = `/digest`; **Build slides** =
+     `[/digest] → /deck → /render` (explicit, so no confirmation; stops at the first ⚠);
+     **Download PPTX**. Slash commands still work. The UI hides the router's `→ routed to` and
+     `Next:` lines (they stay in the CLI).
+  4. Router: a command pasted in a code fence or backticks still parses; files sent with text
+     are ingested first and the text is then routed (also `/ingest <words>` + files in the UI);
+     `/use <question>` explains itself.
+  5. Security: the server binds 127.0.0.1 only, rejects other `Host` headers (DNS rebinding)
+     and cross-site `Origin`s on writes, sanitises every file name (`safe_name`), and closes the
+     connection after an error (an unread body must not leak into the next request).
+  6. The Open WebUI build is frozen on branch `archive/open-webui` (a11c3e6), an explicit,
+     maintainer-approved exception to the dev/main-only rule. `archive/*` branches are read-only.
+     v0.1.0 (Open WebUI based) is not shipped; the release will target the Studio UI.
+- Why: Open WebUI was hard to use for this job (opp-ids, command order, the `/` prompt menu,
+  pasted commands not recognised, "No active opportunity" errors) and heavy to install on
+  Windows without admin. The router was already UI-agnostic (`Router.handle`), so the new UI
+  is a thin layer. Stdlib server = no new dependencies.
+- Spec impact: §1, §2, §5.1 (Open WebUI `/` conflict), §5.3 (session key), §12 change in Phase
+  11b, when `owui/` and the Open WebUI setup are removed.

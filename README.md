@@ -16,6 +16,21 @@ It all runs on a 16 GB laptop with no admin rights, no Docker and no internet at
 
 > _Screenshots: coming with the first release._
 
+## Quick start: the Studio app (new)
+
+```
+pip install -e .        # once, in the project folder
+studio ui               # opens http://127.0.0.1:8765 in your browser
+```
+
+Drop an RFP onto the page and start asking questions. A project is created for you, and its
+files are read and indexed. **Analyse RFP** builds the summary and **Build slides** writes and
+renders the deck. **Download PPTX** saves the result. Everything stays on this computer.
+Ollama must be running for answers.
+
+> The Open WebUI setup below is being retired (Phase 11b). It is archived on the
+> `archive/open-webui` branch.
+
 ## Install
 
 1. Download the latest release zip (`proposal-studio-<version>-windows.zip`) from
@@ -31,7 +46,7 @@ It all runs on a 16 GB laptop with no admin rights, no Docker and no internet at
 The full guide is in [docs/install.md](docs/install.md). Check the install with
 `scripts/smoke_test.*`.
 
-> **New here?** The [step-by-step tutorial](tutorial.html) walks through install, your first
+> **New here?** The [step-by-step tutorial](vibes/tutorial.html) walks through install, your first
 > proposal, building a block library, mapping your own template, research and agents, with
 > worked examples. Download it and open it in a browser; it's a single offline file. To read it
 > online, enable GitHub Pages for the repo (Settings → Pages → branch `main`, folder `/`), then open
@@ -94,7 +109,7 @@ Details are in [docs/privacy.md](docs/privacy.md).
 
 ## Docs
 
-[Tutorial](tutorial.html) · [Install](docs/install.md) · [Commands](docs/commands.md) · [Configuration](docs/config.md) ·
+[Tutorial](vibes/tutorial.html) · [Install](docs/install.md) · [Commands](docs/commands.md) · [Configuration](docs/config.md) ·
 [Templates](docs/templates.md) · [Agents](docs/agents.md) ·
 [Performance](docs/performance.md) · [Troubleshooting](docs/troubleshooting.md) ·
 [Privacy](docs/privacy.md)

@@ -37,7 +37,7 @@ def test_bench_with_fake_models(tmp_path: Path) -> None:
 def test_tutorial_is_complete_offline_and_linked() -> None:
     import re
 
-    html = (REPO_ROOT / "tutorial.html").read_text(encoding="utf-8")
+    html = (REPO_ROOT / "vibes" / "tutorial.html").read_text(encoding="utf-8")
     routes = cfgmod.load_config(REPO_ROOT).routes
     for name in routes.commands:
         assert f"<code>/{name}</code>" in html, f"tutorial is missing /{name}"

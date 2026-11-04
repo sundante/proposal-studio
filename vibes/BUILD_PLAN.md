@@ -132,3 +132,15 @@ Spec: §16.3, §16.4
   create a GitHub Release with notes from CHANGELOG.
 - Verify the zip installs cleanly in a fresh folder with `setup.ps1` (simulate on the CI Windows runner).
 - Then run `/ship 0.1.0`.
+
+## Phase 11 — Studio UI (replaces Open WebUI)
+Spec: §1, §2, §5, §12 (deviation recorded in DECISIONS.md, 2026-11-04)
+- **11a (done):** `studio ui` — stdlib local server + single-page chat app (`src/studio/ui/`):
+  projects/chats sidebar, drag-and-drop upload → ingest, streamed answers with citations,
+  Analyse RFP / Build slides / Download PPTX, side panel (Files, RFP summary, Slides).
+  Router: fenced commands parse, files + text = ingest then route, clearer `/use` and `/ingest`
+  errors. Tests: `tests/test_ui.py` (real HTTP, FakeLLM).
+- **11b:** remove `owui/`, `src/studio/owui.py`, the `owui-*` CLI commands and the open-webui
+  install from `setup.*`/`start.*`/`offline.env`/`build_release.py`/release workflow;
+  `start.*` launch `studio ui`. Rewrite README, `docs/install.md`, the tutorial and spec §1/2/5/12
+  for the Studio UI; drop `open-webui` from the dependency notes.

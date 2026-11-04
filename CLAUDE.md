@@ -34,6 +34,8 @@ analysis, deck writing and PPTX rendering.
 - Only two branches: `dev` and `main`. Work and commit on `dev`; push with `git push origin dev`.
 - Never commit to, merge into or push `main` — the maintainer promotes `dev` → `main` manually.
 - No feature/phase branches and no PRs. Conventional Commits, small commits as you go.
+- Exception: `archive/*` branches are read-only snapshots (e.g. `archive/open-webui`); never
+  commit to them.
 - Before pushing: lint + tests green, `vibes/PROGRESS.md` updated.
 
 ## Style of work

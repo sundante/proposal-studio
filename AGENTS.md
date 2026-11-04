@@ -15,5 +15,5 @@ This is the same guidance as `CLAUDE.md`, for agents other than Claude Code.
 - Commands: `pip install -e .[dev]` · `ruff check . --fix && ruff format .` · `pytest -q` ·
   `studio doctor`.
 - Git: commit on `dev` and push `origin dev`. Never touch `main` (promoted manually). No
-  branches or PRs. Conventional Commits.
+  branches or PRs. Conventional Commits. `archive/*` branches are read-only snapshots.
 - Python 3.11+, type hints, pydantic v2, small modules, docstrings on public functions.

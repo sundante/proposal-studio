@@ -72,6 +72,29 @@ def create_opportunity(root: Path, opp_id: str, title: str = "") -> Opportunity:
     return opp
 
 
+def slugify(name: str) -> str:
+    """A valid opportunity id from free text: ``"Acme RFP (2026)"`` → ``acme-rfp-2026``."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:50].strip("-")
+    return slug or "project"
+
+
+def create_project(root: Path, name: str) -> Opportunity:
+    """Create an opportunity from a display name; its id is a unique slug (``-2``, ``-3``…)."""
+    base = slugify(name)
+    slug, n = base, 2
+    while (workspace_dir(root) / slug / OPP_FILE).exists():
+        slug, n = f"{base}-{n}", n + 1
+    return create_opportunity(root, slug, name.strip() or slug)
+
+
+def rename_opportunity(root: Path, opp_id: str, title: str) -> Opportunity:
+    """Change an opportunity's display title."""
+    opp = get_opportunity(root, opp_id)
+    opp.title = title.strip() or opp.id
+    (opp.path / OPP_FILE).write_text(opp.model_dump_json(indent=2), encoding="utf-8")
+    return opp
+
+
 def get_opportunity(root: Path, opp_id: str) -> Opportunity:
     """Load an existing opportunity."""
     path = workspace_dir(root) / validate_opp_id(opp_id)

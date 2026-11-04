@@ -514,6 +514,35 @@ def chat_cmd() -> None:
         attachments = []
 
 
+@app.command("ui")
+def ui_cmd(
+    port: int = typer.Option(8765, "--port", help="Port on 127.0.0.1."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Don't open a browser tab."),
+) -> None:
+    """Start the Proposal Studio chat app in your browser (local only)."""
+    import webbrowser
+
+    from studio.ui.server import make_server
+
+    root = cfgmod.project_root()
+    if not (root / "config").is_dir():
+        _fail(f"No config/ folder in {root}. Run from the project folder or set STUDIO_HOME.")
+    try:
+        server = make_server(root, lambda: OllamaClient(cfgmod.load_config(root).models), port)
+    except OSError as exc:
+        _fail(f"Can't listen on port {port} ({exc}). Try `studio ui --port {port + 1}`.")
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    typer.echo(f"Proposal Studio is running at {url}  (Ctrl+C to stop)")
+    if not no_browser:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        typer.echo("\nStopped.")
+    finally:
+        server.server_close()
+
+
 def _emit_status(event: dict) -> None:
     data = event.get("data", {})
     if not data.get("done"):

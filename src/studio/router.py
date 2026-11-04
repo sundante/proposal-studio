@@ -21,7 +21,7 @@ import difflib
 import inspect
 import re
 import shlex
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Generator, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -81,12 +81,28 @@ class Command:
     args: str = ""
 
 
+FENCE = re.compile(r"^\s*(`{3,}|~{3,})[\w-]*[ \t]*\n?(.*?)\n?[ \t]*\1\s*$", re.S)
+
+
+def unfence(text: str) -> str:
+    """``text`` without a surrounding code fence or inline backticks (pasted commands)."""
+    match = FENCE.match(text)
+    if match:
+        return match.group(2).strip()
+    stripped = text.strip()
+    inner = stripped[1:-1]
+    if len(stripped) > 1 and stripped[0] == stripped[-1] == "`" and "`" not in inner:
+        return inner.strip()
+    return text
+
+
 def parse(text: str, routes: RoutesConfig) -> Command | None:
     """``/name args`` → :class:`Command` (aliases resolved), or None for plain text.
 
+    A command pasted inside a code fence or backticks (```/new x``` or `/new x`) still counts.
     Raises :class:`RouterError` for an unknown command, suggesting the closest one.
     """
-    match = re.match(r"^\s*/([A-Za-z][\w-]*)\s*(.*)$", text, re.S)
+    match = re.match(r"^\s*/([A-Za-z][\w-]*)\s*(.*)$", unfence(text), re.S)
     if not match:
         return None
     name = match.group(1).lower()
@@ -210,6 +226,11 @@ def h_use(c: Call) -> Iterator[str]:
         ]
         yield "\n".join(lines) + _next("`/use <opp-id>`")
         return
+    if len(c.args.split()) > 1:
+        raise RouterError(
+            "`/use` expects an opportunity id, e.g. `/use acme-2026` (send `/use` alone to list "
+            "them). To ask a question, just type it."
+        )
     opp = sessmod.get_opportunity(c.ctx.root, c.args.split()[0])
     c.session.active_opp = opp.id
     yield f"Active opportunity: **{opp.id}**" + _next("`/status`")
@@ -230,7 +251,10 @@ def _ingest_paths(c: Call) -> list[Path]:
     paths = list(c.attachments)
     if c.args:
         if not c.ctx.allow_local_paths:
-            raise RouterError("Attach the files to your message instead of typing paths.")
+            raise RouterError(
+                "`/ingest` doesn't take instructions: attach the files and send `/ingest` on its "
+                "own, then ask your question."
+            )
         paths += [Path(p).expanduser() for p in shlex.split(c.args)]
     return paths
 
@@ -640,7 +664,11 @@ class Router:
     def process(
         self, text: str, attachments: Sequence[Path], sess: sessmod.Session, status: StatusFn
     ) -> Iterator[str]:
-        """Route and run one message, yielding reply chunks."""
+        """Route and run one message, yielding reply chunks.
+
+        Files sent together with text are ingested first; the text is then routed as usual
+        (so "here's the RFP — when is it due?" ingests, then answers).
+        """
         try:
             cfg = self.ctx.config()
         except cfgmod.ConfigError as exc:
@@ -653,15 +681,53 @@ class Router:
                 llm_holder.append(self.ctx.llm_factory())
             return llm_holder[0]
 
+        files = list(attachments)
+        follow = self._follow_up_text(text, files, cfg.routes)
+        if follow is not None:
+            ok = yield from self._run(
+                Decision(Command("ingest"), "rules"), files, sess, cfg, llm_holder, llm, status
+            )
+            if not ok or "pending" in sess.last_outputs:
+                return
+            yield "\n\n---\n\n"
+            text, files = follow, []
+
         try:
-            decision = self.decide(text, attachments, sess, cfg, llm)
+            decision = self.decide(text, files, sess, cfg, llm)
         except RouterError as exc:
             yield f"⚠ {exc}"
             return
+        yield from self._run(decision, files, sess, cfg, llm_holder, llm, status)
+
+    def _follow_up_text(self, text: str, files: Sequence[Path], routes: RoutesConfig) -> str | None:
+        """With attachments: the text to route after ingesting them (None: no two-step)."""
+        if not files:
+            return None
+        try:
+            parsed = parse(text, routes)
+        except RouterError:
+            return None
+        if parsed is None:
+            return text.strip() or None
+        if parsed.name == "ingest" and parsed.args and not self.ctx.allow_local_paths:
+            return parsed.args  # "/ingest understand the RFP" + file: ingest, then route the words
+        return None
+
+    def _run(
+        self,
+        decision: Decision,
+        attachments: Sequence[Path],
+        sess: sessmod.Session,
+        cfg: StudioConfig,
+        llm_holder: list[LLMClient],
+        llm: Callable[[], LLMClient],
+        status: StatusFn,
+    ) -> Generator[str, None, bool]:
+        """Run a routing decision; return False if it ended in an error or clarification."""
         yield decision.route_line() + "\n\n"
         if decision.command is None:
             yield decision.clarification
-            return
+            return False
 
         command, confirmed = decision.command, False
         files = list(attachments)
@@ -669,10 +735,10 @@ class Router:
             pending = sess.last_outputs.pop("pending", None)
             if not pending:
                 yield "Nothing is waiting for confirmation." + _next("`/status`")
-                return
+                return False
             if command.name == "reject":
                 yield f"Cancelled `/{pending['command']}`." + _next("`/status`")
-                return
+                return True
             command = Command(pending["command"], pending.get("args", ""))
             files = [Path(p) for p in pending.get("attachments", [])]
             confirmed = True
@@ -686,12 +752,12 @@ class Router:
             yield f"`/{command.name}` writes files, so I won't run it automatically." + _next(
                 f"`/approve` to run `/{command.name}`, or `/reject`"
             )
-            return
+            return True
 
         handler = HANDLERS.get(command.name)
         if handler is None:
             yield f"`/{command.name}` isn't available yet." + _next("`/help`")
-            return
+            return False
         call = Call(self.ctx, cfg, sess, command.args, files, status, confirmed)
         call.auto = decision.how in ("rules", "classifier")
         call._llm = llm_holder[0] if llm_holder else None
@@ -699,6 +765,11 @@ class Router:
             yield from handler(call)
         except (RouterError, *USER_ERRORS) as exc:
             yield f"⚠ {exc}"
+            return False
+        finally:
+            if call._llm is not None and not llm_holder:
+                llm_holder.append(call._llm)
+        return True
 
     # -- async entry point --
 
