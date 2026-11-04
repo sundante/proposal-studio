@@ -241,11 +241,6 @@ a.file-chip:hover { border-color: var(--accent); }
 }
 
 /* ---- phase 12: workspace switcher, collapsible sidebar, resizable panel, dialogs ---- */
-.ws-switch { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; border-radius: 9px; padding: 6px 8px; font-size: 13.5px; color: var(--muted); text-align: left; }
-.ws-switch:hover { background: var(--hover); color: var(--text); }
-.ws-switch .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
-.ws-switch svg { width: 16px; height: 16px; }
-.ws-switch .chev { color: var(--faint); }
 button.health { border: 0; background: none; padding: 4px 6px; margin-left: -6px; border-radius: 8px; }
 button.health:hover { background: var(--hover); color: var(--text); }
 .only-desktop { display: inline-flex; }
@@ -253,10 +248,10 @@ button.health:hover { background: var(--hover); color: var(--text); }
 #app.side-collapsed #sidebar { width: 60px; padding: 12px 8px; align-items: center; }
 #app.side-collapsed .side-top { flex-direction: column; gap: 8px; padding: 2px 0; }
 #app.side-collapsed .brand span,
-#app.side-collapsed .ws-switch .t, #app.side-collapsed .ws-switch .chev,
+#app.side-collapsed .side-item .where,
 #app.side-collapsed .new-chat span, #app.side-collapsed .side-scroll,
 #app.side-collapsed .health span { display: none; }
-#app.side-collapsed .ws-switch, #app.side-collapsed .new-chat { width: 40px; height: 40px; justify-content: center; padding: 0; }
+#app.side-collapsed .new-chat { width: 40px; height: 40px; justify-content: center; padding: 0; }
 #app.side-collapsed .side-foot { flex-direction: column; gap: 6px; margin-top: auto; border-top: 0; padding: 0; }
 #app.side-collapsed #collapse-sidebar svg { transform: scaleX(-1); }
 
@@ -273,13 +268,6 @@ body.resizing { cursor: col-resize; user-select: none; }
 .modal-body { overflow-y: auto; padding: 6px 20px 20px; }
 .modal.locked #modal-close { display: none; }
 .lead { color: var(--muted); margin: 0 0 14px; font-size: 14px; }
-.ws-recent { display: grid; gap: 6px; margin-bottom: 16px; }
-.ws-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 9px 12px; text-align: left; width: 100%; }
-.ws-item:hover { border-color: var(--accent); }
-.ws-item .nm { font-weight: 600; }
-.ws-item .p { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ws-item > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.ws-item .forget { opacity: .6; }
 .browser { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .browser-bar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); background: var(--bg); }
 .browser-bar input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 5px 9px; background: var(--surface); font-family: var(--mono); font-size: 13px; }
@@ -315,3 +303,36 @@ body.resizing { cursor: col-resize; user-select: none; }
   .panel { width: 100%; }
   #app.side-collapsed #sidebar { width: 268px; padding: 12px 10px; align-items: stretch; }
 }
+
+/* ---- projects as folders: path lines, project menu, dialogs ---- */
+.side-item.project { align-items: flex-start; }
+.side-item.project > svg { margin-top: 3px; }
+.side-item .t .where { display: block; font-size: 11.5px; color: var(--faint); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-item.missing .t { color: var(--faint); text-decoration: line-through; }
+.side-item.missing .t .where { text-decoration: none; color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: default; }
+.side-foot .spacer { flex: 1; }
+#app.side-collapsed .side-foot .spacer { display: none; }
+.menu { position: fixed; z-index: 80; min-width: 230px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 5px; }
+.menu-item { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 10px; border-radius: 8px; font-size: 14px; text-align: left; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--hover); outline: none; }
+.menu-item svg { width: 16px; height: 16px; color: var(--muted); }
+.menu-item.danger, .menu-item.danger svg { color: var(--danger); }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.lbl { display: block; font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin: 14px 0 6px; }
+.lbl:first-child { margin-top: 0; }
+.field { width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; background: var(--surface); font-size: 15px; }
+.field:focus { outline: none; border-color: var(--accent); }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.path { font-family: var(--mono); font-size: 13px; background: var(--code); border-radius: 6px; padding: 6px 9px; overflow-wrap: anywhere; }
+.setting { padding: 12px 0; border-bottom: 1px solid var(--border); display: grid; gap: 6px; }
+.setting:last-child { border-bottom: 0; }
+.setting .lbl { margin: 0; }
+.folder-head { display: grid; gap: 6px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.folder-head .lbl { margin: 0; }
+.btn svg { width: 15px; height: 15px; vertical-align: -3px; margin-right: 5px; }
+.trust-box .check { align-items: flex-start; }
+.trust-box .check input { margin-top: 4px; }
+.browser .err { padding: 0 10px 10px; }
+.browser-bar .btn { white-space: nowrap; }

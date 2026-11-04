@@ -39,6 +39,10 @@ const ICON = {
   stop: '<rect x="5" y="5" width="10" height="10" rx="2"/>',
   download: '<path d="M10 3v10M6 9l4 4 4-4M4 16h12"/>',
   trash: '<path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/>',
+  more: '<circle cx="5" cy="10" r="1.2"/><circle cx="10" cy="10" r="1.2"/><circle cx="15" cy="10" r="1.2"/>',
+  open: '<path d="M11 3.5h5.5V9M16.5 3.5L9 11M14 12v3.5a1 1 0 01-1 1H4.5a1 1 0 01-1-1V7a1 1 0 011-1H8"/>',
+  edit: '<path d="M13.5 3.5l3 3L7 16H4v-3z"/>',
+  link: '<rect x="6.5" y="6.5" width="10" height="10" rx="2"/><path d="M13.5 6.5V4.5a1 1 0 00-1-1h-8a1 1 0 00-1 1v8a1 1 0 001 1h2"/>',
 };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -71,7 +75,6 @@ async function api(method, url, body) {
     err.status = res.status;
     err.data = data;
     if (data.needs_login) showLogin();
-    else if (data.needs_workspace) openWorkspacePicker({ required: true });
     throw err;
   }
   return data;
@@ -184,6 +187,7 @@ const state = {
   streaming: null, // AbortController while a reply streams
   panelTab: store.get('ps.panelTab', 'files'),
   panelOpen: store.get('ps.panelOpen', '1') === '1',
+  settings: null, // { home, library, user_dir, user_home, sep }
 };
 
 // ---------------------------------------------------------------- composer
@@ -317,22 +321,24 @@ function renderSidebar() {
   const activeChat = state.chat?.id;
   const list = $('#project-list');
   if (!state.projects.length) {
-    list.replaceChildren(h('li', { class: 'side-empty', text: 'No projects yet' }));
+    list.replaceChildren(h('li', { class: 'side-empty', text: 'No projects yet — use New project' }));
   } else {
     list.replaceChildren(...state.projects.map((p) => {
       const open = p.id === activeProject;
       const row = h('li', {},
         h('div', {
-          class: `side-item${open && !activeChat ? ' active' : ''}`, role: 'button', tabindex: '0',
-          onclick: () => openProject(p),
+          class: `side-item project${open && !activeChat ? ' active' : ''}${p.missing ? ' missing' : ''}`,
+          role: 'button', tabindex: '0', title: p.path,
+          onclick: () => (p.missing ? projectMenu(p, row.firstChild) : openProject(p)),
           onkeydown: (e) => { if (e.key === 'Enter') openProject(p); },
         },
         svg(ICON.folder),
-        h('span', { class: 't', text: p.title, title: p.title }),
+        h('span', { class: 't' }, p.title,
+          h('span', { class: 'where', text: p.missing ? 'Folder missing — click to remove' : compactPath(p.path) })),
         h('button', {
-          class: 'add', title: 'New chat in this project', 'aria-label': `New chat in ${p.title}`,
-          onclick: (e) => { e.stopPropagation(); newChat(p.id); },
-        }, svg(ICON.plus))));
+          class: 'add', title: 'Project options', 'aria-label': `Options for ${p.title}`,
+          onclick: (e) => { e.stopPropagation(); projectMenu(p, e.currentTarget); },
+        }, svg(ICON.more))));
       if (open) {
         const chats = p.chats.filter((c) => c.id === activeChat || c.title !== 'New chat' || p.chats.length === 1);
         row.append(h('ul', { class: 'side-chats' }, chats.map((c) => chatItem(c, false))));
@@ -344,6 +350,86 @@ function renderSidebar() {
   recent.replaceChildren(...(state.recent.length
     ? state.recent.slice(0, 15).map((c) => chatItem(c, true))
     : [h('li', { class: 'side-empty', text: 'Your chats will appear here' })]));
+}
+
+/** The last two folders of a path: ``…/Proposal Studio/Acme 2026`` (full path in the tooltip). */
+const compactPath = (p) => {
+  const parts = shortPath(p).split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : shortPath(p);
+};
+
+const shortPath = (p) => {
+  const home = state.settings?.user_home;
+  return home && p.startsWith(home) ? `~${p.slice(home.length)}` : p;
+};
+
+// ---------------------------------------------------------------- popover menu
+function popMenu(anchor, items) {
+  closeMenu();
+  const menu = h('div', { class: 'menu', role: 'menu' }, items.map((it) => (it === '-' ? h('div', { class: 'menu-sep' })
+    : h('button', {
+      class: `menu-item${it.danger ? ' danger' : ''}`, role: 'menuitem', type: 'button',
+      onclick: () => { closeMenu(); it.run(); },
+    }, svg(it.icon), it.label))));
+  document.body.append(menu);
+  const r = anchor.getBoundingClientRect();
+  const left = Math.min(r.left, window.innerWidth - menu.offsetWidth - 8);
+  const top = r.bottom + menu.offsetHeight + 8 > window.innerHeight ? r.top - menu.offsetHeight - 4 : r.bottom + 4;
+  menu.style.left = `${Math.max(8, left)}px`;
+  menu.style.top = `${Math.max(8, top)}px`;
+  popMenu.el = menu;
+  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+  menu.querySelector('button')?.focus();
+}
+function closeMenu() {
+  popMenu.el?.remove();
+  popMenu.el = null;
+}
+
+function projectMenu(p, anchor) {
+  const items = p.missing ? [
+    { label: 'Remove from Proposal Studio', icon: ICON.trash, danger: true, run: () => removeProject(p, false) },
+  ] : [
+    { label: 'New chat', icon: ICON.plus, run: () => newChat(p.id) },
+    { label: 'Rename', icon: ICON.edit, run: () => renameProject(p) },
+    { label: 'Open folder', icon: ICON.open, run: () => revealProject(p) },
+    { label: 'Copy folder path', icon: ICON.link, run: () => copyText(p.path, 'Folder path copied') },
+    '-',
+    { label: 'Remove from list (keep files)', icon: ICON.x, run: () => removeProject(p, false) },
+    { label: 'Delete project and its folder…', icon: ICON.trash, danger: true, run: () => removeProject(p, true) },
+  ];
+  popMenu(anchor, items);
+}
+
+async function copyText(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done); } catch { toast(text, 8000); }
+}
+
+async function revealProject(p) {
+  try { await api('POST', `/api/projects/${encodeURIComponent(p.id)}/reveal`); } catch (e) { toast(e.message); }
+}
+
+async function renameProject(p) {
+  const title = prompt('Project name', p.title);
+  if (!title || title.trim() === p.title) return;
+  try {
+    await api('PATCH', `/api/projects/${encodeURIComponent(p.id)}`, { title: title.trim() });
+    await refreshLists();
+    if (state.project?.id === p.id) { await loadProject(p.id); renderCrumbs(); }
+  } catch (e) { toast(e.message); }
+}
+
+async function removeProject(p, deleteFiles) {
+  const msg = deleteFiles
+    ? `Delete “${p.title}” and everything in its folder?\n\n${p.path}\n\nUploaded files, chats, summaries and decks in that folder are permanently deleted.`
+    : `Remove “${p.title}” from Proposal Studio?\n\nThe folder and its files stay on your computer:\n${p.path}\n\nYou can add it back later with New project → Open an existing project folder.`;
+  if (!confirm(msg)) return;
+  try {
+    await api('DELETE', `/api/projects/${encodeURIComponent(p.id)}${deleteFiles ? '?files=delete' : ''}`);
+    toast(deleteFiles ? `Deleted ${p.title}` : `Removed ${p.title} (files kept)`);
+    if (state.project?.id === p.id) go('#/');
+    await refreshLists();
+  } catch (e) { toast(e.message); }
 }
 
 function chatItem(c, withProject) {
@@ -504,13 +590,11 @@ function scrollDown(force) {
 // ---------------------------------------------------------------- sending
 async function sendFromHome({ text, files }) {
   const name = files.length ? stem(files[0].name) : text.split(/\s+/).slice(0, 6).join(' ');
-  try {
-    const { chat } = await api('POST', '/api/projects', { name: name || 'Untitled project' });
-    history.pushState(null, '', `#/chat/${chat.id}`);
-    await refreshLists();
-    await openChat(chat.id);
-    await send({ text, files });
-  } catch (err) { toast(err.message); }
+  openNewProject({
+    name: name || 'Untitled project',
+    onCreated: async (chat) => { await send({ text, files }); },
+    restore: () => { homeComposer.add(files); if (text) homeComposer.fill(text); },
+  });
 }
 
 async function uploadAll(files) {
@@ -693,7 +777,14 @@ async function loadInto(body, fn) {
 
 function filesTab() {
   const p = state.project;
-  const frag = h('div', {}, h('h3', { text: 'Project files' }));
+  const frag = h('div', {},
+    h('div', { class: 'folder-head' },
+      h('div', { class: 'lbl', text: 'Project folder' }),
+      h('div', { class: 'path', text: p.path, title: p.path }),
+      h('div', { class: 'row-btns' },
+        h('button', { class: 'btn', type: 'button', onclick: () => revealProject(p) }, svg(ICON.open), 'Open folder'),
+        h('button', { class: 'btn', type: 'button', onclick: () => copyText(p.path, 'Folder path copied') }, 'Copy path'))),
+    h('h3', { text: 'Project files' }));
   if (!p.files.length) frag.append(h('div', { class: 'empty', text: 'No files yet.' }));
   for (const f of p.files) {
     frag.append(h('div', { class: 'file-row' },
@@ -870,8 +961,8 @@ function boot() {
   chatComposer = new Composer($('#chat-composer-slot'), (msg) => send(msg));
   $('#home-composer-slot .composer textarea').placeholder = 'Drop an RFP or ask a question…';
 
-  $('#new-chat').addEventListener('click', () => go('#/'));
-  $('#ws-switch').addEventListener('click', () => openWorkspacePicker({ required: false }));
+  $('#new-chat').addEventListener('click', () => openNewProject({}));
+  $('#open-settings').addEventListener('click', openSettings);
   $('#health').addEventListener('click', openModels);
   $('#modal-close').addEventListener('click', closeModal);
   $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
@@ -912,25 +1003,18 @@ function boot() {
   setupLayout();
   checkHealth();
   setInterval(checkHealth, 30000);
-  startWorkspace();
+  startApp();
 }
 
-async function startWorkspace() {
-  let info;
+async function startApp() {
   try {
-    info = await api('GET', '/api/workspace');
+    state.settings = await api('GET', '/api/settings');
   } catch {
     return; // 401 → login screen already shown
-  }
-  setWorkspaceName(info);
-  if (!info.active) {
-    openWorkspacePicker({ required: true, info });
-    return;
   }
   await refreshLists().catch((err) => toast(err.message));
   route();
 }
-
 
 // ---------------------------------------------------------------- modal
 function openModal(title, body, { locked = false } = {}) {
@@ -954,124 +1038,174 @@ function showLogin() {
   { locked: true });
 }
 
-// ---------------------------------------------------------------- workspace
-function setWorkspaceName(info) {
-  const name = info?.name;
-  $('#ws-name').textContent = name || 'Choose workspace…';
-  $('#ws-switch').title = info?.active ? `Workspace: ${info.active} — click to switch` : 'Choose a workspace folder';
-}
+// ---------------------------------------------------------------- folders: browser, new project, settings
+const sep = () => state.settings?.sep || '/';
+const joinPath = (dir, name) => (dir.endsWith('/') || dir.endsWith('\\') ? dir + name : `${dir}${sep()}${name}`);
+const safeFolderName = (name) => name.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '-').replace(/^[ .-]+|[ .]+$/g, '').slice(0, 80) || 'Project';
+const parentOf = (path) => path.replace(/[\\/][^\\/]*$/, '') || path;
 
-const shortPath = (p, home) => (home && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
-const joinPath = (dir, name) => (dir.endsWith('/') || dir.endsWith('\\') ? dir + name : `${dir}${dir.includes('\\') && !dir.includes('/') ? '\\' : '/'}${name}`);
-
-async function openWorkspace(path, trustIt, openLast) {
-  const body = { path, trust: Boolean(trustIt) };
-  if (openLast !== undefined) body.open_last = openLast;
-  const info = await api('POST', '/api/workspace', body);
-  setWorkspaceName(info);
-  $('#modal').classList.remove('locked');
-  closeModal();
-  state.chat = null;
-  state.project = null;
-  history.pushState(null, '', '#/');
-  await refreshLists();
-  route();
-  toast(`Workspace: ${info.name}`);
-}
-
-async function openWorkspacePicker({ required = false, info = null } = {}) {
-  if (openWorkspacePicker.open) return;
-  openWorkspacePicker.open = true;
-  try {
-    info = info || await api('GET', '/api/workspace');
-  } catch { openWorkspacePicker.open = false; return; }
-  const home = info.home;
-  const err = h('div', { class: 'err' });
-  const body = h('div', {});
-  const fail = (e) => { err.textContent = e.message; };
-
-  const recent = info.trusted.length ? h('div', {},
-    h('h3', { class: 'side-label', style: 'padding:0 0 6px', text: 'Trusted workspaces' }),
-    h('div', { class: 'ws-recent' }, info.trusted.map((w) => h('button', {
-      class: 'ws-item', onclick: () => openWorkspace(w.path, false).catch(fail),
-    }, svg(ICON.folder),
-    h('div', {}, h('span', { class: 'nm', text: w.path.split(/[\\/]/).pop() }), h('span', { class: 'p', text: shortPath(w.path, home) })),
-    w.path === info.active ? h('span', { class: 'pill role', text: 'open' }) : null)))) : null;
-
-  // folder browser
-  let current = info.active || home;
-  const pathInput = h('input', { value: current, 'aria-label': 'Folder path', spellcheck: 'false' });
+/** A folder browser: path box, sub-folder list, "New folder". Calls onChange(info) on every move. */
+function folderBrowser(start, onChange) {
+  const pathInput = h('input', { value: start, 'aria-label': 'Folder path', spellcheck: 'false' });
   const list = h('ul', { class: 'dir-list' });
-  const sel = h('span', { class: 'sel' });
-  const useBtn = h('button', { class: 'btn primary', type: 'button' }, 'Use this folder');
+  const err = h('div', { class: 'err' });
+  let current = start;
   async function browse(path) {
     err.textContent = '';
     try {
       const data = await api('GET', `/api/fs?path=${encodeURIComponent(path)}`);
       current = data.path;
       pathInput.value = data.path;
-      sel.textContent = shortPath(data.path, home);
-      useBtn.textContent = data.trusted ? 'Open this workspace' : 'Use this folder';
       const items = [];
       if (data.parent) items.push(h('li', {}, h('button', { type: 'button', onclick: () => browse(data.parent) }, svg('<path d="M12 5l-5 5 5 5"/>'), '..')));
       for (const d of data.dirs) items.push(h('li', {}, h('button', { type: 'button', onclick: () => browse(joinPath(data.path, d)) }, svg(ICON.folder), d)));
       if (!data.dirs.length) items.push(h('li', { class: 'side-empty', text: 'No sub-folders' }));
       list.replaceChildren(...items);
-    } catch (e) { fail(e); }
+      onChange(data);
+    } catch (e) {
+      err.textContent = e.status === 404 ? `${path} doesn't exist yet — it will be created.` : e.message;
+      onChange({ path, missing: true });
+    }
   }
   pathInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); browse(pathInput.value.trim()); } });
   const newFolder = h('button', {
     class: 'btn', type: 'button',
     onclick: async () => {
-      const name = prompt('New folder name', 'Proposal Studio');
+      const name = prompt('New folder name');
       if (!name) return;
-      try { const r = await api('POST', '/api/fs/mkdir', { path: current, name }); browse(r.path); } catch (e) { fail(e); }
+      try { const r = await api('POST', '/api/fs/mkdir', { path: current, name }); browse(r.path); } catch (e) { err.textContent = e.message; }
     },
   }, 'New folder');
-  useBtn.addEventListener('click', async () => {
+  const el = h('div', { class: 'browser' },
+    h('div', { class: 'browser-bar' }, pathInput, h('button', { class: 'btn', type: 'button', onclick: () => browse(pathInput.value.trim()) }, 'Go'), newFolder),
+    list, err);
+  browse(start);
+  return { el, path: () => current };
+}
+
+/** New project: a name, a folder (default: <Proposal Studio folder>/<name>) and explicit trust. */
+async function openNewProject({ name = '', onCreated = null, restore = null } = {}) {
+  if (!state.settings) state.settings = await api('GET', '/api/settings').catch(() => null);
+  const home = state.settings?.home || '';
+  const nameInput = h('input', { class: 'field', value: name, placeholder: 'e.g. Acme Health Plan 2026', 'aria-label': 'Project name' });
+  const trustBox = h('input', { type: 'checkbox', id: 'trust-folder' });
+  const err = h('div', { class: 'err' });
+  const create = h('button', { class: 'btn primary', type: 'button', disabled: true }, 'Create project');
+  let custom = null; // a folder picked in the browser; null = default location
+  let existing = false;
+  const where = h('div', { class: 'path' });
+  const hint = h('div', { class: 'muted small' });
+  const location = () => custom || joinPath(home, safeFolderName(nameInput.value.trim() || 'Untitled project'));
+  const refresh = () => {
+    where.textContent = location();
+    hint.textContent = existing
+      ? 'This folder already holds a Proposal Studio project — it will be added back with its chats.'
+      : custom ? 'The project files go directly into this folder.' : 'A new folder is created here for this project.';
+    create.textContent = existing ? 'Add project' : 'Create project';
+    create.disabled = !trustBox.checked || (!existing && !nameInput.value.trim());
+  };
+  nameInput.addEventListener('input', refresh);
+  trustBox.addEventListener('change', refresh);
+
+  const browserSlot = h('div', {});
+  const chooseBtn = h('button', {
+    class: 'btn', type: 'button',
+    onclick: () => {
+      const start = custom || home;
+      const fb = folderBrowser(start, (info) => {
+        custom = info.path;
+        existing = Boolean(info.project);
+        refresh();
+      });
+      browserSlot.replaceChildren(fb.el, h('div', { class: 'row-btns', style: 'margin-top:8px' },
+        h('button', { class: 'btn', type: 'button', onclick: () => { custom = null; existing = false; browserSlot.replaceChildren(); refresh(); } }, 'Use the default location')));
+    },
+  }, 'Choose another folder…');
+
+  create.addEventListener('click', async () => {
     err.textContent = '';
+    create.disabled = true;
     try {
-      await openWorkspace(current, false);
+      const res = await api('POST', '/api/projects', { name: nameInput.value.trim(), folder: custom || '', trust: true });
+      restore = null;
+      closeModal();
+      history.pushState(null, '', `#/chat/${res.chat.id}`);
+      await refreshLists();
+      await openChat(res.chat.id);
+      toast(`Project folder: ${shortPath(res.project.path)}`, 5000);
+      if (onCreated) await onCreated(res.chat);
     } catch (e) {
-      if (e.data?.needs_trust) showTrust(e.data.needs_trust);
-      else fail(e);
+      err.textContent = e.message;
+      refresh();
     }
   });
 
-  function showTrust(path) {
-    const auto = h('input', { type: 'checkbox', id: 'open-last' });
-    body.replaceChildren(h('div', { class: 'trust-box' },
-      h('strong', { text: 'Do you trust this folder?' }),
-      h('div', { class: 'path', text: path }),
-      'Proposal Studio will work only inside this folder:',
-      h('ul', {},
-        h('li', { text: 'project files, uploads and chats are saved here (in projects/)' }),
-        h('li', { text: 'your proposal library goes in library/' }),
-        h('li', { text: 'settings and caches go in .studio/' })),
-      h('label', { class: 'check', for: 'open-last' }, auto, 'Open this workspace automatically next time'),
-      h('div', { class: 'row-btns' },
-        h('button', { class: 'btn primary', type: 'button', onclick: () => openWorkspace(path, true, auto.checked).catch(fail) }, 'Trust and open'),
-        h('button', { class: 'btn', type: 'button', onclick: () => render() }, 'Back')),
-      err));
-  }
-
-  function render() {
-    body.replaceChildren(
-      h('p', { class: 'lead', text: 'Pick the folder Proposal Studio may read and write — for example one folder per bid or per client. Nothing outside it is touched.' }),
-      recent || '',
-      h('h3', { class: 'side-label', style: 'padding:0 0 6px', text: info.trusted.length ? 'Or choose another folder' : 'Choose a folder' }),
-      h('div', { class: 'browser' },
-        h('div', { class: 'browser-bar' }, pathInput, h('button', { class: 'btn', type: 'button', onclick: () => browse(pathInput.value.trim()) }, 'Go')),
-        list,
-        h('div', { class: 'browser-foot' }, sel, h('div', { class: 'row-btns' }, newFolder, useBtn))),
-      err);
-    browse(current);
-  }
-
-  render();
-  openModal(required ? 'Choose a workspace folder' : 'Switch workspace', body, { locked: required });
-  const obs = new MutationObserver(() => { if ($('#modal').hidden) { openWorkspacePicker.open = false; obs.disconnect(); } });
+  refresh();
+  openModal('New project', h('div', {},
+    h('label', { class: 'lbl', text: 'Project name' }), nameInput,
+    h('label', { class: 'lbl', text: 'Project folder' }), where, hint,
+    h('div', { class: 'row-btns', style: 'margin:8px 0 4px' }, chooseBtn),
+    browserSlot,
+    h('div', { class: 'trust-box', style: 'margin-top:14px' },
+      h('label', { class: 'check', for: 'trust-folder', style: 'margin:0' }, trustBox,
+        h('span', {}, h('strong', { text: 'I trust this folder. ' }),
+          'Proposal Studio may read and write files only inside it: uploaded RFPs, chats, the search index, summaries and decks.'))),
+    h('div', { class: 'row-btns', style: 'margin-top:14px' }, create,
+      h('button', { class: 'btn', type: 'button', onclick: closeModal }, 'Cancel')),
+    err));
+  const obs = new MutationObserver(() => {
+    if ($('#modal').hidden) { obs.disconnect(); if (restore) restore(); }
+  });
   obs.observe($('#modal'), { attributes: true, attributeFilter: ['hidden'] });
+  nameInput.focus();
+  nameInput.select();
+}
+
+async function openSettings() {
+  let st;
+  try { st = state.settings = await api('GET', '/api/settings'); } catch (e) { toast(e.message); return; }
+  const body = h('div', {});
+  const row = (title, path, desc, ...actions) => h('div', { class: 'setting' },
+    h('div', { class: 'lbl', text: title }), h('div', { class: 'path', text: path }), h('div', { class: 'muted small', text: desc }),
+    h('div', { class: 'row-btns' }, ...actions));
+  const render = () => body.replaceChildren(
+    row('Proposal Studio folder', st.home,
+      'New projects are created here by default. It also holds your shared library.',
+      h('button', { class: 'btn', type: 'button', onclick: () => api('POST', '/api/home/reveal').catch((e) => toast(e.message)) }, svg(ICON.open), 'Open folder'),
+      h('button', { class: 'btn', type: 'button', onclick: () => copyText(st.home, 'Path copied') }, 'Copy path'),
+      h('button', { class: 'btn', type: 'button', onclick: changeHome }, 'Change…')),
+    row('Library', st.library,
+      'Past proposals (library/proposals), reference documents (library/reference) and curated content blocks (library/blocks). Shared by all projects.',
+      h('button', { class: 'btn', type: 'button', onclick: () => api('POST', '/api/library/reveal').catch((e) => toast(e.message)) }, svg(ICON.open), 'Open folder')),
+    row('Projects', `${state.projects.filter((p) => !p.missing).length} project folder(s)`,
+      'Each project lives in the folder you chose when creating it — see the path under each project in the sidebar, or use ⋯ → Open folder.'),
+    row('App settings', st.user_dir, 'Where Proposal Studio remembers these settings (no project files here).'));
+  async function changeHome() {
+    let picked = st.home;
+    const trustBox = h('input', { type: 'checkbox', id: 'trust-home' });
+    const err = h('div', { class: 'err' });
+    const fb = folderBrowser(parentOf(st.home), (info) => { picked = info.path; });
+    body.replaceChildren(h('p', { class: 'lead', text: 'Choose the new Proposal Studio folder. Existing projects stay where they are; the library list starts fresh in the new folder (move library/ yourself if you want it there).' }),
+      fb.el,
+      h('label', { class: 'check', for: 'trust-home', style: 'margin-top:12px' }, trustBox, 'I trust this folder'),
+      h('div', { class: 'row-btns' },
+        h('button', {
+          class: 'btn primary', type: 'button',
+          onclick: async () => {
+            if (!trustBox.checked) { err.textContent = 'Tick “I trust this folder” first.'; return; }
+            try {
+              st = state.settings = await api('POST', '/api/settings/home', { path: picked, trust: true });
+              await refreshLists();
+              go('#/');
+              render();
+            } catch (e) { err.textContent = e.message; }
+          },
+        }, 'Use this folder'),
+        h('button', { class: 'btn', type: 'button', onclick: render }, 'Back')),
+      err);
+  }
+  render();
+  openModal('Settings', body);
 }
 
 // ---------------------------------------------------------------- models

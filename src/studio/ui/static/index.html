@@ -21,11 +21,6 @@
           <svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M8 3.5v13"/></svg>
         </button>
       </div>
-      <button class="ws-switch" id="ws-switch" title="Switch workspace folder">
-        <svg viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 011-1h4l2 2h7a1 1 0 011 1v8a1 1 0 01-1 1h-13a1 1 0 01-1-1z"/></svg>
-        <span class="t" id="ws-name">Choose workspace…</span>
-        <svg class="chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4"/></svg>
-      </button>
       <button class="new-chat" id="new-chat" title="New project">
         <svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg><span>New project</span>
       </button>
@@ -37,6 +32,10 @@
       </nav>
       <div class="side-foot">
         <button id="health" class="health" title="Models"><i></i><span>Checking model…</span></button>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="open-settings" title="Settings and folders" aria-label="Settings and folders">
+          <svg viewBox="0 0 20 20"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
+        </button>
         <button class="icon-btn" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light or dark theme">
           <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6L16 16M4 16l1.4-1.4M14.6 5.4L16 4"/></svg>
         </button>
@@ -58,7 +57,7 @@
       <section id="home" class="home" hidden>
         <img src="logo.svg" alt="" class="home-logo" width="40" height="40">
         <h1 class="greeting">What are we bidding on?</h1>
-        <p class="home-sub">Drop an RFP to start a project, then ask anything about it.</p>
+        <p class="home-sub">Drop an RFP to start a project in a folder you choose, then ask anything about it.</p>
         <div id="home-composer-slot"></div>
         <div class="home-hints">
           <button class="hint" data-fill="When is the proposal due?">When is the proposal due?</button>
