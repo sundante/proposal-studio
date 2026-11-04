@@ -19,7 +19,7 @@
 | 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
 | 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | e231132 |
 | 14 | Navigation, composer, models and modes | ✅ done | a1a2ffd |
-| 15 | Open files in the side panel (viewer, clickable citations) | ✅ done | (this commit) |
+| 15 | Open files in the side panel (viewer, clickable citations) | ✅ done | 39ffbe2 |
 | 16 | Shared drives and co-working (sync folders, presence, lock) | ⬜ todo | |
 | 17 | Notebook (sources + notes, generate briefs) | ⬜ todo | |
 | 18 | Outputs, Templates and Customize | ⬜ todo | |
