@@ -36,6 +36,9 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - Project docs: `vibes/` (spec, build plan, decisions, progress, status).
 
 ## Known issues
+- The last CI run (before CI was removed) failed on Ubuntu only; the cause is unknown because the
+  log needs a logged-in `gh`. Tests pass on macOS (and passed on Windows in CI). Re-check on Linux
+  before a Linux release.
 - Studio UI: Stop closes the stream but the model finishes the current step in the background
   (the reply is saved to the chat); a second message in the same project waits for it.
 - Studio UI front-end JS has no automated tests (server/API are covered by `tests/test_ui.py`
@@ -46,20 +49,20 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
   Choose another folder… (documented in docs/install.md).
 - Changing the Proposal Studio folder in Settings starts a fresh project list there (projects
   listed in the old folder can be added back by folder); library files aren't moved.
-- `setup.ps1`/`start.ps1` changes are syntax-checked in CI but not yet run on Windows.
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
   troubleshooting.md and the tutorial recommend one format per document).
 - Performance measured with `studio bench` (docs/performance.md); the Intel CPU-only target
   itself is still unmeasured (estimated 2–4× the Mac CPU-only numbers).
 - Rendered decks were checked structurally (bounds, overlaps, empty placeholders), not visually:
-  no LibreOffice on the dev machine and Quick Look hangs headless. Open the CI `sample-deck`
+  no LibreOffice on the dev machine and Quick Look hangs headless. Open a rendered deck
   artifact in PowerPoint once to eyeball it.
 - Deck quality depends on curated blocks: with only 5 synthetic blocks, 4 vendor slides render as
   skeletons. qwen3:8b still imports block claims into client slides and fills `{{date}}` slots;
   both are flagged for review, not prevented.
 - `/research` synthesis (summary/implications) is not itself cited and can blur facts; the
   findings carry the citations. Sub-questions from qwen3:8b tend to overlap.
-- `setup.ps1`/`start.ps1` are syntax-checked in CI but not yet run on a real Windows 11 laptop.
+- `setup.ps1`/`start.ps1` have not been run on a real Windows 11 laptop, and nothing checks them
+  automatically any more (CI was removed).
 - The Open WebUI pipe was verified via its HTTP API; the browser confirmation dialog (needs a
   live browser session) and the light-theme step are untested manually.
 - If the Ollama tray app is already running, `offline.env`'s `OLLAMA_*` settings don't apply.

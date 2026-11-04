@@ -528,3 +528,13 @@ Format:
   6. Voice input was **not** built: browser speech recognition sends audio to a cloud service.
 - Why: parity with the desktop-app reference the maintainer shared, within the offline rules.
 - Spec impact: §5.1 adds `/chat`; §12 UI.
+
+## 2026-11-04 — Remove GitHub Actions and Dependabot
+- Decision: delete `.github/workflows/ci.yml`, `.github/workflows/release.yml` and
+  `.github/dependabot.yml`. The maintainer commits to `dev` and promotes `dev` → `main` by hand;
+  checks run locally (`/verify`); `/ship` builds the release files locally and the maintainer
+  publishes the GitHub Release. Issue/PR templates and the optional local pre-commit config stay
+  (they don't run anything on GitHub).
+- Why: the automation added noise (failing Ubuntu jobs, Node deprecation warnings) without being
+  used in the maintainer's manual flow.
+- Spec impact: §16.2, §16.3.

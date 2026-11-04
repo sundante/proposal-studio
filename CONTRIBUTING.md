@@ -16,7 +16,8 @@ way.
 1. Fork and branch from `dev` (`feat/<topic>` or `fix/<topic>`); pull requests target `dev`.
 2. `pip install -e ".[dev]"` and `pre-commit install`.
 3. `ruff check . --fix && ruff format . && pytest -q`.
-4. Use Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`).
+4. Use Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+5. There is no CI: run `ruff check . && ruff format --check . && pytest -q` before you push.
 5. Open a PR and complete the checklist in the template.
 
 ## Dependencies

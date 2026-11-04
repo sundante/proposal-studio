@@ -1,9 +1,9 @@
 ---
-description: Cut a release (tag v<version> on main after dev is promoted; CI builds the GitHub Release)
+description: Cut a release (tag v<version> on main after dev is promoted; build the files locally)
 argument-hint: <version, e.g. 0.1.0>
 ---
 
-Ship **v$ARGUMENTS**:
+Ship **v$ARGUMENTS**. There is no GitHub Actions automation, so everything is built locally:
 
 1. Ask me to confirm that `dev` has been promoted to `main`. Then `git switch main && git pull`.
 2. Check `src/studio/__init__.py` says `$ARGUMENTS` and `CHANGELOG.md` has a `## [$ARGUMENTS]`
@@ -12,8 +12,7 @@ Ship **v$ARGUMENTS**:
 3. Run `/verify`, `python -m build`, and `python scripts/build_release.py --version $ARGUMENTS --out dist`.
 4. **Ask me first**, then create and push the tag: `git tag v$ARGUMENTS && git push origin v$ARGUMENTS`.
    This is the one action on `main`.
-5. The `Release` workflow builds the sdist, the wheel and `proposal-studio-$ARGUMENTS-windows.zip`,
-   installs the zip on a clean Windows runner, and publishes the GitHub Release with the
-   CHANGELOG notes. Watch it with `gh run watch` (if `gh` is logged in) or the Actions tab, then
-   print the release URL.
+5. Tell me which files to attach (`dist/*.tar.gz`, `dist/*.whl`,
+   `dist/proposal-studio-$ARGUMENTS-windows.zip`, notes in `dist/RELEASE_NOTES.md`). I create the
+   GitHub Release by hand, or, only if I ask, with `gh release create`.
 6. `git switch dev`.

@@ -93,7 +93,7 @@ lives in a folder the user chose and trusted; the shared library lives in the Pr
 > - **config:** `config/{rag,deck,research}.yaml`
 > - **Removed in Phase 12:** `owui/` and `src/studio/owui.py` (see `archive/open-webui`)
 > - **scripts:** `scripts/{offline.env,build_release.py,check_no_private_paths.py}`
-> - **CI:** `.github/workflows/release.yml`
+> - **CI:** removed (2026-11-04); releases are built locally (`scripts/build_release.py`)
 > - **user docs:** `docs/*.md`, `tutorial.html`
 > - **project docs:** non-functional docs live in `vibes/`
 
@@ -507,23 +507,23 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
   local-only design), `CHANGELOG.md` (Keep a Changelog), `docs/` (install, commands, config,
   templates, agents, troubleshooting, privacy).
 - `.github/`: `ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml`, `PULL_REQUEST_TEMPLATE.md`
-  (checklist includes "no client/proprietary data added"), `dependabot.yml` (pip + github-actions,
+  (checklist includes "no client/proprietary data added"), `dependabot.yml` (removed 2026-11-04; was pip + github-actions,
   monthly).
 - `.gitignore` covers `library/`, `workspace/`, `templates/*` except `templates/sample/`,
   `config/overrides.yaml`, `.venv/`, indexes, logs, `*.pptx` outside fixtures.
 - A pre-commit config (ruff, end-of-file, trailing whitespace, check-added-large-files, and a
   simple guard that blocks committing files under `library/` or `workspace/`).
 
-### 16.2 CI (`.github/workflows/ci.yml`)
-- On push/PR: matrix `windows-latest` + `ubuntu-latest`, Python 3.11 and 3.12; `pip install -e .[dev]`;
-  `ruff check`; `ruff format --check`; `pytest -q`. No Ollama, no network beyond pip.
-- A job that runs `studio render` on the sample deck fixture and uploads the PPTX as a build artifact,
-  so every PR shows a real rendered deck.
+### 16.2 Checks (no CI)
+> **As built (2026-11-04):** GitHub Actions and Dependabot were removed at the maintainer's request.
+> Checks run locally before every commit (`/verify`: `ruff check`, `ruff format`, `pytest -q`, the
+> private-path guard). The maintainer commits to `dev` and promotes to `main` by hand.
 
-### 16.3 Releases (`.github/workflows/release.yml`)
-- On tag `v*.*.*`: build sdist + wheel, and a **Windows bundle zip**
+### 16.3 Releases (built locally)
+- `/ship <version>`: build sdist + wheel, and a **Windows bundle zip**
   `proposal-studio-<version>-windows.zip` containing the source, `scripts/*.ps1`, `config/`,
-  `templates/sample/`, docs; attach all to a GitHub Release with notes from `CHANGELOG.md`.
+  `templates/sample/`, docs; the maintainer attaches them to a GitHub Release with notes from
+  `CHANGELOG.md`.
 - Versioning: SemVer, starting `0.1.0`. `studio --version` reports it.
 
 ### 16.4 Install from GitHub (end-user path, documented in README and docs/install.md)
