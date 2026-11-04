@@ -17,7 +17,7 @@
 | 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | fd00b3c |
 | 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
 | 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
-| 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | (this commit) |
+| 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | e231132 |
 | 14 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
 | 15 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
 | 16 | Model router and suggestions | ⬜ todo | |
