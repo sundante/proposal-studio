@@ -13,7 +13,7 @@
 | 8 | Agents route | ✅ done | 0761ec7 |
 | 9 | Hardening + docs | ✅ done | 6dd79d4 |
 | 10 | Release pipeline + v0.1.0 | ⏸ superseded — v0.1.0 (Open WebUI) not shipped | 415d709 |
-| 11a | Studio UI: local chat app (`studio ui`) | ✅ done | (this commit) |
+| 11a | Studio UI: local chat app (`studio ui`) | ✅ done | 0f4b457 |
 | 11b | Remove Open WebUI, rewrite docs for the Studio UI | ⬜ todo | |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
