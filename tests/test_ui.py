@@ -9,14 +9,16 @@ from pathlib import Path
 import httpx
 import pytest
 
-from studio import trust
 from studio.ui.server import make_server
 from studio.ui.store import title_from
 from tests.test_router import make
 
+REVEALED: list[Path] = []
 
-def serve(home: Path, llm, **kwargs) -> tuple[ThreadingHTTPServer, str]:
-    server = make_server(home, lambda: llm, port=0, **kwargs)
+
+def serve(app_root: Path, llm, **kwargs) -> tuple[ThreadingHTTPServer, str]:
+    kwargs.setdefault("reveal_fn", REVEALED.append)  # never open a real file manager in tests
+    server = make_server(app_root, lambda: llm, port=0, **kwargs)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server, f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -30,14 +32,14 @@ def home(studio_home: Path) -> Path:
 
 @pytest.fixture
 def ws(home: Path) -> Path:
-    """A trusted workspace folder (data lives here; config stays in ``home``)."""
-    return trust.trust(home.parent / f"{home.name}-ws")
+    """The Proposal Studio folder (library + project list); config stays in ``home``."""
+    return home.parent / f"{home.name}-Proposal Studio"
 
 
 @pytest.fixture
 def client(home: Path, ws: Path) -> Iterator[httpx.Client]:
     _, llm = make(home)
-    server, base = serve(home, llm, workspace=ws)
+    server, base = serve(home, llm, home=ws)
     with httpx.Client(base_url=base, timeout=30) as c:
         yield c
     server.shutdown()
@@ -58,7 +60,7 @@ def reply_text(evts: list[tuple[str, dict]]) -> str:
 
 
 def new_project(client: httpx.Client, name: str = "Acme Health Plan RFP") -> tuple[str, str]:
-    resp = client.post("/api/projects", json={"name": name})
+    resp = client.post("/api/projects", json={"name": name, "trust": True})
     assert resp.status_code == 201
     data = resp.json()
     return data["project"]["id"], data["chat"]["id"]
@@ -97,8 +99,9 @@ def test_drop_ask_analyse_build_download(client: httpx.Client, ws: Path, rfp_fil
     detail = client.get(f"/api/projects/{project}").json()
     assert [f["name"] for f in detail["files"]] == ["acme_rfp.pdf"]
     assert detail["status"]["chunks"] > 0
-    assert not list((ws / "projects" / project / ".uploads").glob("*"))  # cleaned up
-    assert (ws / "projects" / project / "input" / "acme_rfp.pdf").exists()
+    folder = ws / "Acme Health Plan RFP"  # a readable folder, named after the project
+    assert not list((folder / ".uploads").glob("*"))  # cleaned up
+    assert (folder / "input" / "acme_rfp.pdf").exists() and (folder / "chats").is_dir()
 
     saved = client.get(f"/api/chats/{chat}").json()
     assert saved["title"] == "When are proposals due?"
@@ -186,35 +189,77 @@ def test_title_from_message_or_file() -> None:
 # --- workspace, trust, token, folders, models (phase 12) ----------------------------------
 
 
-def test_needs_a_trusted_workspace_first(home: Path, tmp_path: Path) -> None:
-    _, llm = make(home)
-    server, base = serve(home, llm)
-    try:
-        with httpx.Client(base_url=base, timeout=30) as c:
-            blocked = c.get("/api/projects")
-            assert blocked.status_code == 409 and blocked.json()["needs_workspace"] is True
-            target = tmp_path / "Bids" / "Acme"
-            ask = c.post("/api/workspace", json={"path": str(target)})
-            assert ask.status_code == 400 and ask.json()["needs_trust"] == str(target.resolve())
-            assert not target.exists()  # nothing is created before trust
-            opened = c.post("/api/workspace", json={"path": str(target), "trust": True}).json()
-            assert opened["active"] == str(target.resolve())
-            assert (target / ".studio" / "workspace.json").exists()
-            project = c.post("/api/projects", json={"name": "Acme"}).json()["project"]["id"]
-            assert (target / "projects" / project / "opportunity.json").exists()
-            assert not (home / "workspace").exists()  # nothing written to the app folder
-            assert c.get("/api/workspace").json()["trusted"][0]["path"] == str(target.resolve())
-            assert c.post("/api/workspace", json={"path": "/", "trust": True}).status_code == 400
-            gone = c.post("/api/workspace/forget", json={"path": str(target)}).json()
-            assert gone["active"] is None and c.get("/api/projects").status_code == 409
-    finally:
-        server.shutdown()
-        server.server_close()
+def test_new_project_asks_for_trust_and_shows_its_folder(
+    client: httpx.Client, ws, tmp_path
+) -> None:
+    assert client.post("/api/projects", json={"name": "Acme"}).status_code == 400  # no trust
+    made = client.post("/api/projects", json={"name": "Acme", "trust": True}).json()["project"]
+    assert made["path"] == str((ws / "Acme").resolve())
+    chosen = tmp_path / "Bids" / "Example Hospital"
+    other = client.post(
+        "/api/projects", json={"name": "Example", "folder": str(chosen), "trust": True}
+    ).json()["project"]
+    assert other["path"] == str(chosen.resolve()) and (chosen / "opportunity.json").exists()
+    for bad in (str(ws), str(ws / "library"), str(chosen / "sub"), "/", "relative"):
+        r = client.post("/api/projects", json={"name": "x", "folder": bad, "trust": True})
+        assert r.status_code == 400, bad
+    listed = {p["id"]: p for p in client.get("/api/projects").json()}
+    assert listed[other["id"]]["path"] == str(chosen.resolve())
+    settings = client.get("/api/settings").json()
+    assert settings["home"] == str(ws) and settings["library"] == str(ws / "library")
+
+
+def test_delete_project_keep_or_delete_files(client: httpx.Client, tmp_path: Path) -> None:
+    folder = tmp_path / "Bids" / "Acme"
+    pid = client.post(
+        "/api/projects", json={"name": "Acme", "folder": str(folder), "trust": True}
+    ).json()["project"]["id"]
+    kept = client.delete(f"/api/projects/{pid}").json()
+    assert kept["files_deleted"] is False and folder.is_dir()  # removed from the list only
+    assert pid not in {p["id"] for p in client.get("/api/projects").json()}
+    back = client.post(
+        "/api/projects", json={"name": "ignored", "folder": str(folder), "trust": True}
+    ).json()  # an existing project folder is added back, with its chats
+    assert back["project"]["path"] == str(folder.resolve())
+    gone = client.delete(f"/api/projects/{back['project']['id']}?files=delete").json()
+    assert gone["files_deleted"] is True and not folder.exists()
+    assert client.delete("/api/projects/nope").status_code in (400, 404)
+
+
+def test_missing_project_folder_is_listed_and_removable(client: httpx.Client, tmp_path) -> None:
+    import shutil
+
+    folder = tmp_path / "Gone"
+    pid = client.post(
+        "/api/projects", json={"name": "Gone", "folder": str(folder), "trust": True}
+    ).json()["project"]["id"]
+    shutil.rmtree(folder)  # deleted outside the app
+    entry = next(p for p in client.get("/api/projects").json() if p["id"] == pid)
+    assert entry["missing"] is True
+    assert client.delete(f"/api/projects/{pid}").status_code == 200
+    assert all(p["id"] != pid for p in client.get("/api/projects").json())
+
+
+def test_open_folder_buttons(client: httpx.Client, ws: Path) -> None:
+    REVEALED.clear()
+    pid, _ = new_project(client, "Acme")
+    assert client.post(f"/api/projects/{pid}/reveal").json()["path"] == str((ws / "Acme").resolve())
+    assert client.post("/api/library/reveal").json()["path"] == str(ws / "library")
+    assert client.post("/api/home/reveal").json()["path"] == str(ws)
+    assert [(ws / "Acme").resolve(), ws / "library", ws] == REVEALED
+
+
+def test_change_the_proposal_studio_folder(client: httpx.Client, tmp_path: Path) -> None:
+    target = tmp_path / "Elsewhere" / "Proposal Studio"
+    assert client.post("/api/settings/home", json={"path": str(target)}).status_code == 400
+    moved = client.post("/api/settings/home", json={"path": str(target), "trust": True}).json()
+    assert moved["home"] == str(target.resolve()) and (target / "library").is_dir()
+    assert client.get("/api/projects").json() == []  # a fresh folder has no projects yet
 
 
 def test_token_cookie_and_header_required(home: Path, ws: Path) -> None:
     _, llm = make(home)
-    server, base = serve(home, llm, workspace=ws, token="s3cret")
+    server, base = serve(home, llm, home=ws, token="s3cret")
     port = server.server_address[1]
     try:
         with httpx.Client(base_url=base, timeout=30) as c:
@@ -227,7 +272,9 @@ def test_token_cookie_and_header_required(home: Path, ws: Path) -> None:
             assert "SameSite=Strict" in cookie
             assert c.get("/api/health").status_code == 200  # reads: the cookie is enough
             assert c.post("/api/projects", json={"name": "x"}).status_code == 401  # writes: +header
-            made = c.post("/api/projects", json={"name": "x"}, headers={"X-Studio": "1"})
+            made = c.post(
+                "/api/projects", json={"name": "x", "trust": True}, headers={"X-Studio": "1"}
+            )
             assert made.status_code == 201
             assert c.get("/").status_code == 200  # the page itself needs no token
     finally:
@@ -273,7 +320,7 @@ def test_models_list_and_role_change(home: Path, ws: Path, monkeypatch) -> None:
 
     monkeypatch.setattr(sysinfo, "total_ram_bytes", lambda: 16 * 1024**3)
     _, llm = make(home)
-    server, base = serve(home, ModelsLLM(llm), workspace=ws)
+    server, base = serve(home, ModelsLLM(llm), home=ws)
     try:
         with httpx.Client(base_url=base, timeout=30) as c:
             info = c.get("/api/models").json()

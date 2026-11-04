@@ -1,8 +1,8 @@
 """Chats and staged uploads for the Studio UI.
 
-A chat belongs to one project (an opportunity) and is saved as
-``workspace/<project>/chats/<chat-id>.json``. Files dropped into the composer are staged in
-``workspace/<project>/.uploads/`` until the message that carries them has been handled.
+A chat belongs to one project and is saved in the project's folder as ``chats/<chat-id>.json``.
+Files dropped into the composer are staged in the project's ``.uploads/`` until the message that
+carries them has been handled.
 """
 
 from __future__ import annotations
@@ -80,14 +80,15 @@ class ChatStore:
         self.root = root
 
     def _dir(self, project: str) -> Path:
-        return sessmod.workspace_dir(self.root) / sessmod.validate_opp_id(project) / CHATS_DIR
+        return sessmod.get_opportunity(self.root, project).path / CHATS_DIR
 
     def _find(self, chat_id: str) -> Path:
         if not CHAT_ID.match(chat_id):
             raise StoreError(f"Unknown chat '{chat_id}'.")
-        base = sessmod.workspace_dir(self.root)
-        for path in base.glob(f"*/{CHATS_DIR}/{chat_id}.json"):
-            return path
+        for opp in sessmod.list_opportunities(self.root):
+            path = opp.path / CHATS_DIR / f"{chat_id}.json"
+            if path.is_file():
+                return path
         raise StoreError(f"Unknown chat '{chat_id}'.")
 
     def create(self, project: str, title: str = "New chat") -> Chat:

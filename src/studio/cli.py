@@ -514,14 +514,11 @@ def chat_cmd() -> None:
 def ui_cmd(
     port: int = typer.Option(8765, "--port", help="Port on 127.0.0.1."),
     no_browser: bool = typer.Option(False, "--no-browser", help="Don't open a browser tab."),
-    workspace: Path = typer.Option(
-        None, "--workspace", help="Open this already-trusted workspace folder."
-    ),
 ) -> None:
     """Start the Proposal Studio app in your browser (local only).
 
-    The app asks which workspace folder to trust and work in, unless you chose "open my last
-    workspace" or pass a trusted `--workspace`.
+    Each project lives in a folder you choose and trust. The Proposal Studio folder (shown in the
+    app's Settings; default ~/Documents/Proposal Studio) holds the shared library.
     """
     import secrets
     import webbrowser
@@ -532,27 +529,21 @@ def ui_cmd(
     root = cfgmod.project_root()
     if not (root / "config").is_dir():
         _fail(f"No config/ folder in {root}. Run from the project folder or set STUDIO_HOME.")
-    folder = None
-    if workspace is not None:
-        if trust.is_trusted(workspace):
-            folder = workspace.expanduser().resolve()
-        else:
-            typer.echo(f"{workspace} isn't trusted yet; choose it in the app to trust it.")
-    elif trust.open_last():
-        folder = trust.last_workspace()
+    home = trust.home_dir()
     token = secrets.token_urlsafe(24)
     try:
         server = make_server(
             root,
             lambda: OllamaClient(cfgmod.load_config(root).models),
             port,
-            workspace=folder,
+            home=home,
             token=token,
         )
     except OSError as exc:
         _fail(f"Can't listen on port {port} ({exc}). Try `studio ui --port {port + 1}`.")
     url = f"http://127.0.0.1:{server.server_address[1]}/?t={token}"
     typer.echo(f"Proposal Studio is running at {url}")
+    typer.echo(f"Proposal Studio folder (library, new projects): {home}")
     typer.echo("Keep this link private (it unlocks the app for this session). Ctrl+C to stop.")
     if not no_browser:
         webbrowser.open(url)

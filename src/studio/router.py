@@ -134,7 +134,7 @@ class Decision:
 class RouterContext:
     """What the router needs from its host."""
 
-    root: Path  # data: projects and library (the trusted workspace folder in the UI)
+    root: Path  # data: the Proposal Studio folder in the app (library, project list)
     llm_factory: Callable[[], LLMClient]
     allow_local_paths: bool = False  # REPL: True. Chat UI: files arrive as attachments.
     route_overrides: dict[str, Any] = field(default_factory=dict)

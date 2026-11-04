@@ -5,10 +5,11 @@ in ``static/`` and a small JSON API. Message replies stream as Server-Sent Event
 (progress line), ``chunk`` (reply text), ``pending`` (an action waits for Approve/Reject) and
 ``done`` (files produced). Nothing is fetched from the internet; there is no telemetry.
 
-Data lives in a **trusted workspace folder** the user picks in the UI (see :mod:`studio.trust`);
-until one is open, data endpoints answer 409 ``{"needs_workspace": true}``. Config and templates
-come from the app folder. With a per-launch ``token``, every ``/api/*`` request needs the
-session cookie (set by visiting ``/?t=<token>``) and an ``X-Studio: 1`` header.
+Each **project** lives in a folder the user chose and trusted; the *Proposal Studio folder*
+(``home``) holds the shared ``library/`` and the list of projects (see :mod:`studio.session`).
+Config and templates come from the app folder. With a per-launch ``token``, every ``/api/*``
+request needs the session cookie (set by visiting ``/?t=<token>``); writes also need an
+``X-Studio: 1`` header.
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ import hmac
 import json
 import mimetypes
 import re
+import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -67,8 +70,15 @@ def tagged(model: str) -> str:
     return model if ":" in model else f"{model}:latest"
 
 
-def no_workspace() -> ApiError:
-    return ApiError(HTTPStatus.CONFLICT, "Choose a workspace folder first.", needs_workspace=True)
+def reveal(path: Path) -> None:
+    """Show ``path`` in the file manager (Finder, Explorer, or the desktop's default)."""
+    if sys.platform == "darwin":
+        cmd = ["open", str(path)]
+    elif sys.platform == "win32":
+        cmd = ["explorer", str(path)]
+    else:
+        cmd = ["xdg-open", str(path)]
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # noqa: S603
 
 
 @dataclass
@@ -77,21 +87,20 @@ class StudioApp:
 
     app_root: Path  # config/ and templates/
     llm_factory: Callable[[], LLMClient]
-    workspace: Path | None = None  # the trusted data folder; None until the user picks one
+    home: Path  # the Proposal Studio folder: library/ + .studio/ (project list, sessions)
     token: str | None = None  # per-launch API token (None: no token check, e.g. tests)
-    _router: Router | None = field(default=None, init=False)
-    _chats: ChatStore | None = field(default=None, init=False)
+    reveal: Callable[[Path], None] = reveal
+    router: Router = field(init=False)
+    chats: ChatStore = field(init=False)
     _locks: dict[str, threading.Lock] = field(default_factory=dict, init=False)
     _locks_guard: threading.Lock = field(default_factory=threading.Lock, init=False)
 
     def __post_init__(self) -> None:
-        if self.workspace is not None:
-            self.activate(self.workspace)
+        self.set_home(self.home)
 
-    def activate(self, folder: Path) -> None:
-        """Open a trusted workspace folder (all data reads and writes go there)."""
-        if not trust.is_trusted(folder):
-            raise ApiError(HTTPStatus.FORBIDDEN, f"{folder} isn't a trusted workspace.")
+    def set_home(self, folder: Path) -> None:
+        """Use ``folder`` as the Proposal Studio folder (created if missing)."""
+        sessmod.init_home(folder)
         ctx = RouterContext(
             folder,
             self.llm_factory,
@@ -99,38 +108,23 @@ class StudioApp:
             app_root=self.app_root,
             allow_agent_config=False,
         )
-        self.workspace = folder
-        self._router = Router(ctx)
-        self._chats = ChatStore(folder)
+        self.home = folder
+        self.router = Router(ctx)
+        self.chats = ChatStore(folder)
         with self._locks_guard:
             self._locks.clear()
-        trust.touch(folder)
 
     @property
     def root(self) -> Path:
-        if self.workspace is None:
-            raise no_workspace()
-        return self.workspace
+        return self.home
 
-    @property
-    def router(self) -> Router:
-        if self._router is None:
-            raise no_workspace()
-        return self._router
-
-    @property
-    def chats(self) -> ChatStore:
-        if self._chats is None:
-            raise no_workspace()
-        return self._chats
-
-    def workspace_info(self) -> dict[str, Any]:
+    def settings(self) -> dict[str, Any]:
         return {
-            "active": str(self.workspace) if self.workspace else None,
-            "name": self.workspace.name if self.workspace else None,
-            "trusted": trust.trusted(),
-            "open_last": trust.open_last(),
-            "home": str(Path.home()),
+            "home": str(self.home),
+            "library": str(self.home / sessmod.LIBRARY_DIR),
+            "user_dir": str(trust.user_dir()),
+            "user_home": str(Path.home()),
+            "sep": "\\" if sys.platform == "win32" else "/",
         }
 
     def models(self) -> dict[str, Any]:
@@ -176,12 +170,21 @@ class StudioApp:
                 {
                     "id": opp.id,
                     "title": opp.title or opp.id,
+                    "path": str(opp.path),
+                    "missing": False,
                     "created": opp.created,
                     "updated": chats[0].updated if chats else opp.created,
                     "chats": [c.summary() for c in chats],
                 }
             )
-        return sorted(out, key=lambda p: p["updated"], reverse=True)
+        out.sort(key=lambda p: p["updated"], reverse=True)
+        for opp_id, path, ok in sessmod.registry_entries(self.root):
+            if not ok:  # moved or deleted outside the app: shown so it can be removed
+                out.append(
+                    {"id": opp_id, "title": path.name or opp_id, "path": str(path),
+                     "missing": True, "created": "", "updated": "", "chats": []}
+                )  # fmt: skip
+        return out
 
     def project(self, project: str) -> dict[str, Any]:
         opp = self.opp(project)
@@ -191,6 +194,7 @@ class StudioApp:
         return {
             "id": opp.id,
             "title": opp.title or opp.id,
+            "path": str(opp.path),
             "status": info,
             "files": [{"name": n, "chunks": info["files"].get(n, 0)} for n in files],
             "chats": [c.summary() for c in self.chats.list(opp.id)],
@@ -300,9 +304,10 @@ class Handler(BaseHTTPRequestHandler):
         (m, re.compile(f"^{p}$"), h)
         for m, p, h in [
             ("GET", r"/api/health", "health"),
-            ("GET", r"/api/workspace", "get_workspace"),
-            ("POST", r"/api/workspace", "open_workspace"),
-            ("POST", r"/api/workspace/forget", "forget_workspace"),
+            ("GET", r"/api/settings", "get_settings"),
+            ("POST", r"/api/settings/home", "set_home"),
+            ("POST", r"/api/library/reveal", "reveal_library"),
+            ("POST", r"/api/home/reveal", "reveal_home"),
             ("GET", r"/api/fs", "list_dirs"),
             ("POST", r"/api/fs/mkdir", "make_dir"),
             ("GET", r"/api/models", "get_models"),
@@ -311,6 +316,8 @@ class Handler(BaseHTTPRequestHandler):
             ("POST", r"/api/projects", "create_project"),
             ("GET", r"/api/projects/([^/]+)", "get_project"),
             ("PATCH", r"/api/projects/([^/]+)", "rename_project"),
+            ("DELETE", r"/api/projects/([^/]+)", "delete_project"),
+            ("POST", r"/api/projects/([^/]+)/reveal", "reveal_project"),
             ("POST", r"/api/projects/([^/]+)/chats", "create_chat"),
             ("PUT", r"/api/projects/([^/]+)/uploads/([^/]+)", "upload"),
             ("DELETE", r"/api/projects/([^/]+)/files/([^/]+)", "delete_file"),
@@ -481,34 +488,29 @@ class Handler(BaseHTTPRequestHandler):
                 "version": __version__,
                 "ollama": ollama,
                 "loaded": loaded or [],
-                "workspace": str(self.app.workspace) if self.app.workspace else None,
+                "home": str(self.app.home),
             }
         )
 
-    def api_get_workspace(self) -> None:
-        self._json(self.app.workspace_info())
+    def api_get_settings(self) -> None:
+        self._json(self.app.settings())
 
-    def api_open_workspace(self) -> None:
+    def api_set_home(self) -> None:
         body = self._payload()
-        path = str(body.get("path") or "")
-        folder = trust.check_candidate(path)
-        if not trust.is_trusted(folder):
-            if body.get("trust") is not True:
-                raise ApiError(
-                    HTTPStatus.BAD_REQUEST, f"Trust {folder} first.", needs_trust=str(folder)
-                )
-            folder = trust.trust(folder)
-        if "open_last" in body:
-            trust.set_open_last(bool(body["open_last"]))
-        self.app.activate(folder)
-        self._json(self.app.workspace_info())
+        if body.get("trust") is not True:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Confirm that you trust this folder.")
+        self.app.set_home(trust.set_home(str(body.get("path") or "")))
+        self._json(self.app.settings())
 
-    def api_forget_workspace(self) -> None:
-        folder = Path(str(self._payload().get("path") or "")).expanduser()
-        trust.untrust(folder)
-        if self.app.workspace and self.app.workspace == folder.resolve():
-            self.app.workspace, self.app._router, self.app._chats = None, None, None
-        self._json(self.app.workspace_info())
+    def api_reveal_home(self) -> None:
+        self.app.reveal(self.app.home)
+        self._json({"path": str(self.app.home)})
+
+    def api_reveal_library(self) -> None:
+        folder = self.app.home / sessmod.LIBRARY_DIR
+        folder.mkdir(parents=True, exist_ok=True)
+        self.app.reveal(folder)
+        self._json({"path": str(folder)})
 
     def api_list_dirs(self) -> None:
         raw = parse_qs(urlparse(self.path).query).get("path", [""])[0]
@@ -528,7 +530,8 @@ class Handler(BaseHTTPRequestHandler):
                 "path": str(folder),
                 "parent": str(folder.parent) if folder.parent != folder else None,
                 "dirs": dirs,
-                "trusted": trust.is_trusted(folder),
+                "project": (folder / sessmod.OPP_FILE).is_file(),
+                "empty": not any(folder.iterdir()),
                 "home": str(Path.home()),
             }
         )
@@ -570,9 +573,23 @@ class Handler(BaseHTTPRequestHandler):
         self._json(self.app.projects())
 
     def api_create_project(self) -> None:
-        name = str(self._payload().get("name") or "").strip() or "Untitled project"
-        opp = sessmod.create_project(self.app.root, name)
-        chat = self.app.chats.create(opp.id)
+        """New project in a trusted folder (default: a new folder in the Proposal Studio folder).
+
+        A folder that already holds a project is added back to the list instead.
+        """
+        body = self._payload()
+        if body.get("trust") is not True:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Confirm that you trust the project folder.")
+        name = str(body.get("name") or "").strip() or "Untitled project"
+        raw = str(body.get("folder") or "").strip()
+        folder = trust.check_candidate(raw) if raw else None
+        if folder is not None and (folder / sessmod.OPP_FILE).is_file():
+            opp = sessmod.import_project(self.app.root, folder)
+            chats = self.app.chats.list(opp.id)
+            chat = chats[0] if chats else self.app.chats.create(opp.id)
+        else:
+            opp = sessmod.create_project(self.app.root, name, folder)
+            chat = self.app.chats.create(opp.id)
         self._json({"project": self.app.project(opp.id), "chat": chat.model_dump()}, 201)
 
     def api_get_project(self, project: str) -> None:
@@ -582,6 +599,17 @@ class Handler(BaseHTTPRequestHandler):
         self.app.opp(project)
         sessmod.rename_opportunity(self.app.root, project, str(self._payload().get("title", "")))
         self._json(self.app.project(project))
+
+    def api_delete_project(self, project: str) -> None:
+        delete_files = parse_qs(urlparse(self.path).query).get("files", [""])[0] == "delete"
+        with self.app.lock(project):
+            path = sessmod.remove_project(self.app.root, project, delete_files=delete_files)
+        self._json({"deleted": project, "path": str(path), "files_deleted": delete_files})
+
+    def api_reveal_project(self, project: str) -> None:
+        opp = self.app.opp(project)
+        self.app.reveal(opp.path)
+        self._json({"path": str(opp.path)})
 
     def api_create_chat(self, project: str) -> None:
         self.app.opp(project)
@@ -669,15 +697,16 @@ def make_server(
     llm_factory: Callable[[], LLMClient],
     port: int = 8765,
     *,
-    workspace: Path | None = None,
+    home: Path,
     token: str | None = None,
+    reveal_fn: Callable[[Path], None] = reveal,
 ) -> ThreadingHTTPServer:
     """A ready-to-serve UI server on 127.0.0.1:``port`` (0 picks a free port).
 
-    ``workspace`` opens a trusted folder straight away; otherwise the UI asks for one.
-    ``token`` (``studio ui`` passes a random one) protects the API; see :class:`Handler`.
+    ``home`` is the Proposal Studio folder (created if missing). ``token`` (``studio ui`` passes a
+    random one) protects the API; see :class:`Handler`.
     """
-    app = StudioApp(app_root, llm_factory, workspace=workspace, token=token)
+    app = StudioApp(app_root, llm_factory, home=home, token=token, reveal=reveal_fn)
     handler = type("StudioHandler", (Handler,), {"app": app})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     server.daemon_threads = True

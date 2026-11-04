@@ -29,7 +29,7 @@ from pydantic import ValidationError
 from studio.config import AgentsConfig, AgentSpec
 from studio.deck.schemas import Deck
 from studio.guards import GuardError, check_model_allowed, resolve_in_sandbox
-from studio.session import workspace_dir
+from studio.session import project_path
 
 LineFn = Callable[[str], None]
 MAX_DIFF_BYTES = 200_000
@@ -62,10 +62,11 @@ class AgentRun:
 
 def sandbox_dir(cfg: AgentsConfig, root: Path, opp_id: str) -> Path:
     """``workspace/<opp>/agent`` (from ``sandbox_root``), resolved under the project root."""
-    raw = cfg.sandbox_root.replace("{opp}", opp_id)
-    if raw.startswith("workspace/"):  # follow the projects folder (``projects/`` in the UI)
-        return (workspace_dir(root) / raw.removeprefix("workspace/")).resolve()
-    path = Path(raw)
+    template = cfg.sandbox_root
+    if template.startswith("workspace/{opp}"):  # inside the project's own folder
+        rest = template.removeprefix("workspace/{opp}").strip("/")
+        return (project_path(root, opp_id) / rest).resolve()
+    path = Path(template.replace("{opp}", opp_id))
     return (path if path.is_absolute() else root / path).resolve()
 
 
