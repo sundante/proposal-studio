@@ -26,8 +26,9 @@ It all runs on a 16 GB laptop with no admin rights, no Docker and no internet at
    - macOS/Linux: `scripts/setup.sh`
 3. Go offline and start it: `scripts\start.ps1` / `scripts/start.sh`. Your browser opens
    Proposal Studio.
-4. Choose a **workspace folder** for your bids and confirm that you trust it. Proposal Studio
-   reads and writes only inside it.
+4. Click **New project**, name it, and confirm that you trust its folder. By default that's a
+   new folder in `Documents/Proposal Studio/`, but you can pick any folder. Proposal Studio reads
+   and writes only there.
 
 The full guide is in [docs/install.md](docs/install.md). Check the install with
 `scripts/smoke_test.*`.
@@ -38,7 +39,8 @@ The full guide is in [docs/install.md](docs/install.md). Check the install with
 
 ## Daily workflow
 
-1. Drop the RFP onto the page. A project is created, and the files are PHI-checked and indexed.
+1. Drop the RFP onto the page and choose the project's folder. The files are PHI-checked and
+   indexed. Every project shows its folder path, and **⋯ → Open folder** opens it.
 2. Ask anything: "When are proposals due?", "What are the mandatory requirements?" Answers cite
    `[section, p.N]`.
 3. **Analyse RFP** builds the digest: problems, requirements, evaluation criteria, compliance
@@ -86,9 +88,9 @@ a terminal.
 
 - [x] Models run in local Ollama only; cloud models are refused.
 - [x] The app runs on 127.0.0.1 only, behind a per-launch link, and reads and writes only
-      inside the workspace folder you trusted.
+      inside the project folders you trusted.
 - [x] No telemetry in Proposal Studio's code.
-- [x] RFPs, the library, workspaces and your templates are gitignored, and the commit hooks
+- [x] RFPs, the library, project folders and your templates are gitignored, and the commit hooks
       block them.
 - [x] Files are scanned for PHI on ingest; harvested blocks are anonymised and curated by you.
 - [ ] You've checked that your organisation allows these tools on your machine.

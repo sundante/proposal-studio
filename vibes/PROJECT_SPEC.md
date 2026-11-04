@@ -7,7 +7,7 @@
 > **As built** below point to those changes.
 >
 > **Phase 11–12 (2026-11-04):** Open WebUI was replaced by the **Studio UI** (`studio ui`): a
-> local, stdlib-served browser app with trusted workspace folders. §1, §2, §4.2, §5.1, §5.3 and §12
+> local, stdlib-served browser app where each project lives in a folder the user trusts. §1, §2, §4.2, §5.1, §5.3 and §12
 > below describe it; the Open WebUI design is preserved on the `archive/open-webui` branch.
 
 > This file is the single source of truth for building Proposal Studio. Keep it in the repo root.
@@ -56,10 +56,11 @@ tasks inside a sandbox, not the backbone.
 ```
 Studio UI (browser → http://127.0.0.1:8765, per-launch link; single page, no CDN)
  │   projects + chats sidebar · drag-and-drop · Analyse RFP / Build slides / Download PPTX
- │   side panel: files, RFP summary, slides · Models view · workspace switcher
+ │   side panel: files (+ project folder path), RFP summary, slides · Models · Settings
  ▼
 studio.ui.server  (stdlib ThreadingHTTPServer, JSON API + Server-Sent Events, 127.0.0.1 only;
- │                 data only inside a TRUSTED workspace folder: projects/, library/, .studio/)
+ │                 each project in a folder the user TRUSTED; the Proposal Studio folder holds
+ │                 library/ and .studio/projects.json)
  ▼
 studio core (Python package `studio`)
    ├── router      (commands + auto classifier)
@@ -71,7 +72,7 @@ studio core (Python package `studio`)
    ├── render      (python-pptx on firm template, NO LLM)
    ├── research    (offline multi-step research over library)
    ├── agents      (adapters → headless CLI subprocess, sandboxed per project, two-phase approval)
-   ├── trust       (per-user registry of trusted workspace folders)
+   ├── trust       (folder safety checks + per-user settings: where the Proposal Studio folder is)
    └── llm         (Ollama client, structured output, guards)
         │
         ▼
@@ -79,8 +80,8 @@ Ollama (localhost:11434) — OLLAMA_MAX_LOADED_MODELS=1
 ```
 
 The same router also serves `studio chat` (terminal) and the per-command CLI, so behaviour is
-testable outside the UI. Config and templates live in the app folder (`STUDIO_HOME`); data lives in
-the workspace folder the user trusted.
+testable outside the UI. Config and templates live in the app folder (`STUDIO_HOME`); each project
+lives in a folder the user chose and trusted; the shared library lives in the Proposal Studio folder.
 
 ---
 
@@ -181,7 +182,8 @@ think: false                  # disable qwen3 thinking by default (speed); per-r
 ### 4.2 Runtime configuration from the chat
 Two mechanisms, both required:
 1. **Studio UI**: the Models view assigns the model per role (router, worker, embed) and shows
-   what's installed, loaded and fits in RAM; the workspace switcher picks the data folder.
+   what's installed, loaded and fits in RAM; Settings shows (and changes) the Proposal Studio
+   folder.
 2. **`/config` command**:
    - `/config` → show the effective config (models, thresholds, active opp, agent list)
    - `/config set worker.model qwen3:4b` → change at runtime (persisted to a user override file
@@ -445,12 +447,17 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 - Claude Code: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (in the adapter env).
 - OpenCode: disable sharing/telemetry features per its docs.
 
-### 12.3 Workspace folders
-- At launch the app asks for a workspace folder and an explicit **Trust** (unless the user chose
-  "open my last workspace"). Whole drives, the home folder itself and system folders are refused.
-- Trust is recorded per user (`%APPDATA%\ProposalStudio\trusted.json` or
-  `~/.proposal-studio/trusted.json`); the folder gets `.studio/workspace.json`, `projects/` and
-  `library/`. Data endpoints refuse to work until a trusted workspace is open.
+### 12.3 Projects and folders
+- One concept: a **project** = one bid = one folder the user picks (default
+  `~/Documents/Proposal Studio/<name>`) and explicitly **trusts** in the New project dialog. A
+  folder already holding a project is added back. Whole drives, the home folder itself, system
+  folders, the Proposal Studio folder/library, and folders overlapping another project are refused.
+- The **Proposal Studio folder** (per-user setting, `settings.json` in `%APPDATA%\ProposalStudio`
+  or `~/.proposal-studio`) holds `library/` and `.studio/` (`projects.json` = `{id: folder}`,
+  sessions). The path of every project and of the library is always visible, with **Open folder**.
+- Everything that can be created can be removed: projects (remove from list keeping files, or
+  delete the folder — only a folder containing that project's `opportunity.json`), chats, files.
+  Projects whose folder disappeared are listed as missing so they can be removed.
 
 ### 12.4 UX rules in chat
 - Every long step emits status events ("Embedding 214 chunks…", "Writing slide 4/9…").

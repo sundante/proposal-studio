@@ -57,29 +57,46 @@ private. If you close the tab, open the link from the terminal again.
 > On Windows, if the Ollama tray app is already running, the `OLLAMA_*` settings in
 > `offline.env` don't reach it. Quit the tray app before `start.ps1` so it starts Ollama itself.
 
-## 4. Choose a workspace folder
+## 4. Projects and folders
 
-The first thing the app asks for is a **workspace folder** it may read and write, for example
-`Documents\Bids\Acme 2026`, and you confirm that you **trust** it. Nothing outside it is
-touched. Inside it:
+Each **project** (one bid or RFP) lives in **a folder you choose and trust**:
+- Click **New project** and give it a name.
+- By default the folder is created in your *Proposal Studio folder*:
+  - Windows: `Documents\Proposal Studio\<project name>`
+  - macOS/Linux: `~/Documents/Proposal Studio/<project name>`
+- **Choose another folder…** lets you put it anywhere, including a folder that already holds
+  your bid documents.
+- You must tick **I trust this folder** before anything is created. Proposal Studio reads and
+  writes only inside that folder.
 
-| Folder | Holds |
+A project folder contains:
+
+| Item | Holds |
 |---|---|
-| `projects/` | one folder per bid: uploaded files, chats, the index, the digest, deck.json, outputs |
-| `library/` | your past proposals, reference documents and curated content blocks |
-| `.studio/` | the workspace marker, caches and logs |
+| `input/` | the RFP files you uploaded |
+| `out/` | rendered PowerPoint decks and requirement matrices |
+| `chats/` | the project's chats |
+| `index/`, `research/`, `agent/` | the search index, research reports, agent sandbox |
+| `opportunity.json`, `digest.json`, `deck.json` | project info, RFP summary, slide content |
 
-The list of trusted folders is kept for your user account, outside every workspace:
-- Windows: `%APPDATA%\ProposalStudio\trusted.json`
-- macOS/Linux: `~/.proposal-studio/trusted.json`
+Where things are:
+- Every project shows its path in the sidebar, and in full at the top of the **Files** tab.
+  **Open folder** shows it in Explorer or Finder.
+- **Settings** (sliders icon, bottom of the sidebar) shows:
+  - the **Proposal Studio folder**, which holds the shared **library** (past proposals,
+    reference documents, content blocks) and the list of your projects;
+  - the folder where the app keeps its own settings.
 
-Switch workspaces from the folder name at the top of the sidebar. To skip the question at
-launch, tick **Open this workspace automatically next time**.
+Removing and deleting, via **⋯** next to a project:
+- **Remove from list (keep files)** forgets the project, but its folder stays. Add it back with
+  **New project → Choose another folder…**, pointing at that folder.
+- **Delete project and its folder…** permanently deletes the folder and everything in it.
+- Chats and files have their own delete buttons.
 
 ## 5. Use it
 
-1. Drop the RFP (PDF, Word, Excel, PowerPoint or text) onto the page. A project is created and
-   the files are read, PHI-checked and indexed.
+1. Drop the RFP (PDF, Word, Excel, PowerPoint or text) onto the page and choose the project
+   folder. The files are read, PHI-checked and indexed.
 2. Ask questions in plain language. Answers cite `[section, p.N]`.
 3. Click **Analyse RFP** for the summary (requirements, criteria, compliance, risks). It appears
    in the side panel.
@@ -117,11 +134,12 @@ laptop.
 ## Upgrading
 
 Download the new release (or `git pull`) and re-run `setup`. These are kept:
-- your workspace folders;
+- your project folders and the Proposal Studio folder (library);
 - `templates/` (your own templates);
 - `config/overrides.yaml`.
 
 Upgrading from the Open WebUI version (0.1.x development builds):
 - The Open WebUI setup was removed. It is archived on the `archive/open-webui` branch.
-- To keep old projects, move the folders from `workspace/` into a trusted workspace's
-  `projects/` folder, and `library/` into its `library/`.
+- To keep old projects, use **New project → Choose another folder…** and pick each folder in
+  the old `workspace/` (they're added back with their files). Copy `library/` into the
+  Proposal Studio folder's `library/`.

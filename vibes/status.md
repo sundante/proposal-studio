@@ -155,3 +155,13 @@ writes, and agent commands can no longer be changed from chat. Open WebUI is gon
 scripts, release job, docs, tutorial and spec. Checked live on qwen3:8b: pick and trust a folder,
 then drop the RFP and get a cited answer, with headless-Chrome screenshots in light and dark mode.
 Next: Phase 13, the document workbench.
+
+## Phase 12.1 — Projects in folders you choose (2026-11-04)
+Feedback: workspaces and projects were two confusing concepts, projects couldn't be deleted, and it
+wasn't clear where files went. Now there's one concept. A **project** lives in a folder you pick and
+trust when you create it; by default that's a new folder in `Documents/Proposal Studio/` named after
+the project. Its path shows in the sidebar and in full in the Files tab, with **Open folder** and
+**Copy path**. Each project's **⋯** menu has New chat, Rename, Open folder, Copy path, Remove from
+list (files kept) and Delete project and its folder. Settings shows the Proposal Studio folder,
+which holds the shared library, and where app settings live. Starting from the home screen asks for
+the project name and folder first. Checked live with headless-Chrome screenshots; 213 tests pass.

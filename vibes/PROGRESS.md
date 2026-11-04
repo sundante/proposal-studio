@@ -16,6 +16,7 @@
 | 11a | Studio UI: local chat app (`studio ui`) | ✅ done | 0f4b457 |
 | 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | fd00b3c |
 | 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
+| 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | (this commit) |
 | 13 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
 | 14 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
 | 15 | Model router and suggestions | ⬜ todo | |
@@ -38,8 +39,10 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
   and `tests/test_trust.py`); checked by hand with headless-Chrome screenshots.
 - The per-launch link changes every start; a bookmarked `http://127.0.0.1:8765/` shows "open it
   from its link". `start.*` always opens the right link.
-- Old CLI data in `workspace/` isn't migrated automatically into a trusted workspace (move
-  folders into `projects/`; documented in docs/install.md).
+- Old CLI projects in `workspace/` aren't listed automatically; add each back with New project →
+  Choose another folder… (documented in docs/install.md).
+- Changing the Proposal Studio folder in Settings starts a fresh project list there (projects
+  listed in the old folder can be added back by folder); library files aren't moved.
 - `setup.ps1`/`start.ps1` changes are syntax-checked in CI but not yet run on Windows.
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
   troubleshooting.md and the tutorial recommend one format per document).

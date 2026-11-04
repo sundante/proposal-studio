@@ -25,10 +25,17 @@ upgrades. `/config reset` removes it.
 | `agents.yaml` | Agent CLI command templates, env, sandbox copy-in list, timeout (see [agents.md](agents.md)) |
 
 `STUDIO_HOME` sets the app folder (where `config/` and `templates/` live); without it, the current
-folder is used, and the start scripts set it for you. In the app, projects and the library live
-in the **workspace folder** you trust (`projects/`, `library/`); the CLI keeps using
-`workspace/` and `library/` under `STUDIO_HOME`. The list of trusted folders is per user
-(`$STUDIO_USER_DIR` overrides where it's kept). `/config set agents.…` is refused in the app.
+folder is used, and the start scripts set it for you.
+
+In the app:
+- Each project lives in a folder you chose and trusted.
+- The **Proposal Studio folder** (default `~/Documents/Proposal Studio`; change it in Settings)
+  holds the shared `library/` and the list of projects (`.studio/projects.json`).
+- App settings are kept per user in `%APPDATA%\ProposalStudio` or `~/.proposal-studio`;
+  `$STUDIO_USER_DIR` overrides this.
+- `/config set agents.…` is refused.
+
+The CLI keeps using `workspace/` and `library/` under `STUDIO_HOME`.
 
 ## `include_if` rules (storyline.yaml)
 

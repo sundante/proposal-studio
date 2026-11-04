@@ -10,7 +10,8 @@ first). **Nothing leaves the machine at runtime.**
 - **UI:** the Proposal Studio app (`studio ui`) listens on `127.0.0.1` only and loads nothing from
   the internet (no CDN, fonts or analytics). Each launch has a secret link; the API needs its
   session cookie, and writes also need a custom header, so other web pages can't drive it. It
-  reads and writes only inside the workspace folder you trusted.
+  reads and writes only inside the project folders you trusted and the Proposal Studio folder
+  (library).
 - **Embeddings:** `nomic-embed-text` through Ollama, so no Hugging Face downloads
   (`HF_HUB_OFFLINE=1`).
 - **Agents:** local CLIs pointed at local Ollama, with network-fetching features switched off.
@@ -25,7 +26,7 @@ Internet is used only during **setup** (pip packages, `ollama pull`, optional np
 
 | Folder | Contents |
 |---|---|
-| `workspace/<opp>/` | RFP files, index, digest, outline, deck, renders, research reports, agent sandbox |
+| a project folder (app) or `workspace/<opp>/` (CLI) | RFP files, index, digest, outline, deck, renders, research reports, agent sandbox |
 | `library/` | Past proposals, reference documents, harvested blocks, library indexes |
 | `templates/` | Your own templates (only `templates/sample/` is in the repo) |
 | `config/overrides.yaml` | Your settings |
@@ -49,6 +50,6 @@ A pre-commit hook and a CI check refuse to commit any of these.
 
 - [ ] Your organisation permits these tools (Proposal Studio, Ollama, the models) on this machine.
 - [ ] `scripts/start.*` is used, so the offline environment is applied.
-- [ ] Workspace folders live outside the repository (e.g. `Documents\Bids\…`).
+- [ ] Project folders live outside the repository (default: `Documents\Proposal Studio\…`).
 - [ ] The Ollama tray app isn't overriding the `OLLAMA_*` settings (see troubleshooting).
-- [ ] Real client files stay in your workspace folders, never in the repository.
+- [ ] Real client files stay in your project folders, never in the repository.

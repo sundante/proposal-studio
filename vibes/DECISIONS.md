@@ -464,3 +464,27 @@ Format:
 - Why: users asked for an "always ask for a folder to trust" model, a working area they can shape,
   and visibility of models; the review found the new API unauthenticated.
 - Spec impact: §1, §2, §4.2, §5.1, §5.3, §10.2, §12, §15, §16.3–16.4 updated.
+
+## 2026-11-04 — One concept: projects live in folders you trust (replaces "workspaces")
+- Decision (user feedback: "Workspace vs Projects — keep one"; "projects can't be deleted";
+  "where are folders created?"):
+  1. **Workspaces are gone.** A *project* (one bid) lives in a folder the user picks and ticks
+     **I trust this folder** for, in the New project dialog. Default:
+     `~/Documents/Proposal Studio/<name>` (folder named after the project, spaces kept). Any other
+     folder is allowed, subject to `trust.check_candidate` plus no overlap with another project or
+     with the Proposal Studio folder/library. A folder that already holds a project is added back.
+  2. **Proposal Studio folder** (per-user setting in `settings.json`; Settings → Change…) holds the
+     shared `library/` and `.studio/` (`projects.json` registry `{id: folder}`, sessions). It's
+     the app's `RouterContext.root`, so library code is unchanged; `session` resolves project
+     folders through the registry (`project_path`). The CLI keeps `workspace/<id>/`.
+  3. **Delete wherever you can create:** projects get Remove from list (keep files) and Delete
+     project and its folder (only a folder whose `opportunity.json` has that id; never the
+     Proposal Studio folder, home or library). Projects whose folder vanished are listed as
+     missing and can be removed. Chats and files already had delete.
+  4. **Paths are always visible:** sidebar (compact path, full path on hover), Files tab (full
+     path, Open folder, Copy path), Settings (Proposal Studio folder, library, app settings).
+     **Open folder** asks the OS file manager (`open` / `explorer` / `xdg-open`) for a path the
+     server already knows; no user-supplied path is opened.
+  5. The per-user trusted-workspaces list and `studio ui --workspace` are removed (unreleased).
+- Why: two nested concepts confused users and hid where files went.
+- Spec impact: §1, §2, §4.2, §12.3 updated.

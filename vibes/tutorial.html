@@ -167,7 +167,7 @@
   <h2>Set up</h2>
   <a href="#install">1. Install</a>
   <a href="#start">2. Start it</a>
-  <a href="#workspace">3. Choose a workspace</a>
+  <a href="#workspace">3. Projects &amp; folders</a>
   <a href="#check">4. Check everything works</a>
   <h2>Use it</h2>
   <a href="#first">Your first proposal</a>
@@ -223,7 +223,7 @@
     window in your browser (<code>studio ui</code>). <strong>Ollama</strong> runs the AI models on
     your machine. The <strong>studio</strong> Python package does the actual work, and it's the
     same code whether you use the app, the terminal chat or the CLI.</p>
-  <div class="diagram" role="img" aria-label="Architecture: the Proposal Studio app in the browser talks to the local studio server, which calls the router. The router dispatches to ingest, ask, digest, deck, render, research and agents, which use Ollama on localhost and files in your trusted workspace folder.">
+  <div class="diagram" role="img" aria-label="Architecture: the Proposal Studio app in the browser talks to the local studio server, which calls the router. The router dispatches to ingest, ask, digest, deck, render, research and agents, which use Ollama on localhost and files in the project folders you trusted.">
     <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg">
       <rect class="d-box" x="20" y="20" width="200" height="70" rx="10"/>
       <text x="120" y="50" text-anchor="middle" font-weight="700">Proposal Studio app</text>
@@ -255,10 +255,10 @@
       <text x="820" y="112" text-anchor="middle" class="d-small">localhost:11434</text>
       <text x="820" y="128" text-anchor="middle" class="d-small">one model at a time</text>
       <rect class="d-box" x="760" y="190" width="120" height="100" rx="10"/>
-      <text x="820" y="220" text-anchor="middle" font-weight="700">Workspace</text>
-      <text x="820" y="242" text-anchor="middle" class="d-small">projects/</text>
-      <text x="820" y="258" text-anchor="middle" class="d-small">library/</text>
-      <text x="820" y="274" text-anchor="middle" class="d-small">(you trust it)</text>
+      <text x="820" y="220" text-anchor="middle" font-weight="700">Your folders</text>
+      <text x="820" y="242" text-anchor="middle" class="d-small">one per project</text>
+      <text x="820" y="258" text-anchor="middle" class="d-small">+ shared library</text>
+      <text x="820" y="274" text-anchor="middle" class="d-small">(you trust them)</text>
       <path class="d-line" d="M710 100 H760" stroke-dasharray="4 4"/><path class="d-line" d="M710 240 H760" stroke-dasharray="4 4"/>
       <text x="450" y="345" text-anchor="middle" class="d-small">Everything above runs on your laptop. Internet is only used during setup.</text>
     </svg>
@@ -355,21 +355,30 @@ scripts/setup.sh</code></pre></div>
 
 <!-- ====================================================================================== -->
 <section id="workspace">
-  <h2 class="sec"><span class="num">3</span>Choose a workspace folder</h2>
-  <p>The first time the app opens, it asks which <strong>workspace folder</strong> it may read and
-    write, for example <code>Documents\Bids\Acme 2026</code>. Browse to it (or use
-    <strong>New folder</strong>), click <strong>Use this folder</strong>, then confirm
-    <strong>Trust and open</strong>. Nothing outside that folder is touched.</p>
+  <h2 class="sec"><span class="num">3</span>Projects &amp; folders</h2>
+  <p>A <strong>project</strong> is one bid, and it lives in <strong>a folder you choose and
+    trust</strong>. Click <strong>New project</strong>, give it a name and tick <em>I trust this
+    folder</em>. By default a new folder is created at
+    <code>Documents\Proposal Studio\&lt;project name&gt;</code>. Use <strong>Choose another
+    folder…</strong> to put it anywhere, including a folder that already holds your bid documents.
+    Proposal Studio reads and writes only inside it.</p>
   <table>
-    <thead><tr><th>Inside the workspace</th><th>What's there</th></tr></thead>
+    <thead><tr><th>In a project folder</th><th>What's there</th></tr></thead>
     <tbody>
-      <tr><td><code>projects/</code></td><td>One folder per bid: uploaded files, chats, the search index, the digest, <code>deck.json</code>, rendered PPTX files.</td></tr>
-      <tr><td><code>library/</code></td><td>Your past proposals, reference documents and curated content blocks.</td></tr>
-      <tr><td><code>.studio/</code></td><td>The workspace marker, caches and logs.</td></tr>
+      <tr><td><code>input/</code></td><td>The RFP files you uploaded.</td></tr>
+      <tr><td><code>out/</code></td><td>Rendered PowerPoint decks and requirement matrices.</td></tr>
+      <tr><td><code>chats/</code></td><td>The project's chats.</td></tr>
+      <tr><td><code>digest.json</code>, <code>deck.json</code></td><td>The RFP summary and the slide content.</td></tr>
     </tbody>
   </table>
-  <p>Switch workspaces from the folder name at the top of the sidebar. Tick <em>Open this
-    workspace automatically next time</em> to skip the question at launch.</p>
+  <p>Each project shows its path in the sidebar, and in full at the top of the
+    <strong>Files</strong> tab with <strong>Open folder</strong>. <strong>Settings</strong> (the
+    sliders icon at the bottom of the sidebar) shows the <em>Proposal Studio folder</em>. It
+    holds your shared <strong>library</strong> of past proposals, reference documents and content
+    blocks.</p>
+  <p>Everything you create can be removed. In the <strong>⋯</strong> menu next to a project,
+    <em>Remove from list</em> keeps the folder and <em>Delete project and its folder</em> deletes
+    it. Chats and files have their own delete buttons.</p>
   <h3>Find your way around</h3>
   <ul>
     <li><strong>Sidebar</strong>: projects and recent chats. <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>B</kbd> collapses it to icons.</li>
@@ -817,7 +826,7 @@ studio harvest --client "Old Client"  <span class="c"># and: blocks [query]</spa
 studio library index | status         <span class="c"># and: research "…"</span>
 studio agent [name] ["task"]          <span class="c"># list agents, or run one (asks before each step)</span>
 studio template inspect &lt;file&gt; | sample
-studio ui [--port 8765] [--workspace path]  <span class="c"># the app in your browser</span>
+studio ui [--port 8765]               <span class="c"># the app in your browser</span>
 studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
 </section>
 
@@ -848,7 +857,7 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
   <h2 class="sec">Privacy &amp; data</h2>
   <div class="grid2">
     <div class="card"><h4>Stays on your machine</h4><p>Models (local Ollama, cloud models refused), the UI (offline mode, 127.0.0.1), embeddings, agents (local models, isolated, no keys passed). No telemetry in Proposal Studio's code.</p></div>
-    <div class="card"><h4>Where your data lives</h4><p>Your trusted workspace folder: <code>projects/</code> (RFPs, chats, decks, reports) and <code>library/</code> (past proposals, blocks). Keep it outside the repository. In the repository, <code>workspace/</code>, <code>library/</code> and your <code>templates/</code> are gitignored, and commit hooks block them.</p></div>
+    <div class="card"><h4>Where your data lives</h4><p>Each project in the folder you chose (RFPs, chats, decks, reports), plus the shared <code>library/</code> in the Proposal Studio folder (shown in Settings). Keep them outside the repository. In the repository, <code>workspace/</code>, <code>library/</code> and your <code>templates/</code> are gitignored, and commit hooks block them.</p></div>
   </div>
   <h4>Before using real documents</h4>
   <ul>
@@ -856,7 +865,7 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
     <li>☐ You start with <code>scripts/start.*</code>, so the offline environment is applied.</li>
     <li>☐ File Context is off for the Proposal Studio model.</li>
     <li>☐ The Ollama tray app isn't overriding the settings (Windows).</li>
-    <li>☐ Real client files stay in <code>workspace/</code> and <code>library/</code>, never in a repository.</li>
+    <li>☐ Real client files stay in your project folders and library, never in a repository.</li>
   </ul>
   <p class="muted">The PHI scan and the anonymisation are safety nets, not de-identification tools.
     Details: <a href="docs/privacy.md">docs/privacy.md</a>.</p>
@@ -869,8 +878,10 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
     <p>Start Ollama (<code>scripts/start.*</code> does it), or <code>ollama serve</code>. While online, pull the missing model: <code>ollama pull qwen3:8b</code>.</p></details>
   <details><summary>The page says "Open Proposal Studio from its link"</summary>
     <p>The app only works from the <code>http://127.0.0.1:8765/?t=…</code> link that <code>studio ui</code> prints, which is new each launch. Open it again from the terminal, or restart with <code>scripts/start.*</code>.</p></details>
-  <details><summary>"is a system folder" or "too broad" when choosing a workspace</summary>
-    <p>Pick or create a folder for your bids, e.g. <code>Documents\Bids\Acme</code>. Whole drives, your home folder itself and system folders can't be workspaces.</p></details>
+  <details><summary>"is a system folder" or "too broad" when choosing a project folder</summary>
+    <p>Pick or create a folder for the bid, e.g. <code>Documents\Bids\Acme</code>. Whole drives, your home folder itself and system folders can't be used.</p></details>
+  <details><summary>Where are my files?</summary>
+    <p>The sidebar shows each project's path; the <strong>Files</strong> tab shows it in full with <strong>Open folder</strong>. <strong>Settings</strong> shows the Proposal Studio folder and library.</p></details>
   <details><summary>Port 8765 is already in use</summary>
     <p>Start on another port: <code>studio ui --port 8766</code>.</p></details>
   <details><summary>Answers repeat the same excerpt twice</summary>
@@ -893,20 +904,20 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
   <details><summary>Why does it flag things instead of fixing them?</summary><p>Small local models sometimes import claims from a past client or invent a figure. Python checks catch these and show them to you. Silently deleting content could hide a real problem, and the final judgement should be yours.</p></details>
   <details><summary>Will it overwrite my files?</summary><p>No. Renders and exports are versioned (<code>-v1</code>, <code>-v2</code>…), deck changes keep history, harvest never overwrites edited blocks, and agents only copy back after your second approval.</p></details>
   <details><summary>Can I use it without the browser?</summary><p>Yes. <code>studio chat</code> is the same chat in a terminal, and every command also exists as <code>studio &lt;command&gt;</code>.</p></details>
-  <details><summary>How do I upgrade?</summary><p>Download the new release (or <code>git pull</code>), and re-run <code>setup</code>. Your workspace folders, <code>templates/</code> and <code>config/overrides.yaml</code> are kept.</p></details>
+  <details><summary>How do I upgrade?</summary><p>Download the new release (or <code>git pull</code>), and re-run <code>setup</code>. Your project folders, the Proposal Studio folder, <code>templates/</code> and <code>config/overrides.yaml</code> are kept.</p></details>
 </section>
 
 <section id="glossary">
   <h2 class="sec">Glossary</h2>
   <table>
     <tbody>
-      <tr><td><strong>Opportunity</strong></td><td>One bid you're working on, with its own folder <code>workspace/&lt;id&gt;/</code> holding the RFP files, index, digest, deck and renders.</td></tr>
+      <tr><td><strong>Project / opportunity</strong></td><td>One bid you're working on, in its own folder (chosen by you in the app; <code>workspace/&lt;id&gt;/</code> in the CLI) holding the RFP files, index, digest, deck and renders.</td></tr>
       <tr><td><strong>Digest</strong></td><td>The structured, cited summary of the RFP (<code>digest.json</code>) that feeds the outline and the deck.</td></tr>
       <tr><td><strong>Block</strong></td><td>A reusable, client-neutral piece of content (title + points + tags) harvested from past proposals and curated by you.</td></tr>
       <tr><td><strong>Storyline / outline</strong></td><td>The fixed deck spine (<code>storyline.yaml</code>), and the per-RFP decision of which slides are in (<code>outline.json</code>).</td></tr>
       <tr><td><strong>Provenance</strong></td><td>The blocks and RFP citations a slide was built from, kept in <code>deck.json</code> and the speaker notes.</td></tr>
       <tr><td><strong>Review flag</strong></td><td>Something a person should check: an unsupported claim, a figure from nowhere, a filled placeholder, a truncation.</td></tr>
-      <tr><td><strong>Workspace</strong></td><td>The folder you trust Proposal Studio to read and write. It holds your projects and library.</td></tr>
+      <tr><td><strong>Proposal Studio folder</strong></td><td>Holds the shared library and the list of your projects; new projects go here by default. Shown in Settings.</td></tr>
       <tr><td><strong>Router role / worker role</strong></td><td>The small model that routes messages (<code>qwen3:4b</code>), and the model that writes and extracts (<code>qwen3:8b</code>).</td></tr>
     </tbody>
   </table>

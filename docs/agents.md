@@ -10,14 +10,14 @@ deck.json" or "draft speaker notes for every slide". Every run is sandboxed, run
 /agent opencode tighten the platform slide bullets
 ```
 
-1. **Plan:** the agent runs in a *throwaway copy* of the sandbox (`workspace/<opp>/agent/`),
+1. **Plan:** the agent runs in a *throwaway copy* of the sandbox (the project's `agent/` folder),
    which holds copies of `deck.json`, `digest.json` and `outline.json`. You see its plan, and the
    copy is deleted, so nothing it does while planning survives.
 2. **Apply** (after `/approve`): the agent runs again in a fresh working copy with permission to
    edit files there. You see which files changed and a diff.
 3. **Copy back** (after a second `/approve`): changed `deck.json`/`digest.json`/`outline.json`
    replace the originals; the previous versions go to `history/`, and a changed `deck.json` must
-   still be a valid deck. Any other new files go to `workspace/<opp>/agent/results/`.
+   still be a valid deck. Any other new files go to the project's `agent/results/`.
 
 In the app, type `/agent opencode <task>`; each step that changes files shows **Run** /
 **Cancel** buttons. Agent commands can only be changed in `config/agents.yaml`, never from chat.
@@ -33,7 +33,7 @@ questions).
   API keys in your shell are **not** passed.
 - Cloud models are refused.
 - Every run has a timeout (`default_timeout_s`, 15 min) and a log in
-  `workspace/<opp>/agent/logs/`.
+  the project's `agent/logs/`.
 
 Be realistic: on a 16 GB CPU-only laptop each step takes minutes, and small local models
 (qwen3:8b) often don't use their file tools well. Short, specific tasks work best.
