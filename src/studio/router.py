@@ -65,7 +65,20 @@ USER_ERRORS = (
     AgentError,
 )
 # Commands the classifier may pick (session/meta commands need an explicit /command).
-CLASSIFIER_EXCLUDE = {"approve", "reject", "config", "new", "use", "toggle", "library", "edit"}
+CLASSIFIER_EXCLUDE = {
+    "approve", "reject", "config", "new", "use", "toggle", "library", "edit", "chat",
+}  # fmt: skip
+MODES = ("auto", "ask", "research", "chat", "draft")  # composer "working modes"
+CHAT_SYSTEM = (
+    "You are a helpful writing and thinking assistant for a pre-sales solutions architect. "
+    "Answer clearly and concisely in markdown. You do not have the RFP text in this mode; if the "
+    "user asks about RFP facts, say they can switch to 'Ask the RFP' for cited answers."
+)
+DRAFT_SYSTEM = (
+    "You help draft proposal content (emails, slide text, executive summaries, answers to "
+    "questions). Use the project context below; do not invent facts, numbers or client names that "
+    "are not in it — mark gaps as [TBD]. Answer in markdown."
+)
 ARGS_FROM_TEXT = {"ask", "research", "blocks"}  # auto-routed text becomes the argument
 
 
@@ -167,12 +180,15 @@ class Call:
     status: StatusFn
     confirmed: bool = False
     auto: bool = False  # routed from plain text rather than an explicit /command
+    history: list[dict[str, str]] = field(default_factory=list)  # earlier turns (free chat)
+    mode: str = "auto"
     _llm: LLMClient | None = field(default=None, repr=False)
+    _factory: Callable[[], LLMClient] | None = field(default=None, repr=False)
 
     @property
     def llm(self) -> LLMClient:
         if self._llm is None:
-            self._llm = self.ctx.llm_factory()
+            self._llm = (self._factory or self.ctx.llm_factory)()
         return self._llm
 
     def opportunity(self) -> sessmod.Opportunity:
@@ -549,6 +565,54 @@ def h_config(c: Call) -> Iterator[str]:
         raise RouterError("Usage: `/config`, `/config set <key> <value>` or `/config reset`.")
 
 
+def _clean_turn(text: str) -> str:
+    """A past reply without router plumbing (route line, Next: hint)."""
+    lines = [
+        ln for ln in text.splitlines() if not ln.startswith(("→ routed", "→ not routed", "Next: "))
+    ]
+    return "\n".join(lines).strip()
+
+
+def _draft_context(c: Call) -> str:
+    """Short project context for Draft mode: key RFP facts and the deck outline."""
+    if not c.session.active_opp:
+        return ""
+    opp = c.opportunity()
+    parts = [f"Project: {opp.title or opp.id}"]
+    dg = digestmod.load_digest(opp.path)
+    if dg is not None:
+        o = dg.opportunity
+        facts = {"Client": o.client, "Title": o.title, "Due": o.due_date}
+        parts += [f"{k}: {v}" for k, v in facts.items() if v]
+        parts += ["Requirements:"] + [f"- {r.id}: {r.text}" for r in dg.requirements[:12]]
+        parts += ["Problems:"] + [f"- {p.statement}" for p in dg.business_problems[:5]]
+    deck_path = opp.path / writer.DECK_FILE
+    if deck_path.exists():
+        deck = Deck.model_validate_json(deck_path.read_text(encoding="utf-8"))
+        parts += ["Deck slides:"] + [f"- {s.id}: {s.title}" for s in deck.slides]
+    return "\n".join(parts)[:4000]
+
+
+def h_chat(c: Call) -> Iterator[str]:
+    """Free conversation with the worker model (Draft mode adds project context)."""
+    if not c.args:
+        raise RouterError("Usage: `/chat <message>`.")
+    system = CHAT_SYSTEM
+    if c.mode == "draft":
+        context = _draft_context(c)
+        system = DRAFT_SYSTEM + (f"\n\nProject context:\n{context}" if context else "")
+    messages = [{"role": "system", "content": system}]
+    for turn in c.history:
+        content = _clean_turn(turn.get("content", ""))
+        if content and turn.get("role") in ("user", "assistant"):
+            messages.append({"role": turn["role"], "content": content[:3000]})
+    messages.append({"role": "user", "content": c.args})
+    c.status("Writing…")
+    yield from c.llm.generate_text("worker", messages, stream=True)
+    note = "Drafted from the project summary and deck" if c.mode == "draft" else "Free chat"
+    yield f"\n\n_{note} — not checked against the RFP text (no citations)._"
+
+
 HANDLERS: dict[str, Callable[[Call], Iterator[str]]] = {
     "help": h_help,
     "new": h_new,
@@ -568,6 +632,7 @@ HANDLERS: dict[str, Callable[[Call], Iterator[str]]] = {
     "library": h_library,
     "agent": h_agent,
     "config": h_config,
+    "chat": h_chat,
 }
 
 
@@ -674,12 +739,23 @@ class Router:
     # -- processing (runs in a worker thread) --
 
     def process(
-        self, text: str, attachments: Sequence[Path], sess: sessmod.Session, status: StatusFn
+        self,
+        text: str,
+        attachments: Sequence[Path],
+        sess: sessmod.Session,
+        status: StatusFn,
+        *,
+        mode: str = "auto",
+        history: Sequence[dict[str, str]] = (),
+        llm_factory: Callable[[], LLMClient] | None = None,
     ) -> Iterator[str]:
         """Route and run one message, yielding reply chunks.
 
         Files sent together with text are ingested first; the text is then routed as usual
-        (so "here's the RFP — when is it due?" ingests, then answers).
+        (so "here's the RFP — when is it due?" ingests, then answers). ``mode`` (from the
+        composer) sends plain text to one route: ask, research, chat, or draft (chat with project
+        context; ``<slide_id> <instruction>`` edits that slide). ``llm_factory`` overrides the
+        context's (a per-chat model or thinking setting).
         """
         try:
             cfg = self.ctx.config()
@@ -690,26 +766,55 @@ class Router:
 
         def llm() -> LLMClient:
             if not llm_holder:
-                llm_holder.append(self.ctx.llm_factory())
+                llm_holder.append((llm_factory or self.ctx.llm_factory)())
             return llm_holder[0]
+
+        extra = {"history": list(history), "mode": mode if mode in MODES else "auto"}
 
         files = list(attachments)
         follow = self._follow_up_text(text, files, cfg.routes)
         if follow is not None:
             ok = yield from self._run(
-                Decision(Command("ingest"), "rules"), files, sess, cfg, llm_holder, llm, status
-            )
+                Decision(Command("ingest"), "rules"),
+                files, sess, cfg, llm_holder, llm, status, extra,
+            )  # fmt: skip
             if not ok or "pending" in sess.last_outputs:
                 return
             yield "\n\n---\n\n"
             text, files = follow, []
 
+        text = self._apply_mode(text, extra["mode"], sess, cfg.routes)
         try:
             decision = self.decide(text, files, sess, cfg, llm)
         except RouterError as exc:
             yield f"⚠ {exc}"
             return
-        yield from self._run(decision, files, sess, cfg, llm_holder, llm, status)
+        yield from self._run(decision, files, sess, cfg, llm_holder, llm, status, extra)
+
+    def _apply_mode(self, text: str, mode: str, sess: sessmod.Session, routes: RoutesConfig) -> str:
+        """Plain text in a non-auto mode becomes that mode's command (commands are kept)."""
+        stripped = text.strip()
+        if mode == "auto" or not stripped:
+            return text
+        try:
+            if parse(stripped, routes) is not None:
+                return text
+        except RouterError:
+            return text
+        if mode == "draft":
+            first = stripped.split(maxsplit=1)
+            if len(first) == 2 and sess.active_opp:
+                try:
+                    deck_path = sessmod.get_opportunity(self.ctx.root, sess.active_opp).path
+                    deck_path = deck_path / writer.DECK_FILE
+                    if deck_path.exists():
+                        ids = {s.id for s in Deck.model_validate_json(deck_path.read_text()).slides}
+                        if first[0] in ids:
+                            return f"/edit {stripped}"
+                except sessmod.SessionError:
+                    pass
+            return f"/chat {stripped}"
+        return f"/{mode} {stripped}"
 
     def _follow_up_text(self, text: str, files: Sequence[Path], routes: RoutesConfig) -> str | None:
         """With attachments: the text to route after ingesting them (None: no two-step)."""
@@ -734,6 +839,7 @@ class Router:
         llm_holder: list[LLMClient],
         llm: Callable[[], LLMClient],
         status: StatusFn,
+        extra: dict[str, Any] | None = None,
     ) -> Generator[str, None, bool]:
         """Run a routing decision; return False if it ended in an error or clarification."""
         yield decision.route_line() + "\n\n"
@@ -772,7 +878,10 @@ class Router:
             return False
         call = Call(self.ctx, cfg, sess, command.args, files, status, confirmed)
         call.auto = decision.how in ("rules", "classifier")
+        call.history = list((extra or {}).get("history", []))
+        call.mode = (extra or {}).get("mode", "auto")
         call._llm = llm_holder[0] if llm_holder else None
+        call._factory = llm
         try:
             yield from handler(call)
         except (RouterError, *USER_ERRORS) as exc:
@@ -791,8 +900,15 @@ class Router:
         attachments: Sequence[Path] = (),
         session: sessmod.Session | None = None,
         emit: Emit | None = None,
+        *,
+        mode: str = "auto",
+        history: Sequence[dict[str, str]] = (),
+        llm_factory: Callable[[], LLMClient] | None = None,
     ) -> AsyncIterator[str]:
-        """Handle one chat message: stream reply chunks; send status events via ``emit``."""
+        """Handle one chat message: stream reply chunks; send status events via ``emit``.
+
+        ``mode``, ``history`` and ``llm_factory`` are passed to :meth:`process`.
+        """
         sess = session or self.session("default")
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
@@ -802,7 +918,16 @@ class Router:
 
         def work() -> None:
             try:
-                for chunk in self.process(message, attachments, sess, lambda s: put("status", s)):
+                chunks = self.process(
+                    message,
+                    attachments,
+                    sess,
+                    lambda s: put("status", s),
+                    mode=mode,
+                    history=history,
+                    llm_factory=llm_factory,
+                )
+                for chunk in chunks:
                     put("chunk", chunk)
             except BaseException as exc:  # surfaced in the caller's task
                 put("error", exc)

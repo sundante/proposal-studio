@@ -21,6 +21,7 @@ commands:
   library: { route: research, help: "Index the local library: /library index|status" }
   agent: { route: agents, help: "Run an agent CLI in the sandbox: /agent <name> <task>" }
   config: { route: meta, help: "Show or change config: /config [set <key> <value> | reset]" }
+  chat: { route: chat, help: "Free conversation with the model, no RFP retrieval: /chat <message>" }
   approve: { route: meta, help: "Run the action waiting for confirmation" }
   reject: { route: meta, help: "Cancel the action waiting for confirmation" }
 aliases:

@@ -27,6 +27,7 @@ is ingested, and other requests are routed automatically. Every reply shows
 | `/library` | Index the local library: /library index/status | `/library index` |
 | `/agent` | Run an agent CLI in the sandbox: /agent <name> <task> | `/agent opencode tighten the bullets in deck.json` |
 | `/config` | Show or change config: /config [set <key> <value> / reset] | `/config set worker.model qwen3:4b` |
+| `/chat` | Free conversation with the model, no RFP retrieval: /chat <message> | `/chat` |
 | `/approve` | Run the action waiting for confirmation | `/approve` |
 | `/reject` | Cancel the action waiting for confirmation | `/reject` |
 

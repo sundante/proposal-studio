@@ -266,3 +266,42 @@ def fake_llm(route=None) -> FakeLLM:
         },
         text="Proposals are due March 15, 2027 [1].",
     )
+
+
+def test_chat_uses_history_without_retrieval(home: Path) -> None:
+    router, llm = make(home)
+    sess = router.session("c1")
+    router.reply("/new acme", session=sess)
+    history = [
+        {"role": "user", "content": "Hi"},
+        {"role": "assistant", "content": "→ routed to /chat (command)\n\nHello!\n\nNext: x"},
+    ]
+
+    async def run():
+        return "".join(
+            [
+                c
+                async for c in router.handle(
+                    "Write an intro", [], sess, mode="chat", history=history
+                )
+            ]
+        )
+
+    out = asyncio.run(run())
+    assert "→ routed to /chat (command)" in out and "no citations" in out
+    call = llm.calls[-1]
+    assert call["schema"] is None and call["messages"][0]["role"] == "system"
+    assert call["messages"][2] == {"role": "assistant", "content": "Hello!"}  # plumbing removed
+    assert call["messages"][-1]["content"] == "Write an intro"
+    assert not any(c["schema"] for c in llm.calls)  # no classifier / retrieval schema calls
+
+
+def test_draft_mode_edits_a_named_slide_or_chats(home: Path) -> None:
+    router, _ = make(home)
+    sess = router.session("d1")
+    router.reply("/new acme", session=sess)
+    routes = cfgmod.load_config(home).routes
+    assert router._apply_mode("write an email", "draft", sess, routes) == "/chat write an email"
+    assert router._apply_mode("/status", "draft", sess, routes) == "/status"  # commands win
+    assert router._apply_mode("due?", "research", sess, routes) == "/research due?"
+    assert router._apply_mode("due?", "auto", sess, routes) == "due?"
