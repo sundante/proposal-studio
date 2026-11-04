@@ -1,0 +1,5 @@
+# Block harvest (/harvest) and deck writer (/deck) settings.
+blocks_per_slide: 3 # vetted blocks offered to the writer per slide (2-4)
+min_block_score: 0.2 # ignore blocks less similar than this to the slide's digest facts
+harvest_min_chars: 80 # skip slides/sections shorter than this when harvesting
+include_flagged_blocks: false # also use blocks marked needs_review (not yet curated)

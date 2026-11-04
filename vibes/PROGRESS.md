@@ -1,0 +1,82 @@
+# Progress
+
+| Phase | Name | Status | Commit |
+|---|---|---|---|
+| 0 | Bootstrap: repo, OSS foundations, config, LLM client, guards | ✅ done | 3ecd9a8 |
+| 1 | Ingest + RAG + /ask | ✅ done | cea14a3 |
+| 2 | RFP digest | ✅ done | 72e0a75 |
+| 3 | Template inspector + renderer | ✅ done | f68e3e1 |
+| 4 | Blocks, storyline, deck writer | ✅ done | cb2b909 |
+| 5 | Offline research | ✅ done | 9e1ede5 |
+| 6 | Router core | ✅ done | 59b888f |
+| 7 | Open WebUI integration + setup scripts | ✅ done | 2b4e1b9 |
+| 8 | Agents route | ✅ done | 0761ec7 |
+| 9 | Hardening + docs | ✅ done | 6dd79d4 |
+| 10 | Release pipeline + v0.1.0 | ⏸ superseded — v0.1.0 (Open WebUI) not shipped | 415d709 |
+| 11a | Studio UI: local chat app (`studio ui`) | ✅ done | 0f4b457 |
+| 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | fd00b3c |
+| 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
+| 12.1 | Projects-only model: project = trusted folder, delete everywhere, visible paths | ✅ done | 393577b |
+| 13 | UI rebuild: modules, warm paper + ink, folder picker, Settings page | ✅ done | e231132 |
+| 14 | Navigation, composer, models and modes | ✅ done | a1a2ffd |
+| 15 | Open files in the side panel (viewer, clickable citations) | ✅ done | 39ffbe2 |
+| 16 | Shared drives and co-working (sync folders, presence, lock) | ⬜ todo | |
+| 17 | Notebook (sources + notes, generate briefs) | ⬜ todo | |
+| 18 | Outputs, Templates and Customize | ⬜ todo | |
+| 19 | Research in the workbench + opt-in web | ⬜ todo | |
+| 20 | Model router and suggestions | ⬜ todo | |
+
+Status values: ⬜ todo · 🟡 in progress · ✅ done
+
+## Current
+- Phase in progress: none (15 done)
+- Next step: Phase 16 — shared drives and co-working (see vibes/BUILD_PLAN.md).
+- Open WebUI build archived on branch `archive/open-webui` (a11c3e6).
+
+## Docs
+- User docs: `README.md`, `vibes/tutorial.html` (step-by-step, offline single file), `docs/*.md`
+  (install, commands, config, templates, agents, troubleshooting, privacy).
+- Project docs: `CLAUDE.md` (instructions for Claude Code) and `vibes/` (spec, build plan,
+  decisions, progress, status).
+- Removed 2026-11-04 (not needed in the single-maintainer flow): AGENTS.md, CONTRIBUTING.md,
+  CODE_OF_CONDUCT.md, SECURITY.md, vibes/START_HERE.md, docs/performance.md, `.github/`
+  templates, workflows and Dependabot.
+
+## Known issues
+- Viewer: a citation from a table chunk can't be matched word-for-word on the PDF page, so the
+  section heading is highlighted instead. The PDF text layer is approximate (selection works
+  word by word; exotic fonts may misalign slightly).
+- The last CI run (before CI was removed) failed on Ubuntu only; the cause is unknown because the
+  log needs a logged-in `gh`. Tests pass on macOS (and passed on Windows in CI). Re-check on Linux
+  before a Linux release.
+- Security review (2026-11-04): the session cookie isn't port-isolated, so another local OS
+  user listening on a 127.0.0.1 port could capture it (rated low; fix: send the token in a
+  per-origin header). "Delete project and folder" also deletes files that were already in a
+  folder you chose to use as a project folder (warned in the dialog).
+- Studio UI: Stop closes the stream but the model finishes the current step in the background
+  (the reply is saved to the chat); a second message in the same project waits for it.
+- Studio UI front-end JS has no automated tests (server/API are covered by `tests/test_ui.py`
+  and `tests/test_trust.py`); checked by hand with headless-Chrome screenshots.
+- The per-launch link changes every start; a bookmarked `http://127.0.0.1:8765/` shows "open it
+  from its link". `start.*` always opens the right link.
+- Old CLI projects in `workspace/` aren't listed automatically; add each back with New project →
+  Choose another folder… (documented in docs/install.md).
+- Changing the Proposal Studio folder in Settings starts a fresh project list there (projects
+  listed in the old folder can be added back by folder); library files aren't moved.
+- Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
+  troubleshooting.md and the tutorial recommend one format per document).
+- Performance is measured with `studio bench` (the old docs/performance.md was removed); the Intel CPU-only target
+  itself is still unmeasured (estimated 2–4× the Mac CPU-only numbers).
+- Rendered decks were checked structurally (bounds, overlaps, empty placeholders), not visually:
+  no LibreOffice on the dev machine and Quick Look hangs headless. Open a rendered deck
+  artifact in PowerPoint once to eyeball it.
+- Deck quality depends on curated blocks: with only 5 synthetic blocks, 4 vendor slides render as
+  skeletons. qwen3:8b still imports block claims into client slides and fills `{{date}}` slots;
+  both are flagged for review, not prevented.
+- `/research` synthesis (summary/implications) is not itself cited and can blur facts; the
+  findings carry the citations. Sub-questions from qwen3:8b tend to overlap.
+- `setup.ps1`/`start.ps1` have not been run on a real Windows 11 laptop, and nothing checks them
+  automatically any more (CI was removed).
+- If the Ollama tray app is already running, `offline.env`'s `OLLAMA_*` settings don't apply.
+- Agent runs with qwen3:8b are slow (30–70 s per step here) and the model often doesn't use its
+  file tools; Hermes is disabled until a live offline run is verified.

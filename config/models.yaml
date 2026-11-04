@@ -2,7 +2,7 @@
 ollama_url: http://localhost:11434
 roles:
   router: { model: "qwen3:4b", num_ctx: 4096, temperature: 0.0 }
-  worker: { model: "qwen3:8b", num_ctx: 16384, temperature: 0.3 }
+  worker: { model: "qwen3:8b", num_ctx: 8192, temperature: 0.3 } # largest prompt (/ask, 6 excerpts) fits in 8k
   embed: { model: nomic-embed-text }
 keep_alive: 10m
 block_cloud_models: true # reject any model name containing ":cloud" or "-cloud"

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Proposal Studio</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <script>
+    // Apply the saved theme before first paint (no flash).
+    try { const t = localStorage.getItem('ps.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar" aria-label="Navigation"></aside>
+    <div id="scrim" class="scrim"></div>
+    <main id="main">
+      <header class="topbar" id="topbar"></header>
+      <div id="view"></div>
+    </main>
+    <div id="resizer" class="resizer" hidden role="separator" aria-orientation="vertical" aria-label="Resize panel" tabindex="0" title="Drag to resize · double-click to widen"></div>
+    <aside id="panel" hidden aria-label="Project panel"></aside>
+  </div>
+  <noscript>Proposal Studio needs JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -9,14 +9,14 @@ from __future__ import annotations
 import copy
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from studio.guards import GuardError, check_model_allowed
 
-SECTIONS = ("models", "routes", "agents", "storyline", "layout_map")
+SECTIONS = ("models", "routes", "agents", "storyline", "layout_map", "rag", "deck", "research")
 OVERRIDES_FILE = "overrides.yaml"
 
 
@@ -37,6 +37,7 @@ class RoleConfig(_Strict):
     model: str
     num_ctx: int | None = Field(default=None, gt=0, le=131072)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    num_gpu: int | None = Field(default=None, ge=0)  # 0 = CPU only (Ollama option)
 
 
 class ModelsConfig(_Strict):
@@ -102,14 +103,33 @@ class RoutesConfig(_Strict):
 
 
 class AgentSpec(_Strict):
-    """Headless agent CLI adapter definition."""
+    """Headless agent CLI adapter definition (flags verified per CLI; see DECISIONS.md)."""
 
     label: str
     plan_cmd: list[str]
     apply_cmd: list[str]
     env: dict[str, str] = Field(default_factory=dict)
+    files: dict[str, str] = Field(default_factory=dict)  # written into the working copy
     model: str
     enabled: bool = True
+    note: str = ""  # shown when the agent is disabled or limited
+
+
+DEFAULT_ENV_ALLOWLIST = [
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "COMSPEC",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "NODE_OPTIONS",
+]
 
 
 class AgentsConfig(_Strict):
@@ -117,6 +137,8 @@ class AgentsConfig(_Strict):
 
     sandbox_root: str = "workspace/{opp}/agent"
     default_timeout_s: int = Field(default=900, gt=0)
+    copy_in: list[str] = Field(default_factory=lambda: ["deck.json", "digest.json", "outline.json"])
+    env_allowlist: list[str] = Field(default_factory=lambda: list(DEFAULT_ENV_ALLOWLIST))
     agents: dict[str, AgentSpec] = Field(default_factory=dict)
 
 
@@ -139,12 +161,114 @@ class StorylineConfig(_Strict):
     slides: list[StorySlide]
 
 
+class Limits(_Strict):
+    """Hard text limits for slide fields (characters / item counts)."""
+
+    title: int = Field(default=70, gt=0)
+    subtitle: int = Field(default=120, gt=0)
+    bullet: int = Field(default=110, gt=0)
+    min_bullets: int = Field(default=3, ge=0)
+    max_bullets: int = Field(default=5, gt=0)
+    layer: int = Field(default=30, gt=0)
+    component: int = Field(default=40, gt=0)
+    max_layers: int = Field(default=6, gt=0)
+    max_components: int = Field(default=6, gt=0)
+    notes: int = Field(default=2000, gt=0)
+
+    @model_validator(mode="after")
+    def _check_counts(self) -> Limits:
+        if self.min_bullets > self.max_bullets:
+            raise ValueError("min_bullets must not exceed max_bullets")
+        return self
+
+
+class DiagramArea(_Strict):
+    """Box (inches from the top-left) the architecture diagram is drawn in."""
+
+    left: float = Field(ge=0)
+    top: float = Field(ge=0)
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+
+
+class LayoutSpec(_Strict):
+    """How one slide_type maps onto a template layout."""
+
+    layout: str
+    placeholders: dict[str, int | str] = Field(default_factory=dict)
+    limits: dict[str, int] = Field(default_factory=dict)
+    diagram_area: DiagramArea | None = None
+
+    @model_validator(mode="after")
+    def _check_limit_keys(self) -> LayoutSpec:
+        unknown = set(self.limits) - set(Limits.model_fields)
+        if unknown:
+            raise ValueError(f"unknown limit keys: {', '.join(sorted(unknown))}")
+        return self
+
+
 class LayoutMapConfig(_Strict):
-    """Template path, text limits and slide_type → layout mapping (detailed in Phase 3)."""
+    """Template path, text limits and slide_type → layout + placeholder mapping."""
 
     template: str
-    limits: dict[str, int] = Field(default_factory=dict)
-    layouts: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    remove_existing_slides: bool = True
+    limits: Limits = Field(default_factory=Limits)
+    layouts: dict[str, LayoutSpec] = Field(default_factory=dict)
+
+    def limits_for(self, slide_type: str) -> Limits:
+        """Global limits with the slide type's overrides applied."""
+        spec = self.layouts.get(slide_type)
+        if not spec or not spec.limits:
+            return self.limits
+        return Limits.model_validate({**self.limits.model_dump(), **spec.limits})
+
+
+# --- rag.yaml -------------------------------------------------------------------------------
+
+
+class RagConfig(_Strict):
+    """Chunking and retrieval settings."""
+
+    chunk_tokens: int = Field(default=800, ge=100, le=4000)
+    chunk_overlap: int = Field(default=100, ge=0, le=1000)
+    top_k: int = Field(default=6, ge=1, le=50)
+    min_score: float = Field(default=0.25, ge=-1.0, le=1.0)
+    digest_group_tokens: int = Field(default=2000, ge=200, le=8000)
+    dedupe_similarity: float = Field(default=0.9, ge=0.5, le=1.0)
+
+    @model_validator(mode="after")
+    def _check_overlap(self) -> RagConfig:
+        if self.chunk_overlap >= self.chunk_tokens:
+            raise ValueError("chunk_overlap must be smaller than chunk_tokens")
+        return self
+
+
+# --- deck.yaml ------------------------------------------------------------------------------
+
+
+class DeckConfig(_Strict):
+    """Block harvest and deck-writer settings."""
+
+    blocks_per_slide: int = Field(default=3, ge=2, le=4)
+    min_block_score: float = Field(default=0.2, ge=-1.0, le=1.0)
+    harvest_min_chars: int = Field(default=80, ge=0)
+    include_flagged_blocks: bool = False  # use blocks marked needs_review when writing
+
+
+# --- research.yaml --------------------------------------------------------------------------
+
+
+class ResearchConfig(_Strict):
+    """Offline research settings."""
+
+    max_llm_calls: int = Field(default=12, ge=3, le=40)
+    max_sub_questions: int = Field(default=5, ge=1, le=8)
+    top_k_per_query: int = Field(default=4, ge=1, le=20)
+    excerpts_per_question: int = Field(default=6, ge=1, le=20)
+    weak_score: float = Field(default=0.35, ge=-1.0, le=1.0)
+    sources: list[Literal["rfp", "proposals", "reference"]] = Field(
+        default_factory=lambda: ["rfp", "proposals", "reference"], min_length=1
+    )
 
 
 class StudioConfig(_Strict):
@@ -155,6 +279,9 @@ class StudioConfig(_Strict):
     agents: AgentsConfig
     storyline: StorylineConfig
     layout_map: LayoutMapConfig
+    rag: RagConfig = Field(default_factory=RagConfig)
+    deck: DeckConfig = Field(default_factory=DeckConfig)
+    research: ResearchConfig = Field(default_factory=ResearchConfig)
 
     @model_validator(mode="after")
     def _check_agent_models(self) -> StudioConfig:
@@ -224,6 +351,11 @@ def _validate(raw: dict[str, Any]) -> StudioConfig:
         raise ConfigError(f"Invalid config: {errors}") from exc
 
 
+def load_effective(root: Path | None = None) -> dict[str, Any]:
+    """Base config merged with overrides, as plain dicts (before validation)."""
+    return _deep_merge(load_base(root), load_overrides(root))
+
+
 def load_config(root: Path | None = None) -> StudioConfig:
     """Load base YAML + overrides and validate. Raises :class:`ConfigError` on problems."""
     return _validate(_deep_merge(load_base(root), load_overrides(root)))
@@ -235,13 +367,15 @@ def load_config(root: Path | None = None) -> StudioConfig:
 def resolve_key(key: str, effective: dict[str, Any]) -> list[str]:
     """Turn a user key into a full path. ``worker.model`` → ``models.roles.worker.model``.
 
-    Tries, in order: the key as given, then under ``models.``, ``models.roles.``, ``routes.``.
+    Tries, in order: the key as given, then under ``models.``, ``models.roles.``, ``routes.``,
+    ``rag.``.
     Only paths that already exist in the effective config are accepted (no new keys).
     """
     parts = [p for p in key.strip().split(".") if p]
     if not parts:
         raise ConfigError("Empty config key.")
-    for prefix in ([], ["models"], ["models", "roles"], ["routes"]):
+    shorthand = ([], ["models"], ["models", "roles"], ["routes"], ["rag"], ["deck"], ["research"])
+    for prefix in shorthand:
         path = prefix + parts
         node: Any = effective
         for part in path:

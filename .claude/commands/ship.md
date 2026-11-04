@@ -1,14 +1,18 @@
 ---
-description: Cut a release (CHANGELOG, version bump, tag, GitHub Release)
+description: Cut a release (tag v<version> on main after dev is promoted; build the files locally)
 argument-hint: <version, e.g. 0.1.0>
 ---
 
-Prepare release **v$ARGUMENTS**:
+Ship **v$ARGUMENTS**. There is no GitHub Actions automation, so everything is built locally:
 
-1. Make sure you're on `main`, it's up to date, and CI is green on the latest commit (`gh run list`).
-2. Bump the version in `pyproject.toml` / `studio/__init__.py` to `$ARGUMENTS`.
-3. Move `CHANGELOG.md` "Unreleased" entries under `## [$ARGUMENTS] - <today>`.
-4. Run `/verify`. Build locally (`python -m build`) to make sure the sdist/wheel build works.
-5. Commit `chore(release): v$ARGUMENTS`, push, then create and push the tag `v$ARGUMENTS` (ask me first).
-6. Watch the release workflow (`gh run watch`), then confirm the GitHub Release has the wheel,
-   sdist and `proposal-studio-$ARGUMENTS-windows.zip`. Print the release URL.
+1. Ask me to confirm that `dev` has been promoted to `main`. Then `git switch main && git pull`.
+2. Check `src/studio/__init__.py` says `$ARGUMENTS` and `CHANGELOG.md` has a `## [$ARGUMENTS]`
+   section (both are prepared on `dev`). If not, prepare them on `dev`, push, and stop so I can
+   promote again.
+3. Run `/verify`, `python -m build`, and `python scripts/build_release.py --version $ARGUMENTS --out dist`.
+4. **Ask me first**, then create and push the tag: `git tag v$ARGUMENTS && git push origin v$ARGUMENTS`.
+   This is the one action on `main`.
+5. Tell me which files to attach (`dist/*.tar.gz`, `dist/*.whl`,
+   `dist/proposal-studio-$ARGUMENTS-windows.zip`, notes in `dist/RELEASE_NOTES.md`). I create the
+   GitHub Release by hand, or, only if I ask, with `gh release create`.
+6. `git switch dev`.

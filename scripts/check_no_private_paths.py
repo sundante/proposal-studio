@@ -1,4 +1,4 @@
-"""Block committing client/private content: library/, workspace/, private templates, overrides.
+"""Block committing private content: library/, workspace/, .owui-data/, templates, overrides.
 
 Usage: ``check_no_private_paths.py FILE...`` (pre-commit) or ``--all`` (every tracked file, CI).
 """
@@ -15,7 +15,7 @@ def is_private(path: str) -> bool:
     parts = PurePosixPath(path.replace("\\", "/")).parts
     if not parts:
         return False
-    if parts[0] in {"library", "workspace"}:
+    if parts[0] in {"library", "workspace", ".owui-data"}:
         return True
     if parts[0] == "templates" and len(parts) > 1 and parts[1] != "sample":
         return True

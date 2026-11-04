@@ -1,14 +1,16 @@
 # Proposal Studio — instructions for Claude Code
 
-Open-source, fully local/offline proposal workbench: Open WebUI + Ollama + a Python package `studio`
-that routes chat commands (/ingest, /ask, /digest, /deck, /render, /research, /agent …) to RFP
+Open-source, fully local/offline proposal workbench: the `studio ui` browser app + Ollama + a Python
+package `studio` that routes chat commands (/ingest, /ask, /digest, /deck, /render, /research, /agent …) to RFP
 analysis, deck writing and PPTX rendering.
 
 ## Source of truth
-- `PROJECT_SPEC.md` — the decided design. Read the sections relevant to the current task. Do not
-  redesign what it decides; record any necessary deviation in `DECISIONS.md` with the reason.
-- `BUILD_PLAN.md` — the phases. Work on **one phase per session**.
-- `PROGRESS.md` — what's done, what's next, known issues. Read it first; update it last.
+- `vibes/PROJECT_SPEC.md` — the decided design. Read the sections relevant to the current task. Do not
+  redesign what it decides; record any necessary deviation in `vibes/DECISIONS.md` with the reason.
+- `vibes/BUILD_PLAN.md` — the phases. Work on **one phase per session**.
+- `vibes/PROGRESS.md` — what's done, what's next, known issues. Read it first; update it last.
+- `vibes/status.md` — narrative summary of all work done; refresh it at the end of each phase.
+- `vibes/` holds all non-functional planning/tracking docs; keep new ones there.
 
 ## Hard rules
 - Runtime is offline, CPU-only, 16 GB RAM, Windows 11 without admin/Docker. Code must also run on
@@ -19,7 +21,7 @@ analysis, deck writing and PPTX rendering.
   client, person or proprietary template content. Never commit `library/`, `workspace/`,
   `templates/*` (except `templates/sample/`), or `config/overrides.yaml`.
 - Where the spec says VERIFY, check the real tool (`--help`, installed package source) before coding.
-- Dependencies: only those listed in `BUILD_PLAN.md`; ask before adding others.
+- Dependencies: only those listed in `vibes/BUILD_PLAN.md`; ask before adding others.
 - No telemetry in project code. Block Ollama cloud models (`:cloud`).
 
 ## Commands
@@ -29,9 +31,12 @@ analysis, deck writing and PPTX rendering.
 - CLI: `studio --help`, `studio doctor`
 
 ## Git workflow
-- Branch per phase: `phase/<n>-<slug>` from `main`. Conventional Commits.
-- Small commits as you go. Before opening a PR: lint + tests green, `PROGRESS.md` updated.
-- Open PRs with `gh pr create`; PR body follows `.github/PULL_REQUEST_TEMPLATE.md` once it exists.
+- Only two branches: `dev` and `main`. Work and commit on `dev`; push with `git push origin dev`.
+- Never commit to, merge into or push `main` — the maintainer promotes `dev` → `main` manually.
+- No feature/phase branches and no PRs. Conventional Commits, small commits as you go.
+- Exception: `archive/*` branches are read-only snapshots (e.g. `archive/open-webui`); never
+  commit to them.
+- Before pushing: lint + tests green, `vibes/PROGRESS.md` updated.
 
 ## Style of work
 - Be economical: don't print whole files back, don't re-read files you just wrote, keep summaries

@@ -17,7 +17,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from studio.config import ModelsConfig, RoleConfig
-from studio.guards import check_model_allowed
+from studio.guards import check_model_allowed, is_cloud_model
 
 T = TypeVar("T", bound=BaseModel)
 Message = dict[str, str]
@@ -160,6 +160,8 @@ class OllamaClient(BaseLLM):
             options["num_ctx"] = rc.num_ctx
         if rc.temperature is not None:
             options["temperature"] = rc.temperature
+        if rc.num_gpu is not None:
+            options["num_gpu"] = rc.num_gpu
         return {
             "model": rc.model,
             "messages": list(messages),
@@ -257,6 +259,39 @@ class OllamaClient(BaseLLM):
         """Names of locally pulled models."""
         with self._connection_errors():
             resp = self._http.get("/api/tags", timeout=5.0)
+            resp.raise_for_status()
+            return [m["name"] for m in resp.json().get("models", [])]
+
+    def model_details(self) -> list[dict[str, Any]]:
+        """Pulled models with size and details, marked ``loaded`` if in memory now."""
+        with self._connection_errors():
+            tags = self._http.get("/api/tags", timeout=5.0)
+            tags.raise_for_status()
+            ps = self._http.get("/api/ps", timeout=5.0)
+            ps.raise_for_status()
+        loaded = {m["name"]: m for m in ps.json().get("models", [])}
+        out = []
+        for m in tags.json().get("models", []):
+            details = m.get("details") or {}
+            running = loaded.get(m["name"])
+            out.append(
+                {
+                    "name": m["name"],
+                    "size": int(m.get("size") or 0),
+                    "family": details.get("family", ""),
+                    "parameters": details.get("parameter_size", ""),
+                    "quantization": details.get("quantization_level", ""),
+                    "cloud": is_cloud_model(m["name"]),
+                    "loaded": running is not None,
+                    "expires": (running or {}).get("expires_at"),
+                }
+            )
+        return out
+
+    def loaded_models(self) -> list[str]:
+        """Names of models currently loaded in memory (``/api/ps``)."""
+        with self._connection_errors():
+            resp = self._http.get("/api/ps", timeout=5.0)
             resp.raise_for_status()
             return [m["name"] for m in resp.json().get("models", [])]
 

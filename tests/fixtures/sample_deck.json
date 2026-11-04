@@ -1,0 +1,133 @@
+{
+  "opportunity": "acme-demo",
+  "client": "Acme Health Plan",
+  "generated": "synthetic fixture",
+  "slides": [
+    {
+      "id": "title",
+      "slide_type": "title",
+      "title": "Enterprise AI Platform for Care Management",
+      "subtitle": "Proposal for Acme Health Plan (synthetic sample) · March 2027",
+      "sources": ["digest:opportunity"]
+    },
+    {
+      "id": "understanding",
+      "slide_type": "understanding",
+      "title": "Our understanding of your challenges",
+      "bullets": [
+        "Care managers review claims and clinical notes by hand in a legacy portal",
+        "Prior authorization turnaround averages nine days",
+        "Clinical and claims data live in separate systems with nightly batch feeds",
+        "HIPAA, HITRUST and CMS-0057 obligations shape every design choice"
+      ],
+      "speaker_notes": "Lead with the nine-day prior authorization figure.",
+      "sources": ["[1 Introduction > 1.1 Background, p.1]", "[3 Scope of Work > 3.2 Compliance, p.2]"]
+    },
+    {
+      "id": "before_after",
+      "slide_type": "before_after",
+      "title": "From manual review to assisted decisions",
+      "before": [
+        "Manual chart and claims review",
+        "Nine-day prior authorization turnaround",
+        "Siloed clinical and claims data"
+      ],
+      "after": [
+        "AI-assisted triage with human sign-off",
+        "Prior authorization decisions in days, not weeks",
+        "One governed view of clinical and claims data"
+      ],
+      "sources": ["block:before_after/care-mgmt-01", "[1 Introduction > 1.1 Background, p.1]"]
+    },
+    {
+      "id": "solution_architecture",
+      "slide_type": "solution_architecture",
+      "title": "Solution architecture",
+      "layers": [
+        {"name": "Experience", "components": ["Care manager workspace", "Member portal", "APIs"]},
+        {"name": "AI services", "components": ["Document understanding", "Triage models", "LLM assistant", "Guardrails"]},
+        {"name": "Data platform", "components": ["FHIR R4 ingestion", "Claims warehouse feed", "Feature store"]},
+        {"name": "Operations", "components": ["MLOps / LLMOps", "Monitoring and drift", "Audit logging"]}
+      ],
+      "sources": ["block:solution_architecture/layered-01", "[3 Scope of Work > 3.1 Data Integration, p.2]"]
+    },
+    {
+      "id": "ai_enablement",
+      "slide_type": "ai_enablement",
+      "title": "AI enablement advantages",
+      "bullets": [
+        "Pre-built clinical document understanding shortens time to value",
+        "Human-in-the-loop review keeps clinicians in control",
+        "Reusable components cut the cost of each new use case"
+      ],
+      "sources": ["block:ai_enablement/advantages-02"]
+    },
+    {
+      "id": "platform",
+      "slide_type": "platform",
+      "title": "A complete AI platform",
+      "bullets": [
+        "Development: notebooks, prompt workbench and evaluation harness",
+        "MLOps / LLMOps: versioned models, prompts and pipelines",
+        "Observability: quality, drift and cost dashboards",
+        "Governance: model registry, approvals and audit trail"
+      ],
+      "sources": ["block:platform/full-stack-01"]
+    },
+    {
+      "id": "governance",
+      "slide_type": "governance",
+      "title": "Responsible AI, security and compliance",
+      "bullets": [
+        "HIPAA safeguards: encryption, access control and audit logging",
+        "Controls mapped to the HITRUST CSF",
+        "Bias, safety and quality reviews before each release"
+      ],
+      "sources": ["block:governance/hipaa-hitrust-01", "[3 Scope of Work > 3.2 Compliance, p.2]"]
+    },
+    {
+      "id": "maturity",
+      "slide_type": "maturity",
+      "title": "Maturing your AI capability",
+      "stages": [
+        {"name": "Foundation", "description": "Data platform, governance and the first use case live"},
+        {"name": "Scale", "description": "Three to five use cases on shared components"},
+        {"name": "Optimize", "description": "Continuous evaluation and self-service AI for teams"}
+      ],
+      "sources": ["block:maturity/three-stage-01"]
+    },
+    {
+      "id": "practice_leadership",
+      "slide_type": "practice_leadership",
+      "title": "AI as a practice: leadership and insights",
+      "bullets": [
+        "A dedicated healthcare AI practice with clinical advisors",
+        "Quarterly insight briefings for your leadership team",
+        "Playbooks refined across regulated-industry programs"
+      ],
+      "sources": ["block:practice_leadership/practice-01"]
+    },
+    {
+      "id": "why_us",
+      "slide_type": "why_us",
+      "title": "Why us",
+      "bullets": [
+        "Healthcare-first delivery team",
+        "Proven FHIR and claims integration patterns",
+        "Responsible AI built in from day one"
+      ],
+      "sources": ["block:why_us/differentiators-01"]
+    },
+    {
+      "id": "next_steps",
+      "slide_type": "next_steps",
+      "title": "Next steps",
+      "steps": [
+        {"when": "Weeks 1–2", "what": "Discovery workshops and data access"},
+        {"when": "Weeks 3–8", "what": "First use case: prior authorization triage"},
+        {"when": "Weeks 9–12", "what": "Pilot with care managers and go/no-go review"}
+      ],
+      "sources": ["block:next_steps/90-day-01"]
+    }
+  ]
+}
