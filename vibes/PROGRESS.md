@@ -14,8 +14,8 @@
 | 9 | Hardening + docs | ✅ done | 6dd79d4 |
 | 10 | Release pipeline + v0.1.0 | ⏸ superseded — v0.1.0 (Open WebUI) not shipped | 415d709 |
 | 11a | Studio UI: local chat app (`studio ui`) | ✅ done | 0f4b457 |
-| 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | (phase 12) |
-| 12 | Workspace + trust, panels, models view, security fix | ✅ done | (this commit) |
+| 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | fd00b3c |
+| 12 | Workspace + trust, panels, models view, security fix | ✅ done | 881cbf7 |
 | 13 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
 | 14 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
 | 15 | Model router and suggestions | ⬜ todo | |
