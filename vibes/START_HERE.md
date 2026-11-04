@@ -33,7 +33,7 @@ Kit contents:
 
 ```
 You're building Proposal Studio, an open-source, fully local and offline proposal workbench
-(Open WebUI + Ollama + a Python package `studio`). Read CLAUDE.md, vibes/PROJECT_SPEC.md (fully),
+(the `studio ui` app + Ollama + a Python package `studio`). Read CLAUDE.md, vibes/PROJECT_SPEC.md (fully),
 vibes/BUILD_PLAN.md and vibes/PROGRESS.md now.
 
 Don't write code yet. Reply with:
@@ -74,7 +74,7 @@ If a session runs out of usage mid-phase: in the next session run `/clear` then 
    layouts in `config\layout_map.yaml` (docs/templates.md explains how).
 3. Put past proposals in `library\proposals\` and reference docs in `library\reference\`, then run
    `/harvest` once and curate the blocks.
-4. Go offline, run `scripts\start.ps1`, open http://localhost:8080 and pick **Proposal Studio**.
+4. Go offline and run `scripts\start.ps1`. The app opens in your browser; choose and trust a workspace folder.
 
 Before installing it at work, check that your firm allows open-source tools on work machines. It's
 also worth making sure your employment terms are fine with you publishing a personal open-source

@@ -431,3 +431,36 @@ Format:
   is a thin layer. Stdlib server = no new dependencies.
 - Spec impact: §1, §2, §5.1 (Open WebUI `/` conflict), §5.3 (session key), §12 change in Phase
   11b, when `owui/` and the Open WebUI setup are removed.
+
+## 2026-11-04 — Trusted workspace folders, layout, models view; Open WebUI removed  (Phase 12)
+- Decision:
+  1. **App root vs data root.** `RouterContext` gains `app_root` (config/, templates/) separate
+     from `root` (data). In the UI, `root` is a folder the user explicitly **trusts**; it holds
+     `projects/` (opportunities, chats, uploads, outputs), `library/` and `.studio/`
+     (marker `workspace.json`, caches). `session.workspace_dir` returns `projects/` when the marker
+     exists, so every data module (rag, ingest, blocks, research, views) works unchanged; the CLI
+     keeps `workspace/` under `STUDIO_HOME`. Agent sandboxes follow the projects folder.
+  2. **Trust registry** (`studio.trust`) is per user, outside any workspace
+     (`%APPDATA%\ProposalStudio` / `~/.proposal-studio`, `$STUDIO_USER_DIR` for tests). A marker
+     alone doesn't make a folder trusted. Refused: drives, the home folder itself, the settings
+     folder, and system folders (POSIX: anything outside home, temp or an external drive that is
+     under /etc, /usr, /System, /Library, …; Windows: Windows, Program Files, ProgramData).
+  3. **Folder picker without tkinter:** the UI browses folders through `/api/fs` (sub-folder names
+     only, never file contents) because native dialogs from a server thread are unreliable on macOS.
+  4. **Security fix from the review** (unauthenticated local API, confidence 7): `studio ui` makes a
+     random per-launch token; visiting `/?t=<token>` sets an `HttpOnly; SameSite=Strict` cookie.
+     `/api/*` needs the cookie; writes also need `X-Studio: 1` (forces a CORS preflight; plain
+     links like PPTX downloads still work). Chat `/config set agents.*` is refused in the UI, so
+     agent commands can only change in YAML.
+  5. **Models view:** `/api/models` combines `/api/tags` and `/api/ps` (new `model_details`), role
+     assignment from config, total RAM (stdlib; `ctypes` on Windows), and a "fits" flag
+     (size × 1.2 ≤ RAM − 4 GB). Untagged names equal `:latest`. Role changes go through
+     `cfgmod.set_value` (cloud models still blocked).
+  6. **Layout:** collapsible sidebar (60px icon rail, Ctrl/⌘+B); right panel resizable 320px–75%
+     (drag, double-click, arrow keys) and collapsible (Ctrl/⌘+J); widths remembered per browser.
+  7. **Open WebUI removed** (Phase 11b): `owui/`, `src/studio/owui.py`, `owui` CLI, open-webui in
+     setup/start/release, `.webui_secret_key` untracked and ignored (the committed key is burned).
+     Python 3.13 is now allowed. Docs, tutorial and spec describe the Studio UI.
+- Why: users asked for an "always ask for a folder to trust" model, a working area they can shape,
+  and visibility of models; the review found the new API unauthenticated.
+- Spec impact: §1, §2, §4.2, §5.1, §5.3, §10.2, §12, §15, §16.3–16.4 updated.

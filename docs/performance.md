@@ -1,7 +1,7 @@
 # Performance
 
 Budget (spec §15): rules routing < 1 s, classifier < 15 s, `/ask` first token < 60 s, one slide
-< 2 min, full deck 10–20 min, `/render` < 10 s, Open WebUI + studio idle RAM < 2 GB (excluding
+< 2 min, full deck 10–20 min, `/render` < 10 s, studio idle RAM < 2 GB (excluding
 the loaded model).
 
 Measure your own machine with `studio bench` (add `--cpu` to force CPU-only inference). It runs a
@@ -9,7 +9,7 @@ synthetic RFP in a throwaway folder and prints this table.
 
 ## Measured (2026-11-04, qwen3:8b worker, qwen3:4b router, nomic-embed-text)
 
-Apple-silicon Mac, Ollama 0.40, Open WebUI 0.13.0:
+Apple-silicon Mac, Ollama 0.40 (measured with the Open WebUI build; the Studio app is lighter):
 
 | Step | Default (GPU) | CPU only (`--cpu`) | Budget |
 |---|---:|---:|---|
@@ -19,7 +19,7 @@ Apple-silicon Mac, Ollama 0.40, Open WebUI 0.13.0:
 | `/digest` (synthetic 3-page RFP) | 51.5 s | 99.4 s | — |
 | `/deck` one slide | 6.0 s | 21.3 s | < 2 min ✅ |
 | `/render` | 0.1 s | 0.1 s | < 10 s ✅ |
-| Open WebUI + studio idle RSS | 736 MB | — | < 2 GB ✅ |
+| Open WebUI + studio idle RSS (old UI) | 736 MB | — | < 2 GB ✅ |
 
 **Full deck:** the benchmark folder has no block library, so most slides come out as
 skeletons and its "full deck" time (10–18 s) understates the real cost. With a curated library,
@@ -36,8 +36,8 @@ for a full deck. Reports from real target machines are welcome.
   the KV cache uses half the memory of 16k. The router uses 4096.
 - **One model at a time**: `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, and a
   single-flight lock inside studio. `studio doctor` warns if several models are loaded.
-- **Background work stays off**: Open WebUI's title, tag and follow-up generation is disabled,
-  so it doesn't compete with your requests.
+- **No background generations**: the app never calls a model on its own (no automatic titles,
+  tags or follow-ups), so nothing competes with your requests.
 - **No LLM where Python will do**: rules routing, rendering, de-duplication, citation mapping,
   and the title slide.
 - **No LLM for current digests**: an auto-routed `/digest` shows the saved digest when it's

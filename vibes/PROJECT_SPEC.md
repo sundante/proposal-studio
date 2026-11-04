@@ -5,6 +5,10 @@
 > agent flags, the `dev`/`main` git workflow, list-valued digest citations, and a few extra
 > commands and config files — the reason is recorded in `vibes/DECISIONS.md`. Notes marked
 > **As built** below point to those changes.
+>
+> **Phase 11–12 (2026-11-04):** Open WebUI was replaced by the **Studio UI** (`studio ui`): a
+> local, stdlib-served browser app with trusted workspace folders. §1, §2, §4.2, §5.1, §5.3 and §12
+> below describe it; the Open WebUI design is preserved on the `archive/open-webui` branch.
 
 > This file is the single source of truth for building Proposal Studio. Keep it in the repo root.
 > Coding agents: read this file at the start of every session. Do not re-plan what is decided here.
@@ -26,7 +30,7 @@ below means *whatever template the user drops into `templates/` locally*.
 A **fully local, fully offline** proposal workbench for pre-sales Solutions Architects in regulated
 industries (healthcare first — HIPAA/HITRUST/FHIR-aware defaults). It turns RFP documents into an AI-practice proposal deck (PPTX on the firm's
 master template), answers questions about RFPs, researches over a local reference library, and can
-hand tasks to local coding agents. All from one chat UI: **Open WebUI**.
+hand tasks to local coding agents. All from one chat UI: the **Studio UI** (`studio ui`).
 
 ### Non-negotiable constraints
 
@@ -50,44 +54,43 @@ tasks inside a sandbox, not the backbone.
 ## 2. Architecture
 
 ```
-Open WebUI (browser, localhost:8080, offline mode, light theme)
- │
- ├── "Proposal Studio" model  ──►  owui/router_pipe.py   (Open WebUI Pipe function)
- │                                     │  parses /commands, else auto-routes
- │                                     ▼
- │                               studio core (Python package `studio`, installed into the
- │                               SAME venv as Open WebUI so the pipe can `import studio`)
- │                                 ├── router      (commands + auto classifier)
- │                                 ├── ingest      (pdf/docx/xlsx/pptx/txt → sections)
- │                                 ├── rag         (NumPy cosine + nomic-embed-text, cited answers)
- │                                 ├── digest      (RFP → digest.json)
- │                                 ├── blocks      (harvest + block library)
- │                                 ├── deck        (storyline + slide schemas + writer)
- │                                 ├── render      (python-pptx on firm template, NO LLM)
- │                                 ├── research    (offline multi-step research over library)
- │                                 └── llm         (Ollama client, structured output, guards)
- │
- └── "Agents" models (manifold) ──► owui/agents_pipe.py
-                                       │  one dropdown entry per agent in config/agents.yaml
-                                       ▼
-                                 studio.agents  (adapters → headless CLI subprocess,
-                                                 sandboxed to workspace/<opp>/, two-phase approval)
-                                       │
-                                       ▼
-                    Ollama (localhost:11434) — OLLAMA_MAX_LOADED_MODELS=1
+Studio UI (browser → http://127.0.0.1:8765, per-launch link; single page, no CDN)
+ │   projects + chats sidebar · drag-and-drop · Analyse RFP / Build slides / Download PPTX
+ │   side panel: files, RFP summary, slides · Models view · workspace switcher
+ ▼
+studio.ui.server  (stdlib ThreadingHTTPServer, JSON API + Server-Sent Events, 127.0.0.1 only;
+ │                 data only inside a TRUSTED workspace folder: projects/, library/, .studio/)
+ ▼
+studio core (Python package `studio`)
+   ├── router      (commands + auto classifier)
+   ├── ingest      (pdf/docx/xlsx/pptx/txt → sections)
+   ├── rag         (NumPy cosine + nomic-embed-text, cited answers)
+   ├── digest      (RFP → digest.json)
+   ├── blocks      (harvest + block library)
+   ├── deck        (storyline + slide schemas + writer)
+   ├── render      (python-pptx on firm template, NO LLM)
+   ├── research    (offline multi-step research over library)
+   ├── agents      (adapters → headless CLI subprocess, sandboxed per project, two-phase approval)
+   ├── trust       (per-user registry of trusted workspace folders)
+   └── llm         (Ollama client, structured output, guards)
+        │
+        ▼
+Ollama (localhost:11434) — OLLAMA_MAX_LOADED_MODELS=1
 ```
 
-Open WebUI's own built-in RAG/knowledge features stay available for casual chat, but **all
-proposal work goes through the `studio` package**, so behaviour is testable outside the UI.
+The same router also serves `studio chat` (terminal) and the per-command CLI, so behaviour is
+testable outside the UI. Config and templates live in the app folder (`STUDIO_HOME`); data lives in
+the workspace folder the user trusted.
 
 ---
 
 ## 3. Repository layout
 
 > **As built**, in addition to the tree below:
-> - **studio modules:** `src/studio/{models,views,owui,samples,smoke,bench}.py`
+> - **studio modules:** `src/studio/{models,views,samples,smoke,bench,trust,sysinfo}.py`,
+>   `src/studio/ui/{server,store}.py` + `src/studio/ui/static/` (Phase 11–12)
 > - **config:** `config/{rag,deck,research}.yaml`
-> - **Open WebUI:** `owui/agents_pipe.py`
+> - **Removed in Phase 12:** `owui/` and `src/studio/owui.py` (see `archive/open-webui`)
 > - **scripts:** `scripts/{offline.env,build_release.py,check_no_private_paths.py}`
 > - **CI:** `.github/workflows/release.yml`
 > - **user docs:** `docs/*.md`, `tutorial.html`
@@ -134,11 +137,6 @@ proposal-studio/
 │   │   ├── base.py
 │   │   └── adapters.py
 │   └── cli.py               # `studio` CLI mirroring every chat command (for testing/debug)
-├── owui/
-│   ├── router_pipe.py       # paste/import into Open WebUI → Functions
-│   ├── agents_pipe.py
-│   ├── phi_filter.py        # optional inlet filter
-│   └── prompts/             # Open WebUI "Prompts" (slash-command shortcuts) as JSON for import
 ├── templates/               # firm template goes here (gitignored) + a neutral sample template
 ├── library/                 # gitignored content
 │   ├── proposals/           # past proposals & decks (input to /harvest and /research)
@@ -156,7 +154,7 @@ proposal-studio/
 │       └── out/             # rendered PPTX files, versioned
 ├── scripts/
 │   ├── setup.ps1            # user-level install, no admin
-│   ├── start.ps1            # sets env vars, starts Ollama check + Open WebUI
+│   ├── start.ps1            # sets env vars, starts Ollama check + `studio ui`
 │   └── smoke_test.ps1
 └── tests/                   # pytest; uses a FakeLLM, never needs Ollama
 ```
@@ -182,14 +180,15 @@ think: false                  # disable qwen3 thinking by default (speed); per-r
 
 ### 4.2 Runtime configuration from the chat
 Two mechanisms, both required:
-1. **Open WebUI Valves** on each pipe (admin Valves for paths/URLs; UserValves for per-user
-   preferences like default opportunity, auto-route on/off, verbosity). This is the native UI.
+1. **Studio UI**: the Models view assigns the model per role (router, worker, embed) and shows
+   what's installed, loaded and fits in RAM; the workspace switcher picks the data folder.
 2. **`/config` command**:
    - `/config` → show the effective config (models, thresholds, active opp, agent list)
    - `/config set worker.model qwen3:4b` → change at runtime (persisted to a user override file
      `config/overrides.yaml`, never editing the base YAML)
    - `/config reset`
    - Validate every change with the pydantic schema; reject unknown keys and cloud models.
+   - In the Studio UI, `agents.*` keys are refused (agent commands only change in YAML).
 
 ---
 
@@ -219,10 +218,9 @@ Two mechanisms, both required:
 
 Aliases live in `routes.yaml` (e.g., `/q` → `/ask`, `/r` → `/render`).
 
-**Open WebUI "/" conflict:** Open WebUI uses `/` to open its saved-Prompts menu. Ship one Open WebUI
-Prompt per command in `owui/prompts/` (command `/deck` inserts the text `/deck `), so typing `/`
-shows our commands with autocomplete, and the inserted text is then parsed by `router_pipe`.
-Verify the Prompt import format for the installed Open WebUI version.
+A command pasted inside a code fence or backticks still parses. Files sent together with text are
+ingested first, then the text is routed. In the Studio UI, buttons cover the main flow, and the
+router's `→ routed to` / `Next:` lines are hidden (they stay in the CLI).
 
 ### 5.2 Auto-routing (no command given)
 1. **Rules first** (no LLM): attachments present + no text → `/ingest`; question mark + active opp
@@ -236,8 +234,9 @@ Verify the Prompt import format for the installed Open WebUI version.
    transparent and correctable.
 
 ### 5.3 Session state
-Keyed by Open WebUI chat id (fallback: user id). Stores active opp and last outputs. Persisted as
-JSON under `workspace/.sessions/`. Survives Open WebUI restarts.
+Keyed by chat id (`ui-<chat>` in the Studio UI; `cli-chat` in the REPL). Stores active opp and
+last outputs. Persisted as JSON under `<projects>/.sessions/`. Chats themselves are saved per
+project (`projects/<id>/chats/<chat>.json`) and survive restarts.
 
 ---
 
@@ -353,7 +352,7 @@ One slide per LLM call, so a single slide can be regenerated (`/deck <slide_id>`
 - Text-based architecture slide in v1: layered boxes drawn with python-pptx shapes from a simple
   `layers → components` structure. Cloud icons are out of scope for v1 (see §13).
 - **QA report** returned in chat: slide count, empty placeholders, fields truncated, char-limit
-  warnings, missing provenance. Also output the file to the chat for download (Open WebUI file
+  warnings, missing provenance. Also output the file to the chat for download (Studio UI file
   attachment / link to a static path; verify the supported mechanism).
 
 ---
@@ -400,16 +399,14 @@ If a CLI has no reliable headless mode, implement the adapter as "not supported 
 clear message, rather than faking it.
 
 ### 10.2 Behaviour
-- `agents_pipe.py` is a manifold Pipe: one Open WebUI model per enabled agent
-  ("Agent · OpenCode", …). `/agent <name> <task>` from the Proposal Studio model calls the same
-  code.
-- **Sandbox**: `cwd` = `workspace/<opp>/agent/`; files the task needs are *copied* in
+- `/agent <name> <task>` in the chat (or `studio agent` in a terminal) runs an enabled agent.
+- **Sandbox**: `cwd` = `<projects>/<opp>/agent/`; files the task needs are *copied* in
   (e.g., `deck.json`, `digest.json`); results are copied back only on approval. Reject any task
   path outside the sandbox. Strip env to an allowlist plus the agent's `env`.
 - **Two-phase approval**:
   1. Run `plan_cmd` (read-only/plan mode where supported) → show the plan and proposed commands.
-  2. Ask for confirmation in chat (Open WebUI `__event_call__` confirmation dialog; fallback:
-     reply `/approve` or `/reject`).
+  2. Ask for confirmation in chat (Run / Cancel buttons in the Studio UI; or reply `/approve` /
+     `/reject`).
   3. On approve, run `apply_cmd`; stream output through `__event_emitter__`; show a diff of
      changed files.
 - Timeouts, kill on cancel, capture stdout/stderr to `workspace/<opp>/agent/logs/`.
@@ -432,37 +429,33 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 
 ---
 
-## 12. Open WebUI integration & setup
+## 12. Studio UI & setup
 
 ### 12.1 Install (no admin)
-- Python 3.11 venv (user-level): `py -3.11 -m venv .venv`; `pip install open-webui`; `pip install -e .`
-  (installs `studio` into the same venv, so pipes can import it).
-- Node (user-level, e.g., a portable zip or nvm-windows user install) for `opencode` and `claude`.
+- Python 3.11+ venv (user-level); `pip install -e .`. No other UI package is installed.
+- Node (user-level) only for the optional `opencode` / `claude` agents.
 - Ollama: user install; `ollama pull qwen3:8b qwen3:4b nomic-embed-text`.
 - `setup.ps1` does all of this idempotently and prints what it could not do.
 
 ### 12.2 Offline & privacy configuration (`start.ps1` sets these)
-- Open WebUI: offline mode on, web search off, image generation off, community sharing off,
-  telemetry/analytics off where the installed version exposes it; RAG embeddings via Ollama
-  (`nomic-embed-text`) so no Hugging Face model downloads; `HF_HUB_OFFLINE=1`. **Verify exact env
-  var names against the installed Open WebUI version** and record in `vibes/DECISIONS.md`.
-- Ollama: `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=10m`; plus
-  any setting that disables cloud models, if available.
+- Ollama: `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=10m`,
+  `OLLAMA_NO_CLOUD=1`; `HF_HUB_OFFLINE=1`.
+- Studio UI: binds 127.0.0.1 only; loads nothing from the internet; per-launch token (cookie set
+  from the `?t=` link; writes also need `X-Studio: 1`); Host/Origin checks; file names sanitised.
 - Claude Code: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (in the adapter env).
 - OpenCode: disable sharing/telemetry features per its docs.
-- Default UI theme: light.
 
-### 12.3 Functions to install in Open WebUI
-- `router_pipe.py` → model "Proposal Studio" (Valves: workspace path, library path, auto-route
-  on/off, threshold).
-- `agents_pipe.py` → models "Agent · …" per enabled agent.
-- `phi_filter.py` (optional inlet filter) → warns on PHI patterns in typed text.
-- Import `owui/prompts/*.json` for slash-command autocomplete.
-- A short `INSTALL_OPENWEBUI.md` with screenshots-free step-by-step instructions.
+### 12.3 Workspace folders
+- At launch the app asks for a workspace folder and an explicit **Trust** (unless the user chose
+  "open my last workspace"). Whole drives, the home folder itself and system folders are refused.
+- Trust is recorded per user (`%APPDATA%\ProposalStudio\trusted.json` or
+  `~/.proposal-studio/trusted.json`); the folder gets `.studio/workspace.json`, `projects/` and
+  `library/`. Data endpoints refuse to work until a trusted workspace is open.
 
 ### 12.4 UX rules in chat
 - Every long step emits status events ("Embedding 214 chunks…", "Writing slide 4/9…").
-- Every answer ends with the next obvious command (e.g., after `/digest`: "Next: `/outline`").
+- Every answer ends with the next obvious command (e.g., after `/digest`: "Next: `/outline`");
+  the Studio UI shows buttons instead.
 - Errors are one plain sentence plus the fix (e.g., "Model qwen3:8b isn't pulled. Run
   `ollama pull qwen3:8b`.").
 
@@ -483,7 +476,7 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
   `deck.json` → PPTX renders with zero empty placeholders.
 - Router tests: every command parses; auto-route rules; low confidence → clarification.
 - Sandbox tests: path traversal rejected; cloud model names rejected.
-- `studio` CLI mirrors every chat command so each route can be tested without Open WebUI.
+- `studio` CLI mirrors every chat command so each route can be tested without the UI.
 - Type hints throughout; `ruff` clean.
 
 ## 15. Performance budget (16 GB, CPU)
@@ -491,7 +484,7 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 - `/ask`: first token < 60 s.
 - `/deck` full: ~10–20 min acceptable, with per-slide progress; single slide < 2 min.
 - `/render`: < 10 s.
-- Open WebUI + studio idle RAM < 2 GB (excluding the loaded model).
+- Studio UI + studio idle RAM < 2 GB (excluding the loaded model).
 
 ---
 
@@ -522,7 +515,7 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 
 ### 16.3 Releases (`.github/workflows/release.yml`)
 - On tag `v*.*.*`: build sdist + wheel, and a **Windows bundle zip**
-  `proposal-studio-<version>-windows.zip` containing the source, `scripts/*.ps1`, `owui/`, `config/`,
+  `proposal-studio-<version>-windows.zip` containing the source, `scripts/*.ps1`, `config/`,
   `templates/sample/`, docs; attach all to a GitHub Release with notes from `CHANGELOG.md`.
 - Versioning: SemVer, starting `0.1.0`. `studio --version` reports it.
 
@@ -530,9 +523,9 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
 1. Download the latest Release zip (or `git clone`) while online.
 2. Run `scripts\setup.ps1` (no admin): venv, pip installs, `pip install -e .`, `ollama pull` of the
    default models, optional npm user installs of agent CLIs.
-3. Go offline. Run `scripts\start.ps1`, open `http://localhost:8080`, follow docs/install.md to add
-   the functions and prompts (or use the automated import if the Open WebUI version supports it).
-4. Upgrade = download the new zip, re-run `setup.ps1`; `library/`, `workspace/`, `templates/` and
+3. Go offline. Run `scripts\start.ps1`; the Studio UI opens in the browser and asks for a workspace
+   folder to trust.
+4. Upgrade = download the new zip, re-run `setup.ps1`; workspace folders, `templates/` and
    `config/overrides.yaml` are preserved.
 
 ### 16.5 Open-source hygiene

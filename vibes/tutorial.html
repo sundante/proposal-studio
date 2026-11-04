@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proposal Studio Tutorial</title>
-<meta name="description" content="Step-by-step tutorial for Proposal Studio: a fully local, offline proposal workbench on Open WebUI and Ollama.">
+<meta name="description" content="Step-by-step tutorial for Proposal Studio: a fully local, offline proposal workbench in your browser, powered by Ollama.">
 <style>
   /* Self-contained on purpose: no external fonts, scripts or images, so it works offline. */
   :root {
@@ -167,7 +167,7 @@
   <h2>Set up</h2>
   <a href="#install">1. Install</a>
   <a href="#start">2. Start it</a>
-  <a href="#connect">3. Connect to Open WebUI</a>
+  <a href="#workspace">3. Choose a workspace</a>
   <a href="#check">4. Check everything works</a>
   <h2>Use it</h2>
   <a href="#first">Your first proposal</a>
@@ -219,22 +219,22 @@
 <!-- ====================================================================================== -->
 <section id="how">
   <h2 class="sec">How it works</h2>
-  <p>Three local pieces work together. <strong>Open WebUI</strong> is the chat window in your
-    browser. <strong>Ollama</strong> runs the AI models on your machine. The
-    <strong>studio</strong> Python package does the actual work, and it's the same code whether
-    you use the chat, the terminal REPL or the CLI.</p>
-  <div class="diagram" role="img" aria-label="Architecture: Open WebUI talks to the Proposal Studio pipe, which calls the studio router. The router dispatches to ingest, ask, digest, deck, render, research and agents, which use Ollama on localhost and files in workspace and library folders.">
+  <p>Three local pieces work together. The <strong>Proposal Studio app</strong> is the chat
+    window in your browser (<code>studio ui</code>). <strong>Ollama</strong> runs the AI models on
+    your machine. The <strong>studio</strong> Python package does the actual work, and it's the
+    same code whether you use the app, the terminal chat or the CLI.</p>
+  <div class="diagram" role="img" aria-label="Architecture: the Proposal Studio app in the browser talks to the local studio server, which calls the router. The router dispatches to ingest, ask, digest, deck, render, research and agents, which use Ollama on localhost and files in your trusted workspace folder.">
     <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg">
       <rect class="d-box" x="20" y="20" width="200" height="70" rx="10"/>
-      <text x="120" y="50" text-anchor="middle" font-weight="700">Open WebUI</text>
-      <text x="120" y="72" text-anchor="middle" class="d-small">browser · 127.0.0.1:8080</text>
+      <text x="120" y="50" text-anchor="middle" font-weight="700">Proposal Studio app</text>
+      <text x="120" y="72" text-anchor="middle" class="d-small">browser · 127.0.0.1:8765</text>
       <rect class="d-accent" x="20" y="130" width="200" height="70" rx="10"/>
-      <text x="120" y="160" text-anchor="middle" font-weight="700">Proposal Studio pipe</text>
-      <text x="120" y="182" text-anchor="middle" class="d-small">owui/router_pipe.py</text>
+      <text x="120" y="160" text-anchor="middle" font-weight="700">studio ui server</text>
+      <text x="120" y="182" text-anchor="middle" class="d-small">local only · per-launch link</text>
       <rect class="d-box" x="20" y="240" width="200" height="70" rx="10"/>
-      <text x="120" y="270" text-anchor="middle" font-weight="700">Agent · … models</text>
-      <text x="120" y="292" text-anchor="middle" class="d-small">owui/agents_pipe.py</text>
-      <path class="d-line" d="M120 90 V130"/><path class="d-line" d="M120 200 V240"/>
+      <text x="120" y="270" text-anchor="middle" font-weight="700">studio chat / CLI</text>
+      <text x="120" y="292" text-anchor="middle" class="d-small">same router, in a terminal</text>
+      <path class="d-line" d="M120 90 V130"/>
       <rect class="d-accent" x="290" y="130" width="200" height="70" rx="10"/>
       <text x="390" y="160" text-anchor="middle" font-weight="700">Router (code, not AI)</text>
       <text x="390" y="182" text-anchor="middle" class="d-small">rules → classifier → ask</text>
@@ -255,10 +255,10 @@
       <text x="820" y="112" text-anchor="middle" class="d-small">localhost:11434</text>
       <text x="820" y="128" text-anchor="middle" class="d-small">one model at a time</text>
       <rect class="d-box" x="760" y="190" width="120" height="100" rx="10"/>
-      <text x="820" y="220" text-anchor="middle" font-weight="700">Your files</text>
-      <text x="820" y="242" text-anchor="middle" class="d-small">workspace/</text>
+      <text x="820" y="220" text-anchor="middle" font-weight="700">Workspace</text>
+      <text x="820" y="242" text-anchor="middle" class="d-small">projects/</text>
       <text x="820" y="258" text-anchor="middle" class="d-small">library/</text>
-      <text x="820" y="274" text-anchor="middle" class="d-small">templates/</text>
+      <text x="820" y="274" text-anchor="middle" class="d-small">(you trust it)</text>
       <path class="d-line" d="M710 100 H760" stroke-dasharray="4 4"/><path class="d-line" d="M710 240 H760" stroke-dasharray="4 4"/>
       <text x="450" y="345" text-anchor="middle" class="d-small">Everything above runs on your laptop. Internet is only used during setup.</text>
     </svg>
@@ -285,9 +285,9 @@
     <thead><tr><th>You need</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td>A laptop with 16 GB RAM</td><td>Windows 11, macOS or Linux. CPU-only is fine; a GPU just makes it faster. No admin rights or Docker needed.</td></tr>
-      <tr><td>Python 3.11 or 3.12</td><td>Installed for your user (python.org, "Install for me only"). Open WebUI doesn't support 3.13 yet.</td></tr>
+      <tr><td>Python 3.11 or newer</td><td>Installed for your user (python.org, "Install for me only").</td></tr>
       <tr><td>Ollama</td><td>From <code>ollama.com</code>, installed for your user. It runs the models locally.</td></tr>
-      <tr><td>About 12 GB of disk</td><td>Open WebUI ≈ 3 GB, models ≈ 8 GB (<code>qwen3:8b</code>, <code>qwen3:4b</code>, <code>nomic-embed-text</code>).</td></tr>
+      <tr><td>About 9 GB of disk</td><td>Mostly the models, ≈ 8 GB (<code>qwen3:8b</code>, <code>qwen3:4b</code>, <code>nomic-embed-text</code>).</td></tr>
       <tr><td>Internet, once</td><td>Only for setup (Python packages and model downloads). After that you can work offline.</td></tr>
       <tr><td>Optional: Node.js</td><td>Only if you want <a href="#agents">agents</a> (OpenCode, Claude Code via local Ollama).</td></tr>
     </tbody>
@@ -322,7 +322,7 @@ scripts/setup.sh</code></pre></div>
   <p>The script:</p>
   <ol class="steps">
     <li>Creates a Python virtual environment in <code>.venv</code> (using <code>uv</code> if you have it).</li>
-    <li>Installs <code>open-webui==0.13.0</code> and the <code>studio</code> package into it.</li>
+    <li>Installs the <code>studio</code> package into it.</li>
     <li>Starts Ollama if needed and pulls the three models listed in <code>config/models.yaml</code>.</li>
     <li>Prints a list of anything it couldn't do (for example "Ollama not found"), so you can fix
       it and re-run.</li>
@@ -337,16 +337,15 @@ scripts/setup.sh</code></pre></div>
     <div class="code"><span class="label">Windows</span><pre><code>powershell -ExecutionPolicy Bypass -File scripts\start.ps1</code></pre></div>
     <div class="code"><span class="label">macOS / Linux</span><pre><code>scripts/start.sh</code></pre></div>
   </div>
-  <p>Open <strong>http://localhost:8080</strong> and create the first account. It becomes the admin
-    and never leaves your machine.</p>
+  <p>Your browser opens <strong>Proposal Studio</strong> at
+    <code>http://127.0.0.1:8765/?t=…</code>. That link unlocks the app for this session (a new one
+    each launch), so keep it private. If you close the tab, open the link from the terminal again.</p>
   <p>The start script applies <code>scripts/offline.env</code> every time:</p>
   <ul>
-    <li>Open WebUI in <strong>offline mode</strong>, listening on 127.0.0.1 only;</li>
-    <li>no web search, image generation, community sharing, OpenAI connections, update checks
-      or telemetry;</li>
-    <li>Ollama as the only model backend, with <strong>cloud features off</strong> and <strong>one
-      model loaded at a time</strong> (it matters on 16 GB);</li>
-    <li>Open WebUI's background title/tag generation off, so it doesn't compete for the model.</li>
+    <li>Ollama with <strong>cloud features off</strong> and <strong>one model loaded at a time</strong>
+      (it matters on 16 GB);</li>
+    <li>no telemetry from any library;</li>
+    <li>the app itself listens on 127.0.0.1 only and loads nothing from the internet.</li>
   </ul>
   <div class="callout warn"><strong>Windows: quit the Ollama tray app first</strong>
     If Ollama is already running from its tray icon, it won't pick up the settings above. Quit it
@@ -355,50 +354,30 @@ scripts/setup.sh</code></pre></div>
 </section>
 
 <!-- ====================================================================================== -->
-<section id="connect">
-  <h2 class="sec"><span class="num">3</span>Connect Proposal Studio to Open WebUI</h2>
-  <div class="tabs" data-tabs>
-    <div class="tablist" role="tablist">
-      <button role="tab" aria-selected="true" data-tab="auto">Automated (recommended)</button>
-      <button role="tab" aria-selected="false" data-tab="manual">By hand</button>
-    </div>
-    <div class="tabpanel" data-panel="auto">
-      <ol class="steps">
-        <li>In Open WebUI open <strong>Settings → Account → API keys</strong> and create a secret key (it starts with <code>sk-</code>).</li>
-        <li>In a terminal in the project folder:
-          <div class="code"><pre><code>.venv/bin/studio owui install --token sk-...<span class="c">            # Windows: .venv\Scripts\studio.exe owui install --token sk-...</span></code></pre></div>
-        </li>
-        <li>Reload Open WebUI. You'll see the <strong>Proposal Studio</strong> model, one
-          <strong>Agent · …</strong> model per installed agent, the PHI warning filter, and a
-          <code>/</code> shortcut for every command.</li>
-      </ol>
-      <p class="muted">The installer only talks to <code>localhost</code>. Re-run it after upgrading to update the functions.</p>
-    </div>
-    <div class="tabpanel" data-panel="manual" hidden>
-      <ol class="steps">
-        <li><strong>Admin Panel → Functions → +</strong>: paste <code>owui/router_pipe.py</code>, save, and switch it on.</li>
-        <li>Repeat for <code>owui/agents_pipe.py</code> and <code>owui/phi_filter.py</code>. Enable the filter globally, or for the Proposal Studio model.</li>
-        <li><strong>Workspace → Prompts → Import</strong>: choose <code>owui/prompts/all.json</code>.</li>
-      </ol>
-    </div>
-  </div>
-  <h3>Two one-time settings</h3>
-  <ol class="steps">
-    <li><strong>Turn off File Context</strong> for the model: Workspace → Models → Proposal Studio →
-      Capabilities → untick <em>File Context</em>. Proposal Studio reads attachments itself, and
-      this stops Open WebUI also running its own retrieval over them.</li>
-    <li><strong>Light theme</strong> (optional): Settings → General → Theme → Light.</li>
-  </ol>
-  <h3>Valves (settings) you can change</h3>
+<section id="workspace">
+  <h2 class="sec"><span class="num">3</span>Choose a workspace folder</h2>
+  <p>The first time the app opens, it asks which <strong>workspace folder</strong> it may read and
+    write, for example <code>Documents\Bids\Acme 2026</code>. Browse to it (or use
+    <strong>New folder</strong>), click <strong>Use this folder</strong>, then confirm
+    <strong>Trust and open</strong>. Nothing outside that folder is touched.</p>
   <table>
-    <thead><tr><th>Where</th><th>Valve</th><th>What it does</th></tr></thead>
+    <thead><tr><th>Inside the workspace</th><th>What's there</th></tr></thead>
     <tbody>
-      <tr><td>Admin → Functions → Proposal Studio → ⚙</td><td><code>STUDIO_HOME</code></td><td>The project folder. The start script sets it, so you can leave it empty.</td></tr>
-      <tr><td></td><td><code>AUTO_ROUTE</code></td><td>Route plain text automatically (on by default).</td></tr>
-      <tr><td></td><td><code>AUTO_THRESHOLD</code></td><td>How confident the router must be before acting (0.7).</td></tr>
-      <tr><td>Chat → Controls (per user)</td><td><code>DEFAULT_OPPORTUNITY</code></td><td>The opportunity new chats start in.</td></tr>
+      <tr><td><code>projects/</code></td><td>One folder per bid: uploaded files, chats, the search index, the digest, <code>deck.json</code>, rendered PPTX files.</td></tr>
+      <tr><td><code>library/</code></td><td>Your past proposals, reference documents and curated content blocks.</td></tr>
+      <tr><td><code>.studio/</code></td><td>The workspace marker, caches and logs.</td></tr>
     </tbody>
   </table>
+  <p>Switch workspaces from the folder name at the top of the sidebar. Tick <em>Open this
+    workspace automatically next time</em> to skip the question at launch.</p>
+  <h3>Find your way around</h3>
+  <ul>
+    <li><strong>Sidebar</strong>: projects and recent chats. <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>B</kbd> collapses it to icons.</li>
+    <li><strong>Side panel</strong>: Files, RFP summary and Slides for the open project.
+      <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>J</kbd> shows or hides it; drag its edge to make it wider.</li>
+    <li><strong>Models</strong>: click the model status at the bottom of the sidebar to see what's
+      installed, what's loaded, what fits in memory, and to choose which model does what.</li>
+  </ul>
 </section>
 
 <!-- ====================================================================================== -->
@@ -435,14 +414,18 @@ Smoke test passed.</code></pre>
   <div class="flow"><span>/new</span><i>→</i><span>attach RFP</span><i>→</i><span>ask</span><i>→</i><span>/digest</span><i>→</i><span>/outline</span><i>→</i><span>/deck</span><i>→</i><span>/edit</span><i>→</i><span>/render</span></div>
   <p>To practise without real documents, generate the synthetic Acme Health Plan RFP:</p>
   <div class="code"><pre><code>.venv/bin/python -m studio.samples acme-fixtures<span class="c">   # writes acme_rfp.pdf, .docx, .xlsx, .pptx</span></code></pre></div>
-  <p>In Open WebUI, pick <strong>Proposal Studio</strong> and create an <em>opportunity</em> (one
-    per RFP you're bidding on):</p>
+  <p>In the app, just <strong>drop the RFP</strong> onto the home screen. A <em>project</em>
+    (one per RFP you're bidding on) is created and named after the file, and the file is read
+    right away. You can type a question in the same message. The slash commands below still work,
+    and they're what the rest of this tutorial shows, because they make each step explicit. In
+    the app, the <strong>Analyse RFP</strong> and <strong>Build slides</strong> buttons run the same
+    steps.</p>
   <div class="chat">
     <div class="msg you"><div class="who">You</div><div class="bubble"><code>/new acme-2026 Acme Health Plan AI platform</code></div></div>
     <div class="msg"><div class="who">PS</div><div class="bubble"><div class="route">→ routed to /new (command)</div>
       Created <strong>acme-2026</strong> (now active).<br><span class="muted">Next: attach the RFP files and send <code>/ingest</code></span></div></div>
   </div>
-  <p class="muted">Tip: type <kbd>/</kbd> in the chat box to see every command with its description.</p>
+  <p class="muted">In the app you never need <code>/new</code>: dropping a file on the home screen does it.</p>
 </section>
 
 <section id="ingest">
@@ -732,8 +715,8 @@ _Evidence: strong_
       still be a valid deck.</li>
     <li><strong>Locked down by default:</strong> no shell, an isolated home folder, and no API keys
       or secrets passed in. Every run has a timeout and a log.</li>
-    <li>In Open WebUI, each agent is also a model (<strong>Agent · OpenCode (local)</strong>): plain
-      text there becomes an agent task.</li>
+    <li>In the app, steps that change files show <strong>Run</strong> / <strong>Cancel</strong>
+      buttons. Agent commands can only be changed in <code>config/agents.yaml</code>, never from chat.</li>
   </ul>
   <div class="callout warn"><strong>Set expectations</strong>
     On a CPU-only laptop each step takes minutes, and small local models often don't use their
@@ -834,7 +817,7 @@ studio harvest --client "Old Client"  <span class="c"># and: blocks [query]</spa
 studio library index | status         <span class="c"># and: research "…"</span>
 studio agent [name] ["task"]          <span class="c"># list agents, or run one (asks before each step)</span>
 studio template inspect &lt;file&gt; | sample
-studio owui install --token sk-…      <span class="c"># and: owui prompts</span>
+studio ui [--port 8765] [--workspace path]  <span class="c"># the app in your browser</span>
 studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
 </section>
 
@@ -852,7 +835,7 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
       <tr><td><code>/digest</code> (3-page RFP)</td><td>51 s</td><td>99 s</td><td>—</td></tr>
       <tr><td>One slide</td><td>6.0 s</td><td>21.3 s</td><td>&lt; 2 min ✅</td></tr>
       <tr><td><code>/render</code></td><td>0.1 s</td><td>0.1 s</td><td>&lt; 10 s ✅</td></tr>
-      <tr><td>Open WebUI + studio idle RAM</td><td colspan="2">736 MB</td><td>&lt; 2 GB ✅</td></tr>
+      <tr><td>Open WebUI + studio idle RAM (previous UI)</td><td colspan="2">736 MB</td><td>&lt; 2 GB ✅</td></tr>
     </tbody>
   </table>
   <p>On an Intel CPU-only laptop, expect the CPU-only column to be 2–4× slower; a full deck takes
@@ -865,7 +848,7 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
   <h2 class="sec">Privacy &amp; data</h2>
   <div class="grid2">
     <div class="card"><h4>Stays on your machine</h4><p>Models (local Ollama, cloud models refused), the UI (offline mode, 127.0.0.1), embeddings, agents (local models, isolated, no keys passed). No telemetry in Proposal Studio's code.</p></div>
-    <div class="card"><h4>Where your data lives</h4><p><code>workspace/</code> (RFPs, decks, reports) · <code>library/</code> (past proposals, blocks) · <code>templates/</code> · <code>.owui-data/</code> (chats). All gitignored, and commit hooks block them.</p></div>
+    <div class="card"><h4>Where your data lives</h4><p>Your trusted workspace folder: <code>projects/</code> (RFPs, chats, decks, reports) and <code>library/</code> (past proposals, blocks). Keep it outside the repository. In the repository, <code>workspace/</code>, <code>library/</code> and your <code>templates/</code> are gitignored, and commit hooks block them.</p></div>
   </div>
   <h4>Before using real documents</h4>
   <ul>
@@ -884,14 +867,14 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
   <p>Always start with <code>studio doctor</code>.</p>
   <details><summary>"Ollama isn't running" / "Model qwen3:8b isn't pulled"</summary>
     <p>Start Ollama (<code>scripts/start.*</code> does it), or <code>ollama serve</code>. While online, pull the missing model: <code>ollama pull qwen3:8b</code>.</p></details>
-  <details><summary>The Proposal Studio model doesn't appear in Open WebUI</summary>
-    <p>Admin Panel → Functions: make sure it's enabled. Re-run <code>studio owui install --token …</code>. If you see <code>ModuleNotFoundError: studio</code>, Open WebUI is running from a different Python environment: start it with <code>scripts/start.*</code>.</p></details>
-  <details><summary>"can't find its project folder"</summary>
-    <p>Set the <code>STUDIO_HOME</code> valve to your proposal-studio folder, or start Open WebUI with <code>scripts/start.*</code>.</p></details>
-  <details><summary>Open WebUI answers from its own retrieval, or /commands aren't recognised with attachments</summary>
-    <p>Turn off <em>File Context</em> for the model (Workspace → Models → Proposal Studio → Capabilities), and use the start script, which sets <code>RAG_SYSTEM_CONTEXT=True</code>.</p></details>
+  <details><summary>The page says "Open Proposal Studio from its link"</summary>
+    <p>The app only works from the <code>http://127.0.0.1:8765/?t=…</code> link that <code>studio ui</code> prints, which is new each launch. Open it again from the terminal, or restart with <code>scripts/start.*</code>.</p></details>
+  <details><summary>"is a system folder" or "too broad" when choosing a workspace</summary>
+    <p>Pick or create a folder for your bids, e.g. <code>Documents\Bids\Acme</code>. Whole drives, your home folder itself and system folders can't be workspaces.</p></details>
+  <details><summary>Port 8765 is already in use</summary>
+    <p>Start on another port: <code>studio ui --port 8766</code>.</p></details>
   <details><summary>Answers repeat the same excerpt twice</summary>
-    <p>The same RFP was ingested as both PDF and DOCX. Keep one format: remove one from <code>workspace/&lt;opp&gt;/input/</code> and send <code>/ingest</code>.</p></details>
+    <p>The same RFP was ingested as both PDF and DOCX. Keep one format: remove one in the side panel's <strong>Files</strong> tab (or from <code>projects/&lt;project&gt;/input/</code>).</p></details>
   <details><summary>Slides say "Add content — no vetted blocks"</summary>
     <p>Build your library first: put past proposals in <code>library/proposals/</code>, run <code>/harvest</code>, review the YAML, and set <code>needs_review: false</code>.</p></details>
   <details><summary>Render QA errors about layouts</summary>
@@ -905,12 +888,12 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
 
 <section id="faq">
   <h2 class="sec">FAQ</h2>
-  <details><summary>Does any of my data go to the cloud?</summary><p>No. At runtime everything talks to <code>localhost</code>: Ollama for the models and Open WebUI for the UI. Cloud models are refused by name, and Ollama's cloud features are switched off. Internet is only used for setup.</p></details>
+  <details><summary>Does any of my data go to the cloud?</summary><p>No. At runtime everything talks to <code>localhost</code>: Ollama for the models and the Proposal Studio app for the UI. Cloud models are refused by name, and Ollama's cloud features are switched off. Internet is only used for setup.</p></details>
   <details><summary>Can I use a different or bigger model?</summary><p>Yes: <code>/config set worker.model &lt;model&gt;</code> after <code>ollama pull &lt;model&gt;</code>. Bigger models need more RAM, and only one is loaded at a time. Cloud models (<code>:cloud</code>) are always refused.</p></details>
   <details><summary>Why does it flag things instead of fixing them?</summary><p>Small local models sometimes import claims from a past client or invent a figure. Python checks catch these and show them to you. Silently deleting content could hide a real problem, and the final judgement should be yours.</p></details>
   <details><summary>Will it overwrite my files?</summary><p>No. Renders and exports are versioned (<code>-v1</code>, <code>-v2</code>…), deck changes keep history, harvest never overwrites edited blocks, and agents only copy back after your second approval.</p></details>
-  <details><summary>Can I use it without Open WebUI?</summary><p>Yes. <code>studio chat</code> is the same chat in a terminal, and every command also exists as <code>studio &lt;command&gt;</code>.</p></details>
-  <details><summary>How do I upgrade?</summary><p>Download the new release (or <code>git pull</code>), re-run <code>setup</code>, then <code>studio owui install</code>. Your <code>library/</code>, <code>workspace/</code>, <code>templates/</code>, <code>config/overrides.yaml</code> and <code>.owui-data/</code> are kept.</p></details>
+  <details><summary>Can I use it without the browser?</summary><p>Yes. <code>studio chat</code> is the same chat in a terminal, and every command also exists as <code>studio &lt;command&gt;</code>.</p></details>
+  <details><summary>How do I upgrade?</summary><p>Download the new release (or <code>git pull</code>), and re-run <code>setup</code>. Your workspace folders, <code>templates/</code> and <code>config/overrides.yaml</code> are kept.</p></details>
 </section>
 
 <section id="glossary">
@@ -923,7 +906,7 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
       <tr><td><strong>Storyline / outline</strong></td><td>The fixed deck spine (<code>storyline.yaml</code>), and the per-RFP decision of which slides are in (<code>outline.json</code>).</td></tr>
       <tr><td><strong>Provenance</strong></td><td>The blocks and RFP citations a slide was built from, kept in <code>deck.json</code> and the speaker notes.</td></tr>
       <tr><td><strong>Review flag</strong></td><td>Something a person should check: an unsupported claim, a figure from nowhere, a filled placeholder, a truncation.</td></tr>
-      <tr><td><strong>Pipe / Function / Valve</strong></td><td>Open WebUI terms. A pipe is a custom "model" (here, Proposal Studio); functions are the plugins that provide it; valves are their settings.</td></tr>
+      <tr><td><strong>Workspace</strong></td><td>The folder you trust Proposal Studio to read and write. It holds your projects and library.</td></tr>
       <tr><td><strong>Router role / worker role</strong></td><td>The small model that routes messages (<code>qwen3:4b</code>), and the model that writes and extracts (<code>qwen3:8b</code>).</td></tr>
     </tbody>
   </table>

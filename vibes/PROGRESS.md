@@ -14,25 +14,33 @@
 | 9 | Hardening + docs | ✅ done | 6dd79d4 |
 | 10 | Release pipeline + v0.1.0 | ⏸ superseded — v0.1.0 (Open WebUI) not shipped | 415d709 |
 | 11a | Studio UI: local chat app (`studio ui`) | ✅ done | 0f4b457 |
-| 11b | Remove Open WebUI, rewrite docs for the Studio UI | ⬜ todo | |
+| 11b | Remove Open WebUI, rewrite docs for the Studio UI | ✅ done (in 12) | (phase 12) |
+| 12 | Workspace + trust, panels, models view, security fix | ✅ done | (this commit) |
+| 13 | Document workbench (viewer, citations → page, ask about selection) | ⬜ todo | |
+| 14 | Research in the workbench + living notes (opt-in web) | ⬜ todo | |
+| 15 | Model router and suggestions | ⬜ todo | |
 
 Status values: ⬜ todo · 🟡 in progress · ✅ done
 
 ## Current
-- Phase in progress: 11b (remove Open WebUI; docs for the Studio UI)
-- Next step: delete `owui/` + `src/studio/owui.py` + `owui-*` CLI commands and the open-webui
-  install in `scripts/`; make `start.*` run `studio ui`; rewrite README/install/tutorial/spec.
+- Phase in progress: none (12 done)
+- Next step: Phase 13 — document workbench (see vibes/BUILD_PLAN.md).
 - Open WebUI build archived on branch `archive/open-webui` (a11c3e6).
 
 ## Docs
-- User docs: `README.md`, `tutorial.html` (step-by-step, offline single file), `docs/*.md`.
+- User docs: `README.md`, `vibes/tutorial.html` (step-by-step, offline single file), `docs/*.md`.
 - Project docs: `vibes/` (spec, build plan, decisions, progress, status).
 
 ## Known issues
 - Studio UI: Stop closes the stream but the model finishes the current step in the background
   (the reply is saved to the chat); a second message in the same project waits for it.
-- Studio UI front-end JS has no automated tests (server/API are covered by `tests/test_ui.py`);
-  checked by hand with headless Chrome screenshots.
+- Studio UI front-end JS has no automated tests (server/API are covered by `tests/test_ui.py`
+  and `tests/test_trust.py`); checked by hand with headless-Chrome screenshots.
+- The per-launch link changes every start; a bookmarked `http://127.0.0.1:8765/` shows "open it
+  from its link". `start.*` always opens the right link.
+- Old CLI data in `workspace/` isn't migrated automatically into a trusted workspace (move
+  folders into `projects/`; documented in docs/install.md).
+- `setup.ps1`/`start.ps1` changes are syntax-checked in CI but not yet run on Windows.
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
   troubleshooting.md and the tutorial recommend one format per document).
 - Performance measured with `studio bench` (docs/performance.md); the Intel CPU-only target

@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Proposal Studio app (`studio ui`)** replaces Open WebUI: a local browser app with projects and
+  chats, drag-and-drop RFP intake, streamed cited answers, **Analyse RFP**, **Build slides** and
+  **Download PPTX** buttons, and a side panel with files, RFP summary and slide previews.
+- **Trusted workspace folders:** the app asks which folder it may use and keeps all projects,
+  uploads, chats and the library there; switch folders from the sidebar.
+- Collapsible sidebar (Ctrl/⌘+B) and a resizable, collapsible side panel (Ctrl/⌘+J).
+- **Models view:** installed and loaded models, whether each fits in memory, and which model does
+  what (router, worker, embeddings).
+- Router: commands pasted in code blocks work; files sent with a question are ingested first.
+
+### Changed
+- `scripts/start.*` now open the app; setup no longer installs Open WebUI; Python 3.13 allowed.
+
+### Removed
+- Open WebUI integration (`owui/`, `studio owui …`). Archived on the `archive/open-webui` branch.
+
+### Security
+- The app is locked to a per-launch link (session cookie; writes need a custom header), and agent
+  commands can't be changed from chat.
+
 ## [0.1.0] - 2026-11-04
 
 First release: a fully local, offline proposal workbench on Open WebUI + Ollama.

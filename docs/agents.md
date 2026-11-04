@@ -19,8 +19,8 @@ deck.json" or "draft speaker notes for every slide". Every run is sandboxed, run
    replace the originals; the previous versions go to `history/`, and a changed `deck.json` must
    still be a valid deck. Any other new files go to `workspace/<opp>/agent/results/`.
 
-In Open WebUI each enabled agent also appears as its own model, **Agent · OpenCode (local)**:
-plain text there becomes `/agent opencode <text>`, and approvals use the confirmation dialog.
+In the app, type `/agent opencode <task>`; each step that changes files shows **Run** /
+**Cancel** buttons. Agent commands can only be changed in `config/agents.yaml`, never from chat.
 From a terminal: `studio agent opencode "<task>"`, which asks before each step (`--yes` skips the
 questions).
 

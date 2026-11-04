@@ -142,3 +142,16 @@ accepts commands pasted in code blocks and ingests files sent together with a qu
 run on qwen3:8b answered "when is it due" in ~10 s and built an 11-slide PPTX in ~75 s. The
 Open WebUI build is archived on the `archive/open-webui` branch. Phase 11b removes it from the
 repo and rewrites the docs.
+
+## Phase 12 — Workspace folders, layout, models (2026-11-04)
+The app now asks, every launch, which **workspace folder** it may work in and requires an
+explicit **Trust**, as an editor does. A built-in folder browser is used because native dialogs are
+unreliable from a server. Projects, uploads, chats and the library live in that folder, and nothing
+outside it is touched. The sidebar collapses to an icon rail, and the right panel can be dragged
+wider (up to 75% of the window) or hidden. A **Models** view shows what's installed and loaded,
+what fits in RAM, and which model does which job, and lets you reassign them. The security review
+finding (the local API had no authentication) is fixed with a per-launch link, plus a header on
+writes, and agent commands can no longer be changed from chat. Open WebUI is gone from the repo,
+scripts, release job, docs, tutorial and spec. Checked live on qwen3:8b: pick and trust a folder,
+then drop the RFP and get a cited answer, with headless-Chrome screenshots in light and dark mode.
+Next: Phase 13, the document workbench.

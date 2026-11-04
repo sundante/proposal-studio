@@ -24,9 +24,11 @@ upgrades. `/config reset` removes it.
 | `research.yaml` | `/research` LLM-call cap, sub-question count, retrieval sizes, sources |
 | `agents.yaml` | Agent CLI command templates, env, sandbox copy-in list, timeout (see [agents.md](agents.md)) |
 
-`STUDIO_HOME` sets the project folder (where `config/`, `workspace/` and `library/` live); without
-it, the current folder is used. In Open WebUI the start scripts set it for you, or you can use the
-`STUDIO_HOME` valve.
+`STUDIO_HOME` sets the app folder (where `config/` and `templates/` live); without it, the current
+folder is used, and the start scripts set it for you. In the app, projects and the library live
+in the **workspace folder** you trust (`projects/`, `library/`); the CLI keeps using
+`workspace/` and `library/` under `STUDIO_HOME`. The list of trusted folders is per user
+(`$STUDIO_USER_DIR` overrides where it's kept). `/config set agents.…` is refused in the app.
 
 ## `include_if` rules (storyline.yaml)
 

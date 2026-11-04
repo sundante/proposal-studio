@@ -11,25 +11,11 @@ industries (US healthcare first). From one chat window it:
 - hands file tasks to local agent CLIs, sandboxed, with approvals
 
 It all runs on a 16 GB laptop with no admin rights, no Docker and no internet at runtime:
-[Open WebUI](https://github.com/open-webui/open-webui) as the chat UI,
-[Ollama](https://ollama.com) for the models, and the `studio` Python package for the work.
+- the **Proposal Studio app** (`studio ui`) is the chat window in your browser;
+- [Ollama](https://ollama.com) runs the models;
+- the `studio` Python package does the work.
 
 > _Screenshots: coming with the first release._
-
-## Quick start: the Studio app (new)
-
-```
-pip install -e .        # once, in the project folder
-studio ui               # opens http://127.0.0.1:8765 in your browser
-```
-
-Drop an RFP onto the page and start asking questions. A project is created for you, and its
-files are read and indexed. **Analyse RFP** builds the summary and **Build slides** writes and
-renders the deck. **Download PPTX** saves the result. Everything stays on this computer.
-Ollama must be running for answers.
-
-> The Open WebUI setup below is being retired (Phase 11b). It is archived on the
-> `archive/open-webui` branch.
 
 ## Install
 
@@ -38,34 +24,36 @@ Ollama must be running for answers.
 2. While online, run setup once. It needs no admin rights and is safe to re-run:
    - Windows: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`
    - macOS/Linux: `scripts/setup.sh`
-3. Go offline and start it: `scripts\start.ps1` / `scripts/start.sh`. Open
-   http://localhost:8080 and create the local admin account.
-4. Add Proposal Studio to Open WebUI: `studio owui install --token <API key>`, or paste the
-   files from `owui/` by hand.
+3. Go offline and start it: `scripts\start.ps1` / `scripts/start.sh`. Your browser opens
+   Proposal Studio.
+4. Choose a **workspace folder** for your bids and confirm that you trust it. Proposal Studio
+   reads and writes only inside it.
 
 The full guide is in [docs/install.md](docs/install.md). Check the install with
 `scripts/smoke_test.*`.
 
-> **New here?** The [step-by-step tutorial](vibes/tutorial.html) walks through install, your first
-> proposal, building a block library, mapping your own template, research and agents, with
-> worked examples. Download it and open it in a browser; it's a single offline file. To read it
-> online, enable GitHub Pages for the repo (Settings → Pages → branch `main`, folder `/`), then open
-> `<pages-url>/tutorial.html`.
+> **New here?** The [step-by-step tutorial](vibes/tutorial.html) walks through install, your
+> first proposal, building a block library, mapping your own template, research and agents, with
+> worked examples. Download it and open it in a browser; it's a single offline file.
 
 ## Daily workflow
 
-Pick the **Proposal Studio** model and:
+1. Drop the RFP onto the page. A project is created, and the files are PHI-checked and indexed.
+2. Ask anything: "When are proposals due?", "What are the mandatory requirements?" Answers cite
+   `[section, p.N]`.
+3. **Analyse RFP** builds the digest: problems, requirements, evaluation criteria, compliance
+   and risks. It appears in the side panel.
+4. **Build slides** writes a tailored deck from your vetted blocks and renders it on your
+   template, with a QA report.
+5. **Download PPTX** saves the deck. Review it, or revise a slide with
+   `/edit platform shorter, mention FHIR R4`, then build again.
 
-```
-/new acme-2026 Acme Health Plan AI platform     create an opportunity
-(attach the RFP files)                          → /ingest  (PHI check, indexing)
-When are proposals due?                         → /ask     (cited answer)
-/digest xlsx                                    problems, requirements, criteria, compliance, risks
-/outline                                        which storyline slides, and why
-/deck                                           tailored deck.json from your vetted blocks
-/edit platform shorter, mention FHIR R4         revise one slide (shows a diff)
-/render                                         PPTX on your template + QA report + download link
-```
+To change the layout:
+- **Ctrl/⌘+B** collapses the sidebar.
+- **Ctrl/⌘+J** toggles the side panel.
+- Drag the panel's edge to widen it.
+- The model status at the bottom of the sidebar opens the **Models** view: installed models,
+  what's loaded, what fits in memory, and which model does what.
 
 Once per library, and whenever it changes:
 
@@ -75,8 +63,8 @@ Once per library, and whenever it changes:
 /research How have we handled prior authorization before?
 ```
 
-Plain text works too. Every reply starts with `→ routed to /x (rules | classifier | command)`.
-Commands that write files (`/render`, `/harvest`, `/agent`) never run without your confirmation.
+Commands that write files (`/render`, `/harvest`, `/agent`) never run from plain text without
+your confirmation.
 
 ## Commands
 
@@ -97,11 +85,11 @@ a terminal.
 ## Privacy checklist
 
 - [x] Models run in local Ollama only; cloud models are refused.
-- [x] Open WebUI runs in offline mode on 127.0.0.1: no web search, sharing, telemetry or update
-      checks.
+- [x] The app runs on 127.0.0.1 only, behind a per-launch link, and reads and writes only
+      inside the workspace folder you trusted.
 - [x] No telemetry in Proposal Studio's code.
-- [x] RFPs, the library, workspaces, your templates and Open WebUI's data are gitignored, and
-      the commit hooks block them.
+- [x] RFPs, the library, workspaces and your templates are gitignored, and the commit hooks
+      block them.
 - [x] Files are scanned for PHI on ingest; harvested blocks are anonymised and curated by you.
 - [ ] You've checked that your organisation allows these tools on your machine.
 

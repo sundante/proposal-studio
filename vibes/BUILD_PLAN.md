@@ -11,7 +11,7 @@ The design is in `vibes/PROJECT_SPEC.md`; progress is tracked in `vibes/PROGRESS
 Runtime: `httpx`, `pydantic>=2`, `pyyaml`, `pymupdf`, `python-docx`, `openpyxl`, `python-pptx`,
 `numpy`, `typer`. (`faiss-cpu` was dropped in Phase 7: see DECISIONS.md.)
 Dev (`[dev]` extra): `pytest`, `pytest-asyncio`, `ruff`, `pre-commit`, `build`.
-Not a dependency of `studio` (installed separately by `setup.ps1`): `open-webui`.
+(`open-webui` was installed alongside until Phase 12; it is no longer used.)
 Optional, only if Phase 5 records a reason in vibes/DECISIONS.md: `langgraph`.
 Anything else → ask first.
 
@@ -140,7 +140,38 @@ Spec: §1, §2, §5, §12 (deviation recorded in DECISIONS.md, 2026-11-04)
   Analyse RFP / Build slides / Download PPTX, side panel (Files, RFP summary, Slides).
   Router: fenced commands parse, files + text = ingest then route, clearer `/use` and `/ingest`
   errors. Tests: `tests/test_ui.py` (real HTTP, FakeLLM).
-- **11b:** remove `owui/`, `src/studio/owui.py`, the `owui-*` CLI commands and the open-webui
+- **11b (done in Phase 12):** remove `owui/`, `src/studio/owui.py`, the `owui-*` CLI commands and the open-webui
   install from `setup.*`/`start.*`/`offline.env`/`build_release.py`/release workflow;
   `start.*` launch `studio ui`. Rewrite README, `docs/install.md`, the tutorial and spec §1/2/5/12
   for the Studio UI; drop `open-webui` from the dependency notes.
+
+## Phase 12 — Workspace, trust, panels, models list (+ 11b cleanup, security fix)
+Spec: §1, §2, §4.2, §12 (as updated)
+- App root vs data root: `RouterContext.app_root` (config, templates) vs `root` (trusted workspace:
+  `projects/`, `library/`, `.studio/`); `session.workspace_dir` returns `projects/` in a workspace.
+- `studio.trust`: per-user registry of trusted folders; refuses drives, home, system folders.
+- Server: active workspace (409 until trusted), `/api/workspace`, `/api/fs` folder browser,
+  `/api/models` (pulled, loaded, roles, fits-in-RAM), role assignment; per-launch token cookie +
+  `X-Studio` header for writes; chat `/config set agents.*` refused.
+- UI: workspace picker + trust dialog + switcher; collapsible sidebar (icon rail, Ctrl/⌘+B);
+  resizable/collapsible right panel (drag, double-click, Ctrl/⌘+J); Models view.
+- Remove Open WebUI everywhere (code, scripts, release job, docs, tutorial, spec).
+
+## Phase 13 — Document workbench
+- Document tab in the side panel: PDF pages rendered by pymupdf with a selectable text layer;
+  DOCX/XLSX/PPTX/TXT reading view from `ingest.extract_sections`; find in document.
+- Citations open the source: `rag.answer(on_hits=…)` → SSE `sources` → chip click jumps to the
+  page and highlights the passage.
+- Select text → Ask about this / Explain / Add to notes / Research this.
+
+## Phase 14 — Research in the workbench + living notes
+- `projects/<id>/notes.md` edited in a Notes tab, autosaved, snapshotted before appends, and indexed
+  so answers can cite it; "Add to notes" on replies, selections and research results.
+- Research tab over RFP / notes / library, with **opt-in** web search (`studio.web`, off by
+  default, PHI-checked query only, every request logged in `.studio/web-log.jsonl`; VERIFY the
+  provider first). Records a deviation from the offline rule in DECISIONS.md.
+
+## Phase 15 — Model router and suggestions
+- `config/model_catalog.yaml` + `studio.modelrouter`: task per command → best pulled model that
+  fits RAM, preferring the loaded one; suggestion chip in the composer; per-chat role overrides
+  (never switches automatically).

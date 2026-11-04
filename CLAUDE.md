@@ -1,7 +1,7 @@
 # Proposal Studio — instructions for Claude Code
 
-Open-source, fully local/offline proposal workbench: Open WebUI + Ollama + a Python package `studio`
-that routes chat commands (/ingest, /ask, /digest, /deck, /render, /research, /agent …) to RFP
+Open-source, fully local/offline proposal workbench: the `studio ui` browser app + Ollama + a Python
+package `studio` that routes chat commands (/ingest, /ask, /digest, /deck, /render, /research, /agent …) to RFP
 analysis, deck writing and PPTX rendering.
 
 ## Source of truth

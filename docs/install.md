@@ -1,18 +1,19 @@
 # Install Proposal Studio
 
-> Prefer a guided walk-through? See the [tutorial](../tutorial.html) (one offline HTML file).
+> Prefer a guided walk-through? See the [tutorial](../vibes/tutorial.html) (one offline HTML file).
 
-Proposal Studio runs entirely on your machine: [Open WebUI](https://github.com/open-webui/open-webui)
-is the chat UI, [Ollama](https://ollama.com) runs the models, and the `studio` Python package does
-the work. Internet is needed **only during setup** (Python packages and model downloads).
+Proposal Studio runs entirely on your machine:
+- the **Proposal Studio app** (`studio ui`) is the chat window in your browser;
+- [Ollama](https://ollama.com) runs the models;
+- the `studio` Python package does the work.
 
-Tested with Open WebUI **0.13.0** and Python **3.11** (Open WebUI supports 3.11–3.12).
+Internet is needed **only during setup**, to download Python packages and models.
 
 ## 1. Prerequisites (no admin rights needed)
 
-- **Python 3.11 or 3.12**, installed for your user (python.org installer → "Install for me only").
+- **Python 3.11 or newer**, installed for your user (python.org installer → "Install for me only").
 - **Ollama**, installed for your user from https://ollama.com.
-- About 12 GB of disk (Open WebUI ≈ 3 GB, models ≈ 8 GB) and 16 GB RAM.
+- About 9 GB of disk (models ≈ 8 GB) and 16 GB RAM.
 
 ## 2. Set up (online, once)
 
@@ -28,9 +29,11 @@ macOS / Linux:
 scripts/setup.sh
 ```
 
-The script is safe to re-run. It creates `.venv`, installs `open-webui` and `studio` into it, and
-pulls the models named in `config/models.yaml` (`qwen3:8b`, `qwen3:4b`, `nomic-embed-text`). It
-prints anything it couldn't do.
+The script:
+- is safe to re-run;
+- creates `.venv` and installs `studio` into it;
+- pulls the models named in `config/models.yaml`: `qwen3:8b`, `qwen3:4b` and `nomic-embed-text`;
+- prints anything it couldn't do.
 
 ## 3. Start (offline from here on)
 
@@ -42,64 +45,55 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1     # Windows
 scripts/start.sh                                              # macOS / Linux
 ```
 
-`start` applies `scripts/offline.env`: offline mode, no web search, no image generation, no
-community sharing, no telemetry, no update checks, Ollama as the only model backend (cloud
-features off, one model loaded at a time), and Open WebUI's background title/tag generation
-turned off. Open WebUI listens on **127.0.0.1:8080** only and keeps its data in `.owui-data/`
-(never commit it).
+`start` does three things:
+1. Applies `scripts/offline.env`: one model loaded at a time, Ollama cloud features off, and no
+   library telemetry.
+2. Makes sure Ollama is running.
+3. Runs `studio ui`, which opens **http://127.0.0.1:8765/?t=…** in your browser.
+
+The app listens on 127.0.0.1 only. The `?t=…` link unlocks it for this session, so keep it
+private. If you close the tab, open the link from the terminal again.
 
 > On Windows, if the Ollama tray app is already running, the `OLLAMA_*` settings in
 > `offline.env` don't reach it. Quit the tray app before `start.ps1` so it starts Ollama itself.
 
-Open http://localhost:8080 and create the first account. It becomes the admin and stays local.
+## 4. Choose a workspace folder
 
-## 4. Add Proposal Studio to Open WebUI
+The first thing the app asks for is a **workspace folder** it may read and write, for example
+`Documents\Bids\Acme 2026`, and you confirm that you **trust** it. Nothing outside it is
+touched. Inside it:
 
-### Option A — automated
+| Folder | Holds |
+|---|---|
+| `projects/` | one folder per bid: uploaded files, chats, the index, the digest, deck.json, outputs |
+| `library/` | your past proposals, reference documents and curated content blocks |
+| `.studio/` | the workspace marker, caches and logs |
 
-1. In Open WebUI: **Settings → Account → API keys → Create new secret key** (copy the `sk-…`).
-2. In a terminal in the project folder:
+The list of trusted folders is kept for your user account, outside every workspace:
+- Windows: `%APPDATA%\ProposalStudio\trusted.json`
+- macOS/Linux: `~/.proposal-studio/trusted.json`
 
-   ```bash
-   .venv/bin/studio owui install --token sk-...            # Windows: .venv\Scripts\studio.exe
-   ```
-
-   This creates or updates the **Proposal Studio** pipe and the **PHI warning** filter, enables
-   them, and adds one Prompt per command, so typing `/` lists them. It only talks to `localhost`.
-
-### Option B — by hand
-
-1. **Admin Panel → Functions → +** (New Function): paste `owui/router_pipe.py`, save, and enable.
-2. Same again for `owui/phi_filter.py`. Then enable the filter for the Proposal Studio model
-   (Workspace → Models → Proposal Studio → Filters), or globally.
-3. **Workspace → Prompts → Import**: choose `owui/prompts/all.json`.
-
-### Then, once
-
-- **Valves** (Admin Panel → Functions → Proposal Studio → ⚙):
-  - `STUDIO_HOME`: the project folder. `start` already sets this as an environment variable, so
-    you can leave it empty.
-  - `AUTO_ROUTE` / `AUTO_THRESHOLD`: plain-text routing.
-- **User Valves** (chat → Controls): `DEFAULT_OPPORTUNITY` for new chats.
-- **File Context off**: Workspace → Models → Proposal Studio → Capabilities → untick
-  *File Context*. Proposal Studio reads attachments itself, and this stops Open WebUI from also
-  running its own RAG over them.
-- **Light theme**: Settings → General → Theme → Light. There's no server-wide default.
+Switch workspaces from the folder name at the top of the sidebar. To skip the question at
+launch, tick **Open this workspace automatically next time**.
 
 ## 5. Use it
 
-Pick the **Proposal Studio** model and type `/help`. A typical flow:
+1. Drop the RFP (PDF, Word, Excel, PowerPoint or text) onto the page. A project is created and
+   the files are read, PHI-checked and indexed.
+2. Ask questions in plain language. Answers cite `[section, p.N]`.
+3. Click **Analyse RFP** for the summary (requirements, criteria, compliance, risks). It appears
+   in the side panel.
+4. Click **Build slides** to write the deck and render it on your template, then
+   **Download PPTX**.
 
-```
-/new acme-2026 Acme Health Plan AI platform
-(attach the RFP files and send)        → routed to /ingest
-When are proposals due?                → routed to /ask, with [section, p.N] citations
-/digest xlsx                           → digest + requirements matrix (download link)
-/outline   →   /deck   →   /render     → PPTX download link + QA report
-```
+Layout:
+- **Ctrl/⌘+B** collapses the sidebar.
+- **Ctrl/⌘+J** shows or hides the side panel.
+- Drag the panel's edge to widen it; double-click the edge to toggle between wide and normal.
+- Click the model status at the bottom of the sidebar to see installed models and choose which
+  one does what.
 
-Commands that write files (`/render`, `/harvest`, `/agent`) never run from plain text without
-confirmation. You'll get a confirmation dialog, or you can type `/approve`.
+Slash commands still work for power users. See [commands.md](commands.md).
 
 ## Optional: agent CLIs
 
@@ -116,11 +110,18 @@ npm install -g opencode-ai @anthropic-ai/claude-code   # or into a user npm pref
 scripts/smoke_test.sh            # Windows: scripts\smoke_test.ps1
 ```
 
-This runs `studio doctor`, then a synthetic RFP through ingest → ask → digest → outline → deck →
-render on the real models, in a throwaway folder. Expect a few minutes on a CPU-only laptop.
+This runs `studio doctor`, then pushes a synthetic RFP through ingest → ask → digest → outline →
+deck → render on the real models, in a throwaway folder. Expect a few minutes on a CPU-only
+laptop.
 
 ## Upgrading
 
-Download the new release (or `git pull`) and re-run `setup`. `library/`, `workspace/`,
-`templates/` (your own templates), `config/overrides.yaml` and `.owui-data/` are kept. Re-run
-`studio owui install` to update the functions.
+Download the new release (or `git pull`) and re-run `setup`. These are kept:
+- your workspace folders;
+- `templates/` (your own templates);
+- `config/overrides.yaml`.
+
+Upgrading from the Open WebUI version (0.1.x development builds):
+- The Open WebUI setup was removed. It is archived on the `archive/open-webui` branch.
+- To keep old projects, move the folders from `workspace/` into a trusted workspace's
+  `projects/` folder, and `library/` into its `library/`.

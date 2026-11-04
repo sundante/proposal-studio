@@ -7,10 +7,10 @@ whether Ollama is reachable (and its version), and whether each configured model
 |---|---|
 | "Ollama isn't running at http://localhost:11434" | Start it: `ollama serve`, or run `scripts/start.*`, which starts it. |
 | "Model qwen3:8b isn't pulled" | `ollama pull qwen3:8b` (while online). |
-| The Proposal Studio model doesn't appear in Open WebUI | Admin Panel → Functions: is it enabled? Re-run `studio owui install --token …`. |
-| "can't find its project folder" in chat | Set the `STUDIO_HOME` valve (Admin → Functions → Proposal Studio → Valves), or start Open WebUI with `scripts/start.*`. |
-| `ModuleNotFoundError: studio` in Open WebUI | `studio` isn't installed in Open WebUI's venv. Run `scripts/setup.*`, or `pip install -e .` inside that venv. |
-| Open WebUI answers from its own RAG instead of `/ask`, or `/commands` aren't recognised after attaching files | Workspace → Models → Proposal Studio → Capabilities → untick **File Context**, and start with `scripts/start.*` (it sets `RAG_SYSTEM_CONTEXT=True`). |
+| The page says "Open Proposal Studio from its link" | The page only works from the `http://127.0.0.1:8765/?t=…` link that `studio ui` prints (a new one each launch). Open it again from the terminal. |
+| "No config/ folder" when starting | Run `studio ui` from the project folder, or set `STUDIO_HOME`; `scripts/start.*` does this for you. |
+| "… is a system folder" / "too broad" when choosing a workspace | Pick or create a folder for your bids, e.g. `Documents\Bids\Acme`; whole drives, your home folder itself and system folders can't be workspaces. |
+| Port 8765 is in use | `studio ui --port 8766` (or pass the same option to `scripts/start.*`). |
 | Ollama loads several models / RAM fills up | Quit the Ollama tray app and let `start.*` launch Ollama, so `OLLAMA_MAX_LOADED_MODELS=1` applies. |
 | `OMP: Error #15 … libomp already initialized` | This came from FAISS, which Proposal Studio no longer uses. Remove `faiss-cpu` from the venv (`pip uninstall faiss-cpu`) if an old install left it there. |
 | "Possible PHI found" on ingest | RFPs shouldn't contain PHI. Check the listed file/page; re-run with `/approve` (or `--yes`) only if it's a false positive. |
@@ -22,6 +22,6 @@ whether Ollama is reachable (and its version), and whether each configured model
 | Windows: "running scripts is disabled" | Run with `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`. No admin is needed. |
 
 Logs:
-- Open WebUI: its console window.
-- Agents: `workspace/<opp>/agent/logs/`.
-- Ollama: `.owui-data/ollama.log` when it was started by `start.sh`.
+- The app: its terminal window.
+- Agents: `projects/<project>/agent/logs/` in your workspace folder.
+- Ollama: `$TMPDIR/proposal-studio-ollama.log` when it was started by `start.sh`.
