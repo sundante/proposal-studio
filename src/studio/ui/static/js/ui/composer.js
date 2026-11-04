@@ -1,15 +1,16 @@
 // The message composer: auto-growing textarea, attachment cards, send/stop.
 import { bytes, fileTag, h, icon } from '../dom.js';
 import { state } from '../state.js';
+import { popMenu } from './overlay.js';
 
 const ACCEPT = '.pdf,.docx,.xlsx,.pptx,.txt,.md';
 
 export class Composer {
   /**
-   * @param {{placeholder?: string, onSubmit: Function, onStop?: Function, extras?: Node[]}} opts
-   * `extras` sit next to the paperclip (e.g. the project chip on the home screen).
+   * @param {{placeholder?: string, onSubmit: Function, onStop?: Function, left?: Node[], right?: Node[], plusItems?: Function}} opts
+   * `left` sits after the "+" button, `right` before send; `plusItems()` adds entries to the "+" menu.
    */
-  constructor({ placeholder = 'Ask about the RFP…', onSubmit, onStop = null, extras = [] }) {
+  constructor({ placeholder = 'Ask about the RFP…', onSubmit, onStop = null, left = [], right = [], plusItems = null }) {
     this.files = [];
     this.onSubmit = onSubmit;
     this.onStop = onStop;
@@ -17,12 +18,18 @@ export class Composer {
     this.list = h('div', { class: 'composer-files' });
     this.input = h('input', { type: 'file', multiple: true, hidden: true, accept: ACCEPT });
     this.sendBtn = h('button', { class: 'send-btn', type: 'submit', 'aria-label': 'Send' });
+    const plus = h('button', { class: 'icon-btn', type: 'button', title: 'Add files and more', 'aria-label': 'Add files and more', 'aria-haspopup': 'menu' }, icon('plus'));
+    plus.addEventListener('click', () => popMenu(plus, [
+      { label: 'Upload files', desc: 'PDF, Word, Excel, PowerPoint, text', icon: 'upload', run: () => this.input.click() },
+      ...(plusItems ? plusItems() : []),
+    ]));
     this.el = h('form', { class: 'composer', onsubmit: (e) => { e.preventDefault(); this.submit(); } },
       this.list, this.ta,
       h('div', { class: 'composer-row' },
-        h('button', { class: 'icon-btn', type: 'button', title: 'Attach files (PDF, Word, Excel, PowerPoint, text)', 'aria-label': 'Attach files', onclick: () => this.input.click() }, icon('clip')),
-        ...extras,
+        plus,
+        ...left,
         h('span', { class: 'grow' }),
+        ...right,
         this.input, this.sendBtn));
     this.ta.addEventListener('input', () => this.sync());
     this.ta.addEventListener('keydown', (e) => {
@@ -86,5 +93,6 @@ export class Composer {
   }
 
   fill(text) { this.ta.value = text; this.sync(); this.ta.focus(); }
+  setPlaceholder(text) { this.ta.placeholder = text; }
   focus() { this.ta.focus(); }
 }

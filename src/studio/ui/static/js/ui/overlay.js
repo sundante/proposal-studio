@@ -13,7 +13,10 @@ export function popMenu(anchor, items, { align = 'start' } = {}) {
     return h('button', {
       class: `menu-item${it.danger ? ' danger' : ''}${it.checked ? ' checked' : ''}`, role: 'menuitem', type: 'button',
       onclick: (e) => { e.stopPropagation(); closeMenu(); it.run(); },
-    }, it.icon ? icon(it.icon, 'sm') : null, h('span', { class: 'ellipsis', text: it.label }), it.sub ? h('span', { class: 'sub', text: it.sub }) : null);
+    }, it.icon ? icon(it.icon, 'sm') : null,
+    it.desc ? h('span', { class: 'two' }, h('span', { class: 'ellipsis', text: it.label }), h('span', { class: 'desc', text: it.desc }))
+      : h('span', { class: 'ellipsis', text: it.label }),
+    it.sub ? h('span', { class: 'sub', text: it.sub }) : null);
   }));
   document.body.append(menu);
   const r = anchor.getBoundingClientRect();
@@ -36,6 +39,28 @@ export function popMenu(anchor, items, { align = 'start' } = {}) {
   const outside = (e) => { if (!menu.contains(e.target)) closeMenu(); };
   setTimeout(() => document.addEventListener('pointerdown', outside), 0);
   openMenu = { menu, anchor, outside };
+}
+
+/** A popover with custom content under `anchor` (e.g. a searchable picker). Returns the element. */
+export function popPanel(anchor, content, { align = 'start', width = 300 } = {}) {
+  closeMenu();
+  const menu = h('div', { class: 'menu panel-pop', style: { width: `${width}px`, maxWidth: 'calc(100vw - 16px)' } }, content);
+  document.body.append(menu);
+  const place = () => {
+    const r = anchor.getBoundingClientRect();
+    let left = align === 'end' ? r.right - menu.offsetWidth : r.left;
+    left = Math.max(8, Math.min(left, window.innerWidth - menu.offsetWidth - 8));
+    const below = r.bottom + 6;
+    const top = below + menu.offsetHeight > window.innerHeight - 8 ? Math.max(8, r.top - menu.offsetHeight - 6) : below;
+    Object.assign(menu.style, { left: `${left}px`, top: `${top}px` });
+  };
+  place();
+  anchor.setAttribute('aria-expanded', 'true');
+  menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu(); anchor.focus(); } });
+  const outside = (e) => { if (!menu.contains(e.target) && !anchor.contains(e.target)) closeMenu(); };
+  setTimeout(() => document.addEventListener('pointerdown', outside), 0);
+  openMenu = { menu, anchor, outside, place };
+  return menu;
 }
 
 export function closeMenu() {

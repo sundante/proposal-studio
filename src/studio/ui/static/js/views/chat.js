@@ -8,11 +8,21 @@ import { slidesView, summaryView } from '../panels/insights.js';
 import { emit, go, state } from '../state.js';
 import { Composer } from '../ui/composer.js';
 import { toast } from '../ui/overlay.js';
+import { modeOf, prefChips, rememberDefaults } from '../ui/prefs.js';
 import { isWide } from './sidebar.js';
 
 let composer = null;
 let actionsEl = null;
 let mobilePanel = false;
+let prefs = null; // this chat's mode / model / think
+
+/** Called by the router when leaving a chat: temporary chats are deleted then. */
+export async function leaveChat(nextHash) {
+  const chat = state.chat;
+  if (chat?.temporary && !nextHash.endsWith(chat.id)) {
+    try { await api('DELETE', `/api/chats/${chat.id}`); } catch { /* already gone */ }
+  }
+}
 
 export async function renderChat(view, topbar, id) {
   let chat;
@@ -39,11 +49,21 @@ export async function renderChat(view, topbar, id) {
   h('button', { class: 'icon-btn', type: 'button', id: 'panel-toggle', title: 'Project panel (Ctrl+J)', 'aria-label': 'Toggle project panel', onclick: togglePanel }, icon('panel')),
   more);
 
-  composer = new Composer({ placeholder: 'Ask about the RFP, or drop files here…', onSubmit: (msg) => send(msg) });
+  prefs = { mode: chat.prefs?.mode || 'auto', model: chat.prefs?.model || '', think: chat.prefs?.think ?? null };
+  const chips = prefChips(prefs, (p) => { rememberDefaults(p); composer.setPlaceholder(modeOf(p.mode).placeholder); });
+  composer = new Composer({ placeholder: modeOf(prefs.mode).placeholder, right: [chips.mode, chips.model], onSubmit: (msg) => send(msg) });
+  const tempBar = chat.temporary ? h('div', { class: 'note temp-note' }, icon('ghost', 'sm'),
+    h('span', { style: { flex: '1' } }, h('strong', { text: 'Temporary chat. ' }), 'Not saved or listed; deleted when you leave.'),
+    h('button', {
+      class: 'btn sm', type: 'button',
+      onclick: async () => {
+        try { await api('PATCH', `/api/chats/${chat.id}`, { temporary: false }); chat.temporary = false; tempBar.remove(); await loadLists(); toast('Chat kept'); } catch (e) { toast(e.message); }
+      },
+    }, 'Keep this chat')) : null;
   actionsEl = h('div', { class: 'actions' });
   view.replaceChildren(h('div', { class: 'chat' },
     h('div', { class: 'thread-scroll', id: 'thread-scroll' }, h('div', { class: 'thread', id: 'thread' })),
-    h('div', { class: 'dock' }, actionsEl, composer.el,
+    h('div', { class: 'dock' }, tempBar, actionsEl, composer.el,
       h('p', { class: 'disclaimer', text: 'Runs entirely on this computer. Answers can be wrong — check the cited sources.' }))));
   renderThread();
   renderActions();
@@ -53,6 +73,7 @@ export async function renderChat(view, topbar, id) {
   if (state.pendingSend) {
     const msg = state.pendingSend;
     state.pendingSend = null;
+    if (msg.prefs) { Object.assign(prefs, msg.prefs); chips.refresh(); composer.setPlaceholder(modeOf(prefs.mode).placeholder); }
     send(msg);
   }
 }
@@ -154,7 +175,8 @@ export async function send({ text = '', files = [], display, steps }) {
     const names = [];
     for (const f of files) { setStatus(`Uploading ${f.name}…`); names.push((await uploadFile(chat.project, f)).name); }
     setStatus(files.length ? 'Reading the files…' : 'Thinking…');
-    await streamMessage(chat.id, { text, display: shown, steps, files: names }, {
+    const choice = steps ? {} : { mode: prefs?.mode, model: prefs?.model || '', think: prefs?.think ?? null };
+    await streamMessage(chat.id, { text, display: shown, steps, files: names, ...choice }, {
       chunk: (t) => { reply += t; if (!frame) frame = requestAnimationFrame(paint); },
       status: setStatus,
       pending: (cmd) => { pending = cmd; },

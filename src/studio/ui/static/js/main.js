@@ -3,7 +3,9 @@ import { api, loadLists } from './api.js';
 import { $, h, icon } from './dom.js';
 import { emit, on, state } from './state.js';
 import { closeAllDialogs, openDialog, toast } from './ui/overlay.js';
-import { hidePanel, renderChat, renderPanel, setupResizer, togglePanel } from './views/chat.js';
+import { openSearch } from './dialogs/search.js';
+import { hidePanel, leaveChat, renderChat, renderPanel, setupResizer, togglePanel } from './views/chat.js';
+import { renderComing } from './views/coming.js';
 import { renderHome } from './views/home.js';
 import { renderProject } from './views/project.js';
 import { renderProjects } from './views/projects.js';
@@ -17,28 +19,36 @@ async function route() {
   if (!showLogin.open) closeAllDialogs();
   closeDrawer();
   const hash = location.hash || '#/';
+  if (state.chat) await leaveChat(hash);
   let m;
-  const leaveChat = () => { state.chat = null; hidePanel(); };
+  const offChat = () => { state.chat = null; hidePanel(); };
   try {
     if ((m = hash.match(/^#\/chat\/([0-9a-f]{12})$/))) {
       await renderChat(view(), topbar(), m[1]);
     } else if ((m = hash.match(/^#\/project\/([a-z0-9-]+)$/))) {
-      leaveChat();
+      offChat();
       await renderProject(view(), topbar(), m[1]);
     } else if (hash === '#/projects') {
-      leaveChat(); state.project = null;
+      offChat(); state.project = null;
       renderProjects(view(), topbar());
+    } else if ((m = hash.match(/^#\/(outputs|templates|customize)$/))) {
+      offChat(); state.project = null;
+      renderComing(view(), topbar(), m[1]);
     } else if ((m = hash.match(/^#\/settings(?:\/(\w+))?$/))) {
-      leaveChat(); state.project = null;
+      offChat(); state.project = null;
       await renderSettings(view(), topbar(), m[1] || '');
     } else {
-      leaveChat(); state.project = null;
+      offChat(); state.project = null;
       renderHome(view(), topbar());
     }
   } catch (e) {
     toast(e.message);
   }
-  topbar().prepend(h('button', { class: 'icon-btn mobile-only', type: 'button', 'aria-label': 'Open menu', onclick: () => $('#app').classList.add('drawer') }, icon('menu')));
+  topbar().prepend(
+    h('button', { class: 'icon-btn mobile-only', type: 'button', 'aria-label': 'Open menu', onclick: () => $('#app').classList.add('drawer') }, icon('menu')),
+    h('div', { class: 'nav-arrows desktop-only' },
+      h('button', { class: 'icon-btn sm', type: 'button', title: 'Back', 'aria-label': 'Back', onclick: () => history.back() }, icon('back', 'sm')),
+      h('button', { class: 'icon-btn sm', type: 'button', title: 'Forward', 'aria-label': 'Forward', onclick: () => history.forward() }, icon('forward', 'sm'))));
   view().scrollTop = 0;
   renderSidebar();
 }
@@ -90,6 +100,7 @@ function setupKeys() {
     const mod = e.ctrlKey || e.metaKey;
     if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleSidebar(); }
     if (mod && e.key.toLowerCase() === 'j' && state.chat) { e.preventDefault(); togglePanel(); }
+    if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
   });
   window.addEventListener('resize', () => { applyRail(); if (state.chat) renderPanel(); });
 }

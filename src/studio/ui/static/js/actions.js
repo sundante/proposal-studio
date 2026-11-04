@@ -92,8 +92,18 @@ export async function deleteChat(c) {
   } catch (e) { toast(e.message); }
 }
 
+export async function togglePin(c) {
+  try {
+    await api('PATCH', `/api/chats/${c.id}`, { pinned: !c.pinned });
+    c.pinned = !c.pinned;
+    await loadLists();
+    toast(c.pinned ? 'Pinned' : 'Unpinned');
+  } catch (e) { toast(e.message); }
+}
+
 export function chatMenu(c, anchor, { align = 'end' } = {}) {
   popMenu(anchor, [
+    { label: c.pinned ? 'Unpin' : 'Pin', icon: 'pin', run: () => togglePin(c) },
     { label: 'Rename', icon: 'edit', run: () => renameChat(c) },
     { label: 'Delete chat', icon: 'trash', danger: true, run: () => deleteChat(c) },
   ], { align });

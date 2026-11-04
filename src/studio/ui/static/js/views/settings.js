@@ -16,7 +16,17 @@ export async function renderSettings(view, topbar, section = '') {
   document.title = 'Settings · Proposal Studio';
   state.settings = await api('GET', '/api/settings');
   const st = state.settings;
-  const nav = [['general', 'General'], ['folders', 'Folders'], ['models', 'Models'], ['about', 'About']];
+  const nav = [['profile', 'Profile'], ['general', 'General'], ['folders', 'Folders'], ['models', 'Models'], ['about', 'About']];
+  const nameInput = h('input', { class: 'input', value: st.name || '', placeholder: 'e.g. Sun', maxlength: 40, style: { width: '240px' } });
+  const saveName = h('button', { class: 'btn primary sm', type: 'button' }, 'Save');
+  saveName.addEventListener('click', async () => {
+    try {
+      state.settings = await api('POST', '/api/settings/profile', { name: nameInput.value });
+      emit('lists');
+      toast(state.settings.name ? `Hello, ${state.settings.name.split(' ')[0]}` : 'Name cleared');
+    } catch (e) { toast(e.message); }
+  });
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveName.click(); });
 
   const theme = store.get('ps.theme', 'system');
   const seg = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Theme' }, [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, label]) => h('button', {
@@ -39,10 +49,13 @@ export async function renderSettings(view, topbar, section = '') {
         onclick: (e) => { e.preventDefault(); history.replaceState(null, '', `#/settings/${k}`); document.getElementById(`s-${k}`)?.scrollIntoView({ behavior: 'smooth' }); },
       }, label))),
       h('div', {},
+        h('section', { class: 's-section', id: 's-profile' },
+          h('h2', { text: 'Profile' }), h('p', { text: 'Stored only on this computer.' }),
+          row('Your name', 'Used in the greeting and the sidebar.', [nameInput, saveName])),
         h('section', { class: 's-section', id: 's-general' },
           h('h2', { text: 'General' }), h('p', { text: 'How Proposal Studio looks on this computer.' }),
           row('Theme', 'Follow the system, or always light or dark.', seg),
-          row('Keyboard shortcuts', 'Ctrl/⌘+B sidebar · Ctrl/⌘+J project panel · Enter send · Shift+Enter new line · Esc close')),
+          row('Keyboard shortcuts', 'Ctrl/⌘+K search · Ctrl/⌘+B sidebar · Ctrl/⌘+J project panel · Enter send · Shift+Enter new line · Esc close')),
         h('section', { class: 's-section', id: 's-folders' },
           h('h2', { text: 'Folders' }), h('p', { text: 'Where your files live. Each project keeps everything in its own folder — see the path on the project page.' }),
           row('Proposal Studio folder', 'New projects are created here by default. It also holds the shared library and the list of your projects.', [
