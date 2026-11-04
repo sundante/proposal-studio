@@ -37,6 +37,8 @@ All notable changes to this project are documented here. The format follows
 - `scripts/start.*` now open the app; setup no longer installs Open WebUI; Python 3.13 allowed.
 
 ### Removed
+- Community and build-kit docs (AGENTS, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, START_HERE,
+  docs/performance) and the GitHub issue/PR templates.
 - GitHub Actions (CI and release workflows) and Dependabot; checks and release builds are local.
 - Open WebUI integration (`owui/`, `studio owui …`). Archived on the `archive/open-webui` branch.
 

@@ -19,7 +19,7 @@ whether Ollama is reachable (and its version), and whether each configured model
 | `/render` QA errors about layouts | The mapping in `config/layout_map.yaml` doesn't match the template. See [templates.md](templates.md) (`studio template inspect`). |
 | Slides say "Add content — no vetted blocks" | Harvest and curate blocks first: `/harvest`, then review `library/blocks/*.yaml`. |
 | Answers repeat the same excerpt twice | You ingested the same RFP as both PDF and DOCX. Keep one format per document: remove one in the **Files** tab (or from the project's `input/` folder). |
-| Everything is slow | Expected on CPU-only laptops. See [performance.md](performance.md). Use `qwen3:4b` for the worker (`/config set worker.model qwen3:4b`), and keep RFP files focused. |
+| Everything is slow | Expected on CPU-only laptops; measure yours with `studio bench` (add `--cpu` for CPU-only). Use `qwen3:4b` for the worker (`/config set worker.model qwen3:4b`), and keep RFP files focused. |
 | An agent "isn't installed" | Install its CLI (see [agents.md](agents.md)) and make sure it's on PATH. |
 | Windows: "running scripts is disabled" | Run with `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`. No admin is needed. |
 

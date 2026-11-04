@@ -555,3 +555,11 @@ Format:
      not a Drive API — offline rule kept), 17 notebook (sources + notes), then 18 Outputs/
      Templates/Customize, 19 research + opt-in web, 20 model-router suggestions.
 - Spec impact: §12 UI.
+
+## 2026-11-04 — Remove community and build-kit docs
+- Decision: delete AGENTS.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md,
+  vibes/START_HERE.md, docs/performance.md and the `.github/` issue/PR templates. The repo is
+  maintained by one person through a manual `dev` → `main` flow with Claude Code; `CLAUDE.md`
+  is the only agent guide. Links were removed from README, troubleshooting, the tutorial, the spec
+  (§3, §16.1) and the release bundle allowlist. `studio bench` still measures performance.
+- Why: maintainer request: keep only Markdown that's used.

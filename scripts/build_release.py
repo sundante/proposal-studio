@@ -27,9 +27,6 @@ INCLUDE_FILES = (
     "tutorial.html",
     "LICENSE",
     "CHANGELOG.md",
-    "CONTRIBUTING.md",
-    "CODE_OF_CONDUCT.md",
-    "SECURITY.md",
 )
 
 

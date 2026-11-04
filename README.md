@@ -101,8 +101,7 @@ Details are in [docs/privacy.md](docs/privacy.md).
 
 [Tutorial](vibes/tutorial.html) · [Install](docs/install.md) · [Commands](docs/commands.md) · [Configuration](docs/config.md) ·
 [Templates](docs/templates.md) · [Agents](docs/agents.md) ·
-[Performance](docs/performance.md) · [Troubleshooting](docs/troubleshooting.md) ·
-[Privacy](docs/privacy.md)
+[Troubleshooting](docs/troubleshooting.md) · [Privacy](docs/privacy.md)
 
 ## Development
 
@@ -116,8 +115,8 @@ studio bench [--cpu]             # performance against the budget
 ```
 
 The design and its history are in [vibes/](vibes/): `PROJECT_SPEC.md`, `BUILD_PLAN.md`,
-`DECISIONS.md`, `PROGRESS.md` and `status.md`. To contribute, see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+`DECISIONS.md`, `PROGRESS.md` and `status.md`. There is no CI: run the checks above before
+every commit to `dev`; `main` is updated by hand.
 
 ## License
 

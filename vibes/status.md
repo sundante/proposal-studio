@@ -1,135 +1,127 @@
 # Proposal Studio — Status
 
-_Last updated: 2026-11-04 · Branch `dev` · all 11 phases built · v0.1.0 ready to tag · 199 tests_
+_Last updated: 2026-11-04 · Branch `dev` · Phases 0–15 built · 226 tests · no CI (checks run locally)_
 
-Proposal Studio is a fully local, offline proposal workbench: Open WebUI + Ollama + the
-`studio` Python package. It turns RFPs into a cited digest and an AI-practice proposal deck
-on your own PowerPoint template, answers RFP questions with citations, researches your local
-library, and hands file tasks to sandboxed local agents. See [PROJECT_SPEC.md](PROJECT_SPEC.md)
-(design), [BUILD_PLAN.md](BUILD_PLAN.md) (phases), [PROGRESS.md](PROGRESS.md) (checklist,
-known issues) and [DECISIONS.md](DECISIONS.md) (why).
+Proposal Studio is a fully local, offline proposal workbench:
+- the **Proposal Studio app** (`studio ui`) is a browser app served from your own machine;
+- **Ollama** runs the models;
+- the **`studio`** Python package does the work.
+
+It turns RFPs into a cited summary and a proposal deck on your own PowerPoint template, answers
+RFP questions with clickable citations, lets you read the RFP beside the chat, researches your
+local library, and hands file tasks to sandboxed local agents.
+
+See [PROJECT_SPEC.md](PROJECT_SPEC.md) (design), [BUILD_PLAN.md](BUILD_PLAN.md) (phases),
+[PROGRESS.md](PROGRESS.md) (checklist, known issues) and [DECISIONS.md](DECISIONS.md) (why).
 
 ## At a glance
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Bootstrap: repo, OSS files, CI, config, LLM client, guards, CLI | ✅ |
-| 1 | Ingest + RAG + `/ask` | ✅ |
-| 2 | RFP digest | ✅ |
-| 3 | Template inspector + PPTX renderer (no LLM) | ✅ |
-| 4 | Blocks, storyline, deck writer | ✅ |
-| 5 | Offline research | ✅ |
-| 6 | Router core + `studio chat` | ✅ |
-| 7 | Open WebUI integration + setup scripts | ✅ |
-| 8 | Agents route (`/agent`) | ✅ |
-| 9 | Hardening + docs (`studio bench`, full docs) | ✅ |
-| 10 | Release pipeline + v0.1.0 | 🟡 prepared — tag after `dev` → `main` |
+| 0–6 | Engine: config, LLM client, guards, ingest + RAG, digest, renderer, deck writer, research, router | ✅ |
+| 7–10 | Open WebUI front end, agents, hardening, release pipeline | ✅ built, then replaced (archived on `archive/open-webui`) |
+| 11–13 | Proposal Studio app: local server, projects in trusted folders, full UI rebuild | ✅ |
+| 14 | Search, pinned/temporary chats, modes (Auto · Ask · Research · Draft · Chat), model + Fast/Thinking | ✅ |
+| 15 | Read files in the side panel; citations open the cited page | ✅ |
+| 16 | Shared drives and co-working | ⬜ next |
+| 17 | Notebook (sources + notes) | ⬜ |
+| 18 | Outputs, Templates, Customize pages | ⬜ |
+| 19 | Research in the workbench + opt-in web | ⬜ |
+| 20 | Model-router suggestions | ⬜ |
 
-## Using it now (dev setup)
+## Using it now
 
 ```bash
-scripts/setup.sh                    # once, online (Windows: scripts\setup.ps1)
-scripts/start.sh                    # offline from here; open http://localhost:8080
-studio owui install --token sk-…    # pipe + agents + PHI filter + / prompts
-studio smoke                        # end-to-end check on the real models
+scripts/setup.sh          # once, online (Windows: scripts\setup.ps1)
+scripts/start.sh          # offline from here; opens the app in your browser
+studio smoke              # optional end-to-end check on the real models
 ```
 
-Then pick **Proposal Studio** in Open WebUI. Typical flow:
-`/new` → attach the RFP → ask questions → `/digest xlsx` → `/outline` → `/deck` → `/edit` →
-`/render` (download link). Once per library: `/library index`, `/harvest`, then curate
-`library/blocks/`. Full guide: [docs/install.md](../docs/install.md); step-by-step walkthrough:
-[tutorial.html](../tutorial.html).
+In the app:
+1. **New project.** Name it and choose its folder: the default is
+   `Documents/Proposal Studio/<name>`, or any folder you trust.
+2. Drop the RFP onto the chat and ask questions. Citation chips open the PDF at the cited page.
+3. **Analyse RFP** builds the summary; **Build slides** writes and renders the deck;
+   **Download PPTX** saves it.
+4. Use the composer chips to switch mode or model. Use Search (Ctrl/⌘+K), and pin the chats you
+   want to keep at the top.
+
+Full guide: [docs/install.md](../docs/install.md); walkthrough: [tutorial.html](tutorial.html).
 
 ## What was built (by area)
 
-- **Foundations:**
-  - src-layout package, validated YAML config with runtime overrides (`/config`)
-  - Ollama client (schema-constrained output with retries, streaming, single-flight lock)
-  - guards (cloud-model block, path sandbox, PHI scan)
-  - open-source files
-  - CI on Windows and Ubuntu × Python 3.11/3.12, plus a script syntax check and a rendered
-    sample-deck artifact
-- **RFP:**
-  - ingest for PDF/DOCX/XLSX/PPTX/TXT/MD, keeping heading paths, pages/slides and row-wise
-    tables
-  - PHI block-until-confirmed
-  - incremental index (exact NumPy cosine)
-  - `/ask` with `[section, p.N]` citations, or "Not found in the RFP."
-- **Digest:** map-reduce extraction with citations, de-duplication, requirement ids checked
-  against the RFP's own table rows, conflict flags, a Markdown summary and an XLSX matrix.
-- **Deck:**
-  - `/harvest`: anonymised (twice), edit-protected YAML blocks
-  - `/outline`: `include_if` rules that cite the RFP
-  - `/deck`: one call per slide over 2–4 vetted blocks, limits enforced in Python, provenance,
-    review guards (invented figures/certifications, client claims not in the RFP, filled
-    placeholders), skeletons instead of invention
-  - `/edit` with a diff and history
-- **Render:** your template (`.pptx`/`.potx`) mapped via `layout_map.yaml`, a layered
-  architecture diagram, notes with sources, versioned output and a QA report. No LLM.
-- **Research:** a plan → multi-query retrieval → cited findings → gap round → synthesis loop,
-  with a hard LLM-call cap and a saved markdown report.
+- **Engine:**
+  - validated YAML config with overrides;
+  - Ollama client (schema-constrained output, streaming, one generation at a time);
+  - guards: cloud models blocked, path sandbox, PHI scan;
+  - ingest for PDF/DOCX/XLSX/PPTX/TXT/MD, with an incremental NumPy index;
+  - cited `/ask` answers;
+  - map-reduce digest with an XLSX matrix;
+  - harvested and curated content blocks; storyline outline; per-slide deck writer with review
+    guards;
+  - deterministic PPTX renderer with a QA report;
+  - offline research with a call cap;
+  - sandboxed agents (OpenCode, Claude Code via Ollama).
 - **Router:**
-  - every command and alias
-  - rules → classifier → clarification
-  - file-writing routes wait for `/approve`
-  - route line and "Next:" on every reply
-  - per-chat sessions
-  - `studio chat`
-- **Open WebUI:**
-  - the Proposal Studio pipe: attachments, confirmation dialog, download links, Valves
-  - "Agent · …" models
-  - PHI filter and `/` prompts
-  - localhost-only API installer
-  - `offline.env` (offline, no telemetry, Ollama cloud off, one model loaded)
-  - setup/start/smoke scripts for Windows and Unix
-- **Agents:** OpenCode and Claude Code (via Ollama's Anthropic API), verified headless; Hermes
-  shipped disabled. Plan runs in a throwaway copy → approve → apply → diff → approve copy-back,
-  with an isolated HOME, an env allowlist, no shell by default, timeouts and logs.
-- **Hardening:**
-  - `studio bench [--cpu]`: every budgeted step passes, GPU and CPU-only
-  - Open WebUI + studio idle RSS 736 MB
-  - worker context 8k
-  - docs: README, install, commands (generated), config, templates, agents, performance,
-    troubleshooting, privacy, plus **`tutorial.html`**, a detailed single-file offline tutorial
-    (a test keeps it in sync with the commands)
-- **Release:**
-  - allowlisted bundle builder (tracked files only, private-path guard)
-  - `release.yml`: sdist + wheel + Windows zip, a clean-install check on Windows, then a GitHub
-    Release
-  - version 0.1.0 and CHANGELOG prepared
+  - commands and aliases, rules → classifier, and confirmation for actions that write files;
+  - commands pasted in code fences are recognised;
+  - "files + question" ingests first, then answers;
+  - working modes, plus `/chat` with conversation history;
+  - the model and effort can be chosen per message.
+- **App** (`src/studio/ui/`):
+  - **Server:** Python's built-in HTTP server on 127.0.0.1, with SSE streaming.
+  - **Security:** a per-launch token (HttpOnly, SameSite=Strict cookie, and a header required for
+    writes), Host/Origin checks, and agent settings can't be changed from chat.
+  - **Projects:** each project lives in a folder you trust. Folders are always shown with
+    **Open folder**. A project can be removed from the list or deleted with its folder.
+  - **Front end:** a modular UI with a warm paper + ink look and dark mode; a sidebar that
+    collapses to icons; a resizable side panel.
+  - **Pages:** home, projects grid, project page, chat, Settings, with in-app dialogs.
+  - **Composer:** a Finder-style folder picker, search, pinned and temporary chats, and mode and
+    model chips.
+  - **Document viewer:** PDF pages with a selectable text layer, a reading view for Office files,
+    find and zoom, and highlights for citations.
+- **Docs:** README, `docs/` (install, commands, config, templates, agents, troubleshooting,
+  privacy), and an offline `tutorial.html`.
 
 ## Problems that real runs caught (all fixed)
 
-- **qwen3:8b output problems** (citations, ids, client claims, `{{date}}` slots):
-  - It mis-copied long citation labels. It now cites numbers, and Python adds the labels.
-  - It stamped the prompt's example id on every requirement. Ids are now checked against the
-    RFP's table rows.
-  - It copied a past client's claim onto a client slide, and filled a `{{date}}` slot with the
-    due date. Both are now flagged by Python guards.
-- **Harvest:** client names leaked into review notes. The notes are now anonymised too.
-- **Open WebUI:**
-  - FAISS and Open WebUI's torch crashed the server (duplicate OpenMP). Search is now NumPy, and
-    FAISS is removed.
-  - The confirmation dialog auto-approved when no browser was connected. It now needs a literal
-    yes.
-- **Agents:** opencode downloads a model catalogue at runtime. That and other fetches are now
-  disabled via env vars.
+- **qwen3:8b:**
+  - It mis-copied citation labels; it now cites by number, and Python adds the labels.
+  - It stamped one example id on every requirement; ids are now checked against the RFP.
+  - It imported a past client's claims into the deck; the guards now flag them.
+- **Harvest:** client names leaked into review notes; the notes are now anonymised.
+- **Open WebUI era:** a FAISS/torch OpenMP crash led to NumPy search, and the confirmation dialog
+  could auto-approve. Both were fixed before Open WebUI was removed.
+- **App:**
+  - folder chooser bugs;
+  - dialogs that stayed open across pages;
+  - a stray "null" chip;
+  - a CSS clash in the search dialog;
+  - over-wide grid columns next to the panel;
+  - citations from tables that can't be matched word for word (the section heading is now
+    highlighted instead).
 
 ## Still open
 
-- **To release:** promote `dev` → `main`, then `/ship 0.1.0`. That tags `v0.1.0`; CI builds,
-  checks the install on Windows, and publishes the release.
+- **Next phases:** 16 shared drives, 17 notebook, 18 Outputs/Templates/Customize, 19 research +
+  opt-in web, 20 model-router suggestions.
 - **Not yet run for real:**
-  - Windows scripts on a real Windows 11 laptop (CI checks syntax, and the release job does a
-    clean install there)
-  - the in-browser confirmation dialog and the light-theme step
-  - the 16 GB Intel CPU-only target (estimated 2–4× the Mac CPU-only numbers)
-  - a visual check of the rendered deck in PowerPoint
-- **Quality limits with qwen3:8b:** agents rarely use their file tools; research synthesis isn't
-  cited; deck quality depends on curated blocks. See [PROGRESS.md](PROGRESS.md).
-- **Hermes Agent:** enable it once a live offline run is verified.
-- **Before publishing:** confirm your employment terms allow a personal open-source project in
-  this area, and that your firm allows these tools on work machines.
+  - the Windows scripts on a Windows 11 laptop;
+  - the 16 GB Intel CPU-only target;
+  - a visual check of a rendered deck in PowerPoint;
+  - Linux (the last CI run failed on Ubuntu, cause unknown).
+- **Quality limits with qwen3:8b:**
+  - agents rarely use their file tools;
+  - the research synthesis isn't cited;
+  - deck quality depends on curated blocks.
+- **Release:** v0.1.0 was never shipped. `/ship` now builds the files locally, and you publish
+  the GitHub Release by hand.
+- **Before publishing:** confirm your employment terms and your firm's tool policy allow it.
+
+---
+
+# Phase log
 
 ## Phase 11a — Studio UI (2026-11-04)
 Open WebUI was too hard to use for this job, so it is being replaced by our own local chat app,

@@ -2,8 +2,10 @@
 
 Phases are built one per Claude Code session with `/phase <n>`. Each phase ends with commits pushed to `dev`.
 
-> **Note (2026-11-04):** GitHub Actions (CI, release) and Dependabot were removed; checks run
-> locally with `/verify` and releases are built locally by `/ship`.
+> **Note (2026-11-04):** GitHub Actions (CI, release), Dependabot, the `.github/` templates and the
+> community/agent docs (CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, AGENTS.md, START_HERE.md,
+> docs/performance.md) were removed; checks run locally with `/verify` and releases are built
+> locally by `/ship`. Phase descriptions below are kept as history.
 >
 > **Status (2026-11-04):** all phases 0–10 are built. v0.1.0 is prepared; the tag is created
 > with `/ship 0.1.0` after `dev` is promoted to `main`. Deviations are in `vibes/DECISIONS.md`;

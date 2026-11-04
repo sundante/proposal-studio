@@ -99,13 +99,12 @@ lives in a folder the user chose and trusted; the shared library lives in the Pr
 
 ```
 proposal-studio/
-├── CLAUDE.md / AGENTS.md    # short pointers for coding agents (same content)
+├── CLAUDE.md               # short pointers for Claude Code
 ├── vibes/                   # non-functional project docs (planning, tracking)
 │   ├── PROJECT_SPEC.md      # this file
 │   ├── BUILD_PLAN.md        # phases
 │   ├── DECISIONS.md         # deviations + decisions log (append-only)
 │   ├── PROGRESS.md          # phase checklist, updated at end of each phase
-│   ├── START_HERE.md        # build-kit setup notes
 │   └── status.md            # narrative summary of work done
 ├── pyproject.toml           # package `studio`, python >=3.11
 ├── config/
@@ -502,13 +501,11 @@ Hard cap on LLM calls per run (configurable, default 12) and visible progress vi
   committed to `dev`, and the maintainer promotes `dev` → `main` (no phase branches or PRs; see
   DECISIONS.md). Originally specified: `phase/<n>-<slug>` branches merged by PR (squash). Conventional Commits (`feat:`, `fix:`, `docs:`,
   `test:`, `chore:`, `ci:`).
-- Required files: `README.md`, `LICENSE` (Apache-2.0), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
-  (Contributor Covenant), `SECURITY.md` (how to report issues; states the no-telemetry,
-  local-only design), `CHANGELOG.md` (Keep a Changelog), `docs/` (install, commands, config,
-  templates, agents, troubleshooting, privacy).
-- `.github/`: `ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml`, `PULL_REQUEST_TEMPLATE.md`
-  (checklist includes "no client/proprietary data added"), `dependabot.yml` (removed 2026-11-04; was pip + github-actions,
-  monthly).
+- Required files: `README.md`, `LICENSE` (Apache-2.0), `CHANGELOG.md` (Keep a Changelog),
+  `docs/` (install, commands, config, templates, agents, troubleshooting, privacy).
+  **As built (2026-11-04):** CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, AGENTS.md, the `.github/`
+  issue/PR templates, Dependabot and the workflows were removed at the maintainer's request
+  (single-maintainer, manual `dev` → `main` flow).
 - `.gitignore` covers `library/`, `workspace/`, `templates/*` except `templates/sample/`,
   `config/overrides.yaml`, `.venv/`, indexes, logs, `*.pptx` outside fixtures.
 - A pre-commit config (ruff, end-of-file, trailing whitespace, check-added-large-files, and a

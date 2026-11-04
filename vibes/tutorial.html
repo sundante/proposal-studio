@@ -851,7 +851,7 @@ studio config show | set &lt;key&gt; &lt;value&gt; | reset</code></pre></div>
   <p>On an Intel CPU-only laptop, expect the CPU-only column to be 2–4× slower; a full deck takes
     roughly 10–15 minutes. If that's too slow: <code>/config set worker.model qwen3:4b</code>,
     ingest only the documents that matter, and regenerate single slides rather than the whole
-    deck. More in <a href="docs/performance.md">docs/performance.md</a>.</p>
+    deck. Measure your own machine with <code>studio bench</code>.</p>
 </section>
 
 <section id="privacy">

@@ -34,8 +34,13 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - Open WebUI build archived on branch `archive/open-webui` (a11c3e6).
 
 ## Docs
-- User docs: `README.md`, `vibes/tutorial.html` (step-by-step, offline single file), `docs/*.md`.
-- Project docs: `vibes/` (spec, build plan, decisions, progress, status).
+- User docs: `README.md`, `vibes/tutorial.html` (step-by-step, offline single file), `docs/*.md`
+  (install, commands, config, templates, agents, troubleshooting, privacy).
+- Project docs: `CLAUDE.md` (instructions for Claude Code) and `vibes/` (spec, build plan,
+  decisions, progress, status).
+- Removed 2026-11-04 (not needed in the single-maintainer flow): AGENTS.md, CONTRIBUTING.md,
+  CODE_OF_CONDUCT.md, SECURITY.md, vibes/START_HERE.md, docs/performance.md, `.github/`
+  templates, workflows and Dependabot.
 
 ## Known issues
 - Viewer: a citation from a table chunk can't be matched word-for-word on the PDF page, so the
@@ -44,6 +49,10 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
 - The last CI run (before CI was removed) failed on Ubuntu only; the cause is unknown because the
   log needs a logged-in `gh`. Tests pass on macOS (and passed on Windows in CI). Re-check on Linux
   before a Linux release.
+- Security review (2026-11-04): the session cookie isn't port-isolated, so another local OS
+  user listening on a 127.0.0.1 port could capture it (rated low; fix: send the token in a
+  per-origin header). "Delete project and folder" also deletes files that were already in a
+  folder you chose to use as a project folder (warned in the dialog).
 - Studio UI: Stop closes the stream but the model finishes the current step in the background
   (the reply is saved to the chat); a second message in the same project waits for it.
 - Studio UI front-end JS has no automated tests (server/API are covered by `tests/test_ui.py`
@@ -56,7 +65,7 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
   listed in the old folder can be added back by folder); library files aren't moved.
 - Ingesting the same RFP as both PDF and DOCX duplicates excerpts in answers (user-side;
   troubleshooting.md and the tutorial recommend one format per document).
-- Performance measured with `studio bench` (docs/performance.md); the Intel CPU-only target
+- Performance is measured with `studio bench` (the old docs/performance.md was removed); the Intel CPU-only target
   itself is still unmeasured (estimated 2–4× the Mac CPU-only numbers).
 - Rendered decks were checked structurally (bounds, overlaps, empty placeholders), not visually:
   no LibreOffice on the dev machine and Quick Look hangs headless. Open a rendered deck
@@ -68,8 +77,6 @@ Status values: ⬜ todo · 🟡 in progress · ✅ done
   findings carry the citations. Sub-questions from qwen3:8b tend to overlap.
 - `setup.ps1`/`start.ps1` have not been run on a real Windows 11 laptop, and nothing checks them
   automatically any more (CI was removed).
-- The Open WebUI pipe was verified via its HTTP API; the browser confirmation dialog (needs a
-  live browser session) and the light-theme step are untested manually.
 - If the Ollama tray app is already running, `offline.env`'s `OLLAMA_*` settings don't apply.
 - Agent runs with qwen3:8b are slow (30–70 s per step here) and the model often doesn't use its
   file tools; Hermes is disabled until a live offline run is verified.
