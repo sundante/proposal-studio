@@ -58,7 +58,7 @@ function toast(text, ms = 3500) {
 }
 
 async function api(method, url, body) {
-  const opts = { method, headers: {} };
+  const opts = { method, headers: { 'X-Studio': '1' } };
   if (body instanceof Blob) opts.body = body;
   else if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
@@ -69,6 +69,9 @@ async function api(method, url, body) {
   if (!res.ok) {
     const err = new Error(data.error || `HTTP ${res.status}`);
     err.status = res.status;
+    err.data = data;
+    if (data.needs_login) showLogin();
+    else if (data.needs_workspace) openWorkspacePicker({ required: true });
     throw err;
   }
   return data;
@@ -561,7 +564,7 @@ async function send({ text = '', files = [], display, steps }) {
     setStatus('Thinking…');
     const res = await fetch(`/api/chats/${chat.id}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Studio': '1' },
       body: JSON.stringify({ text, display: shown, steps, files: names }),
       signal: controller.signal,
     });
@@ -670,6 +673,7 @@ function renderPanel() {
   const panel = $('#panel');
   const wide = window.matchMedia('(min-width: 861px)').matches;
   panel.hidden = !state.chat || !state.panelOpen || (!wide && !renderPanel.mobileOpen);
+  $('#panel-resizer').hidden = panel.hidden || !wide;
   if (panel.hidden) return;
   $$('.tab', panel).forEach((t) => t.classList.toggle('active', t.dataset.tab === state.panelTab));
   const body = $('#panel-body');
@@ -867,6 +871,10 @@ function boot() {
   $('#home-composer-slot .composer textarea').placeholder = 'Drop an RFP or ask a question…';
 
   $('#new-chat').addEventListener('click', () => go('#/'));
+  $('#ws-switch').addEventListener('click', () => openWorkspacePicker({ required: false }));
+  $('#health').addEventListener('click', openModels);
+  $('#modal-close').addEventListener('click', closeModal);
+  $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
   $$('.hint').forEach((b) => b.addEventListener('click', () => homeComposer.fill(b.dataset.fill)));
   $$('#actions .action[data-action]').forEach((b) => b.addEventListener('click', () => runAction(b.dataset.action)));
   $$('.tab').forEach((t) => t.addEventListener('click', () => showPanel(t.dataset.tab)));
@@ -901,9 +909,293 @@ function boot() {
   });
   window.addEventListener('popstate', route);
   setupDrop();
+  setupLayout();
   checkHealth();
   setInterval(checkHealth, 30000);
-  refreshLists().catch((err) => toast(err.message)).finally(route);
+  startWorkspace();
+}
+
+async function startWorkspace() {
+  let info;
+  try {
+    info = await api('GET', '/api/workspace');
+  } catch {
+    return; // 401 → login screen already shown
+  }
+  setWorkspaceName(info);
+  if (!info.active) {
+    openWorkspacePicker({ required: true, info });
+    return;
+  }
+  await refreshLists().catch((err) => toast(err.message));
+  route();
+}
+
+
+// ---------------------------------------------------------------- modal
+function openModal(title, body, { locked = false } = {}) {
+  $('#modal-title').textContent = title;
+  $('#modal-body').replaceChildren(body);
+  $('#modal').classList.toggle('locked', locked);
+  $('#modal').hidden = false;
+}
+function closeModal() {
+  if ($('#modal').classList.contains('locked')) return;
+  $('#modal').hidden = true;
+  $('#modal-body').replaceChildren();
+}
+
+function showLogin() {
+  openModal('Open Proposal Studio from its link', h('div', {},
+    h('p', { class: 'lead' }, 'For your security this page only works when opened from the link that ',
+      h('code', { text: 'studio ui' }), ' prints in the terminal (it starts with ',
+      h('code', { text: 'http://127.0.0.1:…/?t=' }), ').'),
+    h('p', { class: 'lead', text: 'Restart it with `studio ui` if you closed the terminal; your projects are safe.' })),
+  { locked: true });
+}
+
+// ---------------------------------------------------------------- workspace
+function setWorkspaceName(info) {
+  const name = info?.name;
+  $('#ws-name').textContent = name || 'Choose workspace…';
+  $('#ws-switch').title = info?.active ? `Workspace: ${info.active} — click to switch` : 'Choose a workspace folder';
+}
+
+const shortPath = (p, home) => (home && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
+const joinPath = (dir, name) => (dir.endsWith('/') || dir.endsWith('\\') ? dir + name : `${dir}${dir.includes('\\') && !dir.includes('/') ? '\\' : '/'}${name}`);
+
+async function openWorkspace(path, trustIt, openLast) {
+  const body = { path, trust: Boolean(trustIt) };
+  if (openLast !== undefined) body.open_last = openLast;
+  const info = await api('POST', '/api/workspace', body);
+  setWorkspaceName(info);
+  $('#modal').classList.remove('locked');
+  closeModal();
+  state.chat = null;
+  state.project = null;
+  history.pushState(null, '', '#/');
+  await refreshLists();
+  route();
+  toast(`Workspace: ${info.name}`);
+}
+
+async function openWorkspacePicker({ required = false, info = null } = {}) {
+  if (openWorkspacePicker.open) return;
+  openWorkspacePicker.open = true;
+  try {
+    info = info || await api('GET', '/api/workspace');
+  } catch { openWorkspacePicker.open = false; return; }
+  const home = info.home;
+  const err = h('div', { class: 'err' });
+  const body = h('div', {});
+  const fail = (e) => { err.textContent = e.message; };
+
+  const recent = info.trusted.length ? h('div', {},
+    h('h3', { class: 'side-label', style: 'padding:0 0 6px', text: 'Trusted workspaces' }),
+    h('div', { class: 'ws-recent' }, info.trusted.map((w) => h('button', {
+      class: 'ws-item', onclick: () => openWorkspace(w.path, false).catch(fail),
+    }, svg(ICON.folder),
+    h('div', {}, h('span', { class: 'nm', text: w.path.split(/[\\/]/).pop() }), h('span', { class: 'p', text: shortPath(w.path, home) })),
+    w.path === info.active ? h('span', { class: 'pill role', text: 'open' }) : null)))) : null;
+
+  // folder browser
+  let current = info.active || home;
+  const pathInput = h('input', { value: current, 'aria-label': 'Folder path', spellcheck: 'false' });
+  const list = h('ul', { class: 'dir-list' });
+  const sel = h('span', { class: 'sel' });
+  const useBtn = h('button', { class: 'btn primary', type: 'button' }, 'Use this folder');
+  async function browse(path) {
+    err.textContent = '';
+    try {
+      const data = await api('GET', `/api/fs?path=${encodeURIComponent(path)}`);
+      current = data.path;
+      pathInput.value = data.path;
+      sel.textContent = shortPath(data.path, home);
+      useBtn.textContent = data.trusted ? 'Open this workspace' : 'Use this folder';
+      const items = [];
+      if (data.parent) items.push(h('li', {}, h('button', { type: 'button', onclick: () => browse(data.parent) }, svg('<path d="M12 5l-5 5 5 5"/>'), '..')));
+      for (const d of data.dirs) items.push(h('li', {}, h('button', { type: 'button', onclick: () => browse(joinPath(data.path, d)) }, svg(ICON.folder), d)));
+      if (!data.dirs.length) items.push(h('li', { class: 'side-empty', text: 'No sub-folders' }));
+      list.replaceChildren(...items);
+    } catch (e) { fail(e); }
+  }
+  pathInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); browse(pathInput.value.trim()); } });
+  const newFolder = h('button', {
+    class: 'btn', type: 'button',
+    onclick: async () => {
+      const name = prompt('New folder name', 'Proposal Studio');
+      if (!name) return;
+      try { const r = await api('POST', '/api/fs/mkdir', { path: current, name }); browse(r.path); } catch (e) { fail(e); }
+    },
+  }, 'New folder');
+  useBtn.addEventListener('click', async () => {
+    err.textContent = '';
+    try {
+      await openWorkspace(current, false);
+    } catch (e) {
+      if (e.data?.needs_trust) showTrust(e.data.needs_trust);
+      else fail(e);
+    }
+  });
+
+  function showTrust(path) {
+    const auto = h('input', { type: 'checkbox', id: 'open-last' });
+    body.replaceChildren(h('div', { class: 'trust-box' },
+      h('strong', { text: 'Do you trust this folder?' }),
+      h('div', { class: 'path', text: path }),
+      'Proposal Studio will work only inside this folder:',
+      h('ul', {},
+        h('li', { text: 'project files, uploads and chats are saved here (in projects/)' }),
+        h('li', { text: 'your proposal library goes in library/' }),
+        h('li', { text: 'settings and caches go in .studio/' })),
+      h('label', { class: 'check', for: 'open-last' }, auto, 'Open this workspace automatically next time'),
+      h('div', { class: 'row-btns' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => openWorkspace(path, true, auto.checked).catch(fail) }, 'Trust and open'),
+        h('button', { class: 'btn', type: 'button', onclick: () => render() }, 'Back')),
+      err));
+  }
+
+  function render() {
+    body.replaceChildren(
+      h('p', { class: 'lead', text: 'Pick the folder Proposal Studio may read and write — for example one folder per bid or per client. Nothing outside it is touched.' }),
+      recent || '',
+      h('h3', { class: 'side-label', style: 'padding:0 0 6px', text: info.trusted.length ? 'Or choose another folder' : 'Choose a folder' }),
+      h('div', { class: 'browser' },
+        h('div', { class: 'browser-bar' }, pathInput, h('button', { class: 'btn', type: 'button', onclick: () => browse(pathInput.value.trim()) }, 'Go')),
+        list,
+        h('div', { class: 'browser-foot' }, sel, h('div', { class: 'row-btns' }, newFolder, useBtn))),
+      err);
+    browse(current);
+  }
+
+  render();
+  openModal(required ? 'Choose a workspace folder' : 'Switch workspace', body, { locked: required });
+  const obs = new MutationObserver(() => { if ($('#modal').hidden) { openWorkspacePicker.open = false; obs.disconnect(); } });
+  obs.observe($('#modal'), { attributes: true, attributeFilter: ['hidden'] });
+}
+
+// ---------------------------------------------------------------- models
+const gb = (bytes) => (bytes ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : '—');
+
+async function openModels() {
+  const body = h('div', {}, h('div', { class: 'status' }, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), 'Loading models…'));
+  openModal('Models', body);
+  let info;
+  try { info = await api('GET', '/api/models'); } catch (e) { body.replaceChildren(h('div', { class: 'err', text: e.message })); return; }
+  const head = h('div', { class: 'models-head' },
+    h('span', {}, h('strong', { text: 'Ollama: ' }), info.ollama === false ? 'not running' : info.ollama ? 'running' : 'unknown'),
+    h('span', {}, h('strong', { text: 'Memory: ' }), info.ram ? gb(info.ram) : 'unknown'),
+    h('span', { text: 'One model runs at a time; “fits” leaves ~4 GB for everything else.' }));
+  if (info.ollama === false) {
+    body.replaceChildren(head, h('div', { class: 'empty', text: 'Start Ollama, then reopen this window.' }));
+    return;
+  }
+  const pulled = info.models.filter((m) => !m.cloud);
+  const roleLabels = { worker: 'Main model (answers, summaries, slides)', router: 'Fast model (routing)', embed: 'Embeddings (search index)' };
+  const roles = h('div', { class: 'roles' }, Object.entries(roleLabels).flatMap(([role, labelText]) => {
+    const select = h('select', { 'aria-label': labelText },
+      pulled.map((m) => h('option', { value: m.name, selected: m.name === info.roles[role] ? true : null }, m.name)));
+    if (!pulled.some((m) => m.name === info.roles[role])) select.prepend(h('option', { value: info.roles[role], selected: true }, `${info.roles[role]} (not pulled)`));
+    select.addEventListener('change', async () => {
+      try {
+        await api('POST', '/api/models/role', { role, model: select.value });
+        toast(`${labelText.split(' (')[0]} → ${select.value}`);
+        checkHealth();
+      } catch (e) { toast(e.message); select.value = info.roles[role]; }
+    });
+    return [h('label', { text: labelText }), select];
+  }));
+  const rows = info.models.map((m) => h('tr', {},
+    h('td', { class: 'nm', text: m.name }),
+    h('td', { text: [m.parameters, m.quantization].filter(Boolean).join(' · ') || '—' }),
+    h('td', { text: gb(m.size) }),
+    h('td', {},
+      m.loaded ? h('span', { class: 'pill ok', text: 'loaded' }) : null,
+      m.fits === true ? h('span', { class: 'pill', text: 'fits' }) : m.fits === false ? h('span', { class: 'pill bad', text: 'too big' }) : null,
+      m.cloud ? h('span', { class: 'pill bad', text: 'cloud — blocked' }) : null,
+      (m.roles || []).map((r) => h('span', { class: 'pill role', text: r })))));
+  body.replaceChildren(head,
+    h('h3', { class: 'side-label', style: 'padding:0 0 8px', text: 'Which model does what' }), roles,
+    h('h3', { class: 'side-label', style: 'padding:0 0 8px', text: `Installed models (${info.models.length})` }),
+    info.models.length
+      ? h('div', { class: 'mtable-wrap' }, h('table', { class: 'mtable' },
+        h('thead', {}, h('tr', {}, h('th', { text: 'Model' }), h('th', { text: 'Size class' }), h('th', { text: 'Disk' }), h('th', { text: 'Status' }))),
+        h('tbody', {}, rows)))
+      : h('div', { class: 'empty', text: 'No models yet. While online, run: ollama pull qwen3:8b' }),
+    h('p', { class: 'lead', style: 'margin-top:14px', text: 'Coming next: suggestions for the best model per task.' }));
+}
+
+// ---------------------------------------------------------------- layout: collapsible sidebar, resizable panel
+const isWide = () => window.matchMedia('(min-width: 861px)').matches;
+
+function applySidebar() {
+  const collapsed = store.get('ps.sideCollapsed', '0') === '1';
+  $('#app').classList.toggle('side-collapsed', collapsed && isWide());
+  const btn = $('#collapse-sidebar');
+  btn.title = collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)';
+  btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+}
+function toggleSidebar() {
+  if (!isWide()) { $('#app').classList.toggle('sidebar-open'); return; }
+  store.set('ps.sideCollapsed', store.get('ps.sideCollapsed', '0') === '1' ? '0' : '1');
+  applySidebar();
+}
+
+function setPanelWidth(px) {
+  const max = Math.round(window.innerWidth * 0.75);
+  const w = Math.max(320, Math.min(max, Math.round(px)));
+  document.documentElement.style.setProperty('--panel-w', `${w}px`);
+  return w;
+}
+
+function setupLayout() {
+  applySidebar();
+  const saved = Number(store.get('ps.panelW', '0'));
+  if (saved) setPanelWidth(saved);
+  $('#collapse-sidebar').addEventListener('click', toggleSidebar);
+  window.addEventListener('resize', () => {
+    applySidebar();
+    const w = Number(store.get('ps.panelW', '0'));
+    if (w) setPanelWidth(w);
+    renderPanel();
+  });
+
+  const resizer = $('#panel-resizer');
+  resizer.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId);
+    resizer.classList.add('dragging');
+    document.body.classList.add('resizing');
+    const move = (ev) => setPanelWidth(window.innerWidth - ev.clientX);
+    const up = (ev) => {
+      resizer.releasePointerCapture(ev.pointerId);
+      resizer.classList.remove('dragging');
+      document.body.classList.remove('resizing');
+      resizer.removeEventListener('pointermove', move);
+      resizer.removeEventListener('pointerup', up);
+      store.set('ps.panelW', String(setPanelWidth(window.innerWidth - ev.clientX)));
+    };
+    resizer.addEventListener('pointermove', move);
+    resizer.addEventListener('pointerup', up);
+  });
+  resizer.addEventListener('dblclick', () => {
+    const now = $('#panel').getBoundingClientRect().width;
+    const wide = Math.round(window.innerWidth * 0.6);
+    store.set('ps.panelW', String(setPanelWidth(now < wide - 20 ? wide : 440)));
+  });
+  resizer.addEventListener('keydown', (e) => {
+    const now = $('#panel').getBoundingClientRect().width;
+    if (e.key === 'ArrowLeft') store.set('ps.panelW', String(setPanelWidth(now + 40)));
+    if (e.key === 'ArrowRight') store.set('ps.panelW', String(setPanelWidth(now - 40)));
+  });
+  resizer.tabIndex = 0;
+
+  window.addEventListener('keydown', (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleSidebar(); }
+    if (mod && e.key.toLowerCase() === 'j' && state.chat) { e.preventDefault(); $('#toggle-panel').click(); }
+    if (e.key === 'Escape' && !$('#modal').hidden) closeModal();
+  });
 }
 
 boot();

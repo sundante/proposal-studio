@@ -17,9 +17,17 @@
         <button class="icon-btn only-mobile" id="close-sidebar" title="Close sidebar" aria-label="Close sidebar">
           <svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>
         </button>
+        <button class="icon-btn only-desktop" id="collapse-sidebar" title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">
+          <svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M8 3.5v13"/></svg>
+        </button>
       </div>
-      <button class="new-chat" id="new-chat">
-        <svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg>New project
+      <button class="ws-switch" id="ws-switch" title="Switch workspace folder">
+        <svg viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 011-1h4l2 2h7a1 1 0 011 1v8a1 1 0 01-1 1h-13a1 1 0 01-1-1z"/></svg>
+        <span class="t" id="ws-name">Choose workspace…</span>
+        <svg class="chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4"/></svg>
+      </button>
+      <button class="new-chat" id="new-chat" title="New project">
+        <svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg><span>New project</span>
       </button>
       <nav class="side-scroll">
         <div class="side-label">Projects</div>
@@ -28,7 +36,7 @@
         <ul id="recent-list" class="side-list"></ul>
       </nav>
       <div class="side-foot">
-        <span id="health" class="health" title="Local model status"><i></i><span>Checking model…</span></span>
+        <button id="health" class="health" title="Models"><i></i><span>Checking model…</span></button>
         <button class="icon-btn" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light or dark theme">
           <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6L16 16M4 16l1.4-1.4M14.6 5.4L16 4"/></svg>
         </button>
@@ -81,6 +89,7 @@
       </section>
     </main>
 
+    <div id="panel-resizer" class="resizer" hidden role="separator" aria-orientation="vertical" aria-label="Resize panel" title="Drag to resize · double-click to widen"></div>
     <aside id="panel" class="panel" hidden aria-label="Project panel">
       <div class="panel-head">
         <div class="tabs" role="tablist">
@@ -112,6 +121,18 @@
       </div>
     </form>
   </template>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h2 id="modal-title"></h2>
+        <button class="icon-btn" id="modal-close" title="Close" aria-label="Close">
+          <svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
 
   <div id="drop" class="drop" hidden><div>Drop files to add them to this project</div></div>
   <div id="toast" class="toast" hidden></div>
