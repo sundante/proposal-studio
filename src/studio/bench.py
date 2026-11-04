@@ -118,7 +118,7 @@ def run_bench(
             log(f"{t.label:<20} {t.seconds:9.1f}  {BUDGET[t.label][1]} {mark}")
         rss = _rss_mb()
         if rss:
-            log(f"peak RSS of this process (studio, without Open WebUI): {rss:.0f} MB")
+            log(f"peak RSS of this process (studio): {rss:.0f} MB")
         return timings
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

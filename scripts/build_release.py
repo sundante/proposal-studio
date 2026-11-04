@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from check_no_private_paths import is_private  # noqa: E402
 
-INCLUDE_DIRS = ("src/", "scripts/", "owui/", "config/", "templates/sample/", "docs/", "tests/")
+INCLUDE_DIRS = ("src/", "scripts/", "config/", "templates/sample/", "docs/", "tests/")
 INCLUDE_FILES = (
     "pyproject.toml",
     "README.md",

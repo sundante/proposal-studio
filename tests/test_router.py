@@ -249,3 +249,20 @@ def test_use_with_a_question_explains(home: Path) -> None:
     router, _ = make(home)
     out = router.reply("/use when is the proposal due??")
     assert "`/use` expects an opportunity id" in out
+
+
+def fake_llm(route=None) -> FakeLLM:
+    return FakeLLM(
+        {
+            "RouteDecision": route
+            or {"route": "digest", "alternative": "ask", "confidence": 0.9, "args": ""},
+            "DigestPart": GROUP_A,
+            "WriteUnderstandingContent": {"title": "U", "bullets": ["a", "b", "c"]},
+            "WriteBeforeAfterContent": {
+                "title": "B",
+                "before": ["a", "b", "c"],
+                "after": ["d", "e", "f"],
+            },
+        },
+        text="Proposals are due March 15, 2027 [1].",
+    )

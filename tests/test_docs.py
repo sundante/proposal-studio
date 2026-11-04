@@ -25,7 +25,7 @@ def test_doc_links_resolve() -> None:
 
 def test_bench_with_fake_models(tmp_path: Path) -> None:
     from studio.bench import BUDGET, run_bench
-    from tests.test_owui import fake_llm
+    from tests.test_router import fake_llm
 
     lines: list[str] = []
     timings = run_bench(REPO_ROOT, llm_factory=lambda _home: fake_llm(), log=lines.append)

@@ -1,5 +1,0 @@
-{
-  "command": "toggle",
-  "name": "/toggle — Turn an optional slide on/off: /toggle <slide_id> on|off",
-  "content": "/toggle "
-}

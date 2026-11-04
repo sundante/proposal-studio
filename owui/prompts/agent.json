@@ -1,5 +1,0 @@
-{
-  "command": "agent",
-  "name": "/agent — Run an agent CLI in the sandbox: /agent <name> <task>",
-  "content": "/agent "
-}

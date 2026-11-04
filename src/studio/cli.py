@@ -1,4 +1,4 @@
-"""`studio` CLI: mirrors the chat commands so every route can be tested without Open WebUI."""
+"""`studio` CLI: `studio ui` starts the app; the other commands mirror the chat commands."""
 
 from __future__ import annotations
 
@@ -31,10 +31,6 @@ config_app = typer.Typer(help="Show or change the effective configuration.", no_
 app.add_typer(config_app, name="config")
 library_app = typer.Typer(help="Index the local library for /research.", no_args_is_help=True)
 app.add_typer(library_app, name="library")
-owui_app = typer.Typer(
-    help="Open WebUI helpers (prompts, automated install).", no_args_is_help=True
-)
-app.add_typer(owui_app, name="owui")
 template_app = typer.Typer(help="Inspect templates and build the sample.", no_args_is_help=True)
 app.add_typer(template_app, name="template")
 
@@ -477,7 +473,7 @@ def research_cmd(
 
 @app.command("chat")
 def chat_cmd() -> None:
-    """Chat REPL over the router (same behaviour as the Open WebUI model).
+    """Chat REPL over the router (same behaviour as the chat in `studio ui`).
 
     `:attach <path>` attaches a file to your next message; `:quit` exits.
     """
@@ -518,21 +514,46 @@ def chat_cmd() -> None:
 def ui_cmd(
     port: int = typer.Option(8765, "--port", help="Port on 127.0.0.1."),
     no_browser: bool = typer.Option(False, "--no-browser", help="Don't open a browser tab."),
+    workspace: Path = typer.Option(
+        None, "--workspace", help="Open this already-trusted workspace folder."
+    ),
 ) -> None:
-    """Start the Proposal Studio chat app in your browser (local only)."""
+    """Start the Proposal Studio app in your browser (local only).
+
+    The app asks which workspace folder to trust and work in, unless you chose "open my last
+    workspace" or pass a trusted `--workspace`.
+    """
+    import secrets
     import webbrowser
 
+    from studio import trust
     from studio.ui.server import make_server
 
     root = cfgmod.project_root()
     if not (root / "config").is_dir():
         _fail(f"No config/ folder in {root}. Run from the project folder or set STUDIO_HOME.")
+    folder = None
+    if workspace is not None:
+        if trust.is_trusted(workspace):
+            folder = workspace.expanduser().resolve()
+        else:
+            typer.echo(f"{workspace} isn't trusted yet; choose it in the app to trust it.")
+    elif trust.open_last():
+        folder = trust.last_workspace()
+    token = secrets.token_urlsafe(24)
     try:
-        server = make_server(root, lambda: OllamaClient(cfgmod.load_config(root).models), port)
+        server = make_server(
+            root,
+            lambda: OllamaClient(cfgmod.load_config(root).models),
+            port,
+            workspace=folder,
+            token=token,
+        )
     except OSError as exc:
         _fail(f"Can't listen on port {port} ({exc}). Try `studio ui --port {port + 1}`.")
-    url = f"http://127.0.0.1:{server.server_address[1]}/"
-    typer.echo(f"Proposal Studio is running at {url}  (Ctrl+C to stop)")
+    url = f"http://127.0.0.1:{server.server_address[1]}/?t={token}"
+    typer.echo(f"Proposal Studio is running at {url}")
+    typer.echo("Keep this link private (it unlocks the app for this session). Ctrl+C to stop.")
     if not no_browser:
         webbrowser.open(url)
     try:
@@ -589,37 +610,7 @@ def agent_cmd(
         _fail(str(exc))
 
 
-# --- Open WebUI and smoke test ---------------------------------------------------------------
-
-
-@owui_app.command("prompts")
-def owui_prompts_cmd(
-    out: Path = typer.Option(Path("owui/prompts"), "--out", help="Output folder."),
-) -> None:
-    """Regenerate owui/prompts/*.json (slash-command shortcuts) from config/routes.yaml."""
-    from studio.owui import write_prompts
-
-    root = cfgmod.project_root()
-    paths = write_prompts(cfgmod.load_config().routes, out if out.is_absolute() else root / out)
-    typer.echo(f"Wrote {len(paths)} files to {paths[0].parent}")
-
-
-@owui_app.command("install")
-def owui_install_cmd(
-    token: str = typer.Option(..., "--token", envvar="OWUI_API_KEY", help="Admin API key (sk-…)."),
-    url: str = typer.Option("http://localhost:8080", "--url", help="Local Open WebUI URL."),
-    global_filter: bool = typer.Option(
-        False, "--global-filter", help="Enable the PHI filter for all models."
-    ),
-) -> None:
-    """Install/update the Proposal Studio functions and prompts into a local Open WebUI."""
-    from studio.owui import InstallError, install
-
-    try:
-        install(url, token, cfgmod.project_root(), global_filter=global_filter, log=typer.echo)
-    except (InstallError, cfgmod.ConfigError, httpx.HTTPError) as exc:
-        _fail(str(exc))
-    _next("open Open WebUI, pick the **Proposal Studio** model and type `/help`")
+# --- smoke test ---------------------------------------------------------------
 
 
 @app.command("smoke")
@@ -636,15 +627,12 @@ def smoke_cmd(
 
 @app.command("docs")
 def docs_cmd() -> None:
-    """Regenerate docs/commands.md and owui/prompts/ from config/routes.yaml."""
-    from studio.owui import write_prompts
-
+    """Regenerate docs/commands.md from config/routes.yaml."""
     root = cfgmod.project_root()
     routes = cfgmod.load_config().routes
     (root / "docs").mkdir(exist_ok=True)
     (root / "docs" / "commands.md").write_text(views.commands_markdown(routes), encoding="utf-8")
-    write_prompts(routes, root / "owui" / "prompts")
-    typer.echo("Wrote docs/commands.md and owui/prompts/")
+    typer.echo("Wrote docs/commands.md")
 
 
 @app.command("bench")

@@ -1,7 +1,7 @@
 """Vector index per opportunity / library collection, retrieval, and cited answers.
 
 Search is exact cosine similarity with NumPy (what a flat inner-product index does), which is
-fast at RFP/library scale and avoids loading a second OpenMP runtime next to Open WebUI's torch.
+fast at RFP/library scale and needs no native vector library.
 """
 
 from __future__ import annotations

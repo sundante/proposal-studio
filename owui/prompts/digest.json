@@ -1,5 +1,0 @@
-{
-  "command": "digest",
-  "name": "/digest — Build or refresh the RFP digest: /digest [xlsx] [show]",
-  "content": "/digest "
-}

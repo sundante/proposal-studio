@@ -50,7 +50,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .venv\Scripts\studio.exe --version
-          .venv\Scripts\python.exe -c "import open_webui, studio.owui; print('open-webui import ok')"
+          .venv\Scripts\studio.exe ui --help
           .venv\Scripts\python.exe -m pip install pytest pytest-asyncio
           .venv\Scripts\python.exe -m pytest -q
 

@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # Proposal Studio setup for macOS/Linux (development). Idempotent; needs internet; no sudo.
-# Creates .venv (Python 3.11/3.12), installs open-webui + studio, pulls the Ollama models.
+# Creates .venv (Python 3.11+), installs studio, pulls the Ollama models.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-OPEN_WEBUI_VERSION="${OPEN_WEBUI_VERSION:-0.13.0}"
 problems=()
 
 pick_python() {
-  for cand in python3.11 python3.12 python3; do
+  for cand in python3.12 python3.11 python3.13 python3; do
     if command -v "$cand" >/dev/null 2>&1; then
       ver="$("$cand" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
-      case "$ver" in 3.11|3.12) echo "$cand"; return 0 ;; esac
+      case "$ver" in 3.11|3.12|3.13) echo "$cand"; return 0 ;; esac
     fi
   done
   return 1
@@ -25,7 +24,7 @@ if [ ! -x .venv/bin/python ]; then
     echo "Creating .venv with $PY…"
     "$PY" -m venv .venv || problems+=("could not create .venv")
   else
-    echo "Python 3.11 or 3.12 is required (Open WebUI does not support 3.13 yet)."; exit 1
+    echo "Python 3.11 or newer is required."; exit 1
   fi
 fi
 
@@ -33,8 +32,7 @@ pip_install() {
   if command -v uv >/dev/null 2>&1; then uv pip install --python .venv/bin/python "$@";
   else .venv/bin/python -m pip install "$@"; fi
 }
-echo "Installing open-webui==$OPEN_WEBUI_VERSION and studio (this can take a while)…"
-pip_install "open-webui==$OPEN_WEBUI_VERSION" || problems+=("pip install open-webui failed")
+echo "Installing studio…"
 pip_install -e "$ROOT" || problems+=("pip install studio failed")
 
 if [ "${STUDIO_SKIP_MODELS:-}" = "1" ]; then
@@ -52,7 +50,7 @@ fi
 
 echo
 if [ ${#problems[@]} -eq 0 ]; then
-  echo "Setup complete. Next: scripts/start.sh, then open http://localhost:8080"
+  echo "Setup complete. Next: scripts/start.sh (opens Proposal Studio in your browser)"
 else
   echo "Setup finished with problems:"; printf '  - %s\n' "${problems[@]}"; exit 1
 fi

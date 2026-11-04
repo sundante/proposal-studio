@@ -158,7 +158,7 @@ def commands_markdown(routes: Any) -> str:
         "",
         "<!-- Generated from config/routes.yaml by `studio docs`. Do not edit by hand. -->",
         "",
-        "Type these in the **Proposal Studio** model in Open WebUI, in `studio chat`, or use the",
+        "Type these in the chat in `studio ui`, in `studio chat`, or use the",
         "matching `studio <command>` CLI. Plain text works too: questions go to `/ask` once an RFP",
         "is ingested, and other requests are routed automatically. Every reply shows",
         "`→ routed to /x (how)`.",
